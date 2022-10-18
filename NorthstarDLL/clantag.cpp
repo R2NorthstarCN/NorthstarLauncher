@@ -5,8 +5,7 @@
 #include <mutex>
 #include "squirrel.h"
 AUTOHOOK_INIT();
-typedef char* (*WriteClanTagFunc)(void* arraybase,int playerindex);
-WriteClanTagFunc OriginalWriteClanTagFunc;
+
 
 static SQRESULT SQ_SetLocalPlayerClanTag(HSquirrelVM* sqvm)
 {
@@ -35,9 +34,9 @@ static SQRESULT SQ_GetLocalPlayerClanTag(HSquirrelVM* sqvm)
 	return SQRESULT_NOTNULL;
 }
 
-AUTOHOOK(WriteClanTagFunctionHook, client.dll + 0x164600, char*,__fastcall, (void* arraybase, int playerindex))
+AUTOHOOK(GetClanTag, client.dll + 0x164600, char*,__fastcall, (void* arraybase, int playerindex))
 {
-	char* playerName = OriginalWriteClanTagFunc(arraybase, playerindex);
+	char* playerName = GetClanTag(arraybase, playerindex);
 	std::string convertedName(playerName);
 	
 	if (g_pMasterServerManager->m_ClanTags.count(convertedName) == 0)
