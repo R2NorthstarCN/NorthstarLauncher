@@ -7,14 +7,104 @@
 #include "r2server.h"
 #include "r2engine.h"
 #include "nsprefix.h"
-
+#include "masterserver.h"
 #include <filesystem>
 
 const char* BANLIST_PATH_SUFFIX = "/banlist.txt";
+const char* BANMESSAGE_PATH_SUFFIX = "/banmessages.txt";
+const char* DEFAULT_BAN_MESSAGE = "Banned from server";
 const char BANLIST_COMMENT_CHAR = '#';
 
 ServerBanSystem* g_pBanSystem;
+bool ServerBanSystem::ParseLocalBanMessageFile()
+{
+	// Read and load /R2Northstar/banmessages.txt into m_vBanMessages
+	std::ifstream BanmessagesStream(GetNorthstarPrefix() + "/banmessages.txt");
+	if (!BanmessagesStream.fail())
+	{
+		spdlog::info("banmessages.txt found!");
+		std::string line;
+		while (std::getline(BanmessagesStream, line))
+		{
+			spdlog::info("added {} to banmessages", line);
+			m_vBanMessages.push_back(line);
+		}
+		return true;
+	}
+	else
+	{
+		// spdlog::info("banmessages.txt is not found! make sure it's properly placed in /R2Northstar/banmessages.txt. ignore this if you do
+		// not plan to use custom banmessages");
+		return false;
+	}
+}
 
+void ServerBanSystem::ParseRemoteBanlistString(std::string banlisttring)
+{
+	spdlog::info("Parsing remote banlist string.");
+	std::stringstream banliststream(banlisttring + "\n");
+	uint64_t uid;
+	// load banned UIDs from file
+	m_vBannedUids.clear();
+	OpenBanlist();
+	while (banliststream >> uid)
+	{
+		// spdlog::info("Adding banned uid:{}", uid);
+		// spdlog::info("{}has been inserted into m_vBannedUids! ",uid);
+		InsertBanUID(uid);
+	}
+
+	// for (auto x : m_vBannedUids) {
+	//	spdlog::info("BANLIST:{}", x);
+	// }
+	spdlog::info("Banlist update completed successfully.");
+	g_pMasterServerManager->LocalBanlistVersion = g_pMasterServerManager->RemoteBanlistVersion;
+	banliststream.clear();
+	banliststream.seekg(0);
+}
+
+const char* ServerBanSystem::GetRandomBanMessage()
+{
+	// Returns random message from m_vBanMessages
+	if (m_vBanMessages.size() != 0)
+	{
+		m_CurrentMessageIndex = rand() % m_vBanMessages.size();
+		const char* output = m_vBanMessages[m_CurrentMessageIndex].c_str();
+		// spdlog::info("Chosen ban message:{}",output);
+		return output;
+	}
+	else
+	{
+		return DEFAULT_BAN_MESSAGE; // Return default ban message if no custom ban message is present
+	}
+}
+
+void ServerBanSystem::InsertBanUID(uint64_t uid) // ban the player without fucking with existing banlist objects
+{
+	// todo: switch m_vBannedUids to HashSet
+	// see: https://en.cppreference.com/w/cpp/container/unordered_set
+	auto findResult = std::find(m_vBannedUids.begin(), m_vBannedUids.end(), uid);
+	if (findResult == m_vBannedUids.end())
+	{
+		// cannot find UID in m_vBannedUids, perform ban
+		m_vBannedUids.push_back(uid);
+		std::string UidString = std::to_string(uid);
+		for (int i = 0; i < 32; i++)
+		{
+			R2::CBaseClient* player = &R2::g_pClientArray[i];
+
+			if (!strcmp(player->m_UID, UidString.c_str()))
+			{
+				R2::CBaseClient__Disconnect(player, 1, GetRandomBanMessage());
+				break;
+			}
+		}
+	}
+	else
+	{
+		spdlog::info("Bypassing Incoming Ban from masterserver:{}, Player is already banned!", uid);
+	}
+}
 void ServerBanSystem::OpenBanlist()
 {
 	std::ifstream banlistStream(GetNorthstarPrefix() + "/banlist.txt");
@@ -215,7 +305,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", BanSystem, ConCommand, (CModule module))
 {
 	g_pBanSystem = new ServerBanSystem;
 	g_pBanSystem->OpenBanlist();
-
+	g_pBanSystem->ParseLocalBanMessageFile();
 	RegisterConCommand("ban", ConCommand_ban, "bans a given player by uid or name", FCVAR_GAMEDLL);
 	RegisterConCommand("unban", ConCommand_unban, "unbans a given player by uid", FCVAR_GAMEDLL);
 	RegisterConCommand("clearbanlist", ConCommand_clearbanlist, "clears all uids on the banlist", FCVAR_GAMEDLL);

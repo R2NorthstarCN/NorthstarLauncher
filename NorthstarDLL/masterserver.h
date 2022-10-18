@@ -80,6 +80,9 @@ struct MainMenuPromoData
 class MasterServerManager
 {
   private:
+	bool m_RequestingClantag = false;
+	bool m_RequestingRemoteBanlistVersion = false;
+	bool m_RequestingRemoteBanlist = false;
 	bool m_bRequestingServerList = false;
 	bool m_bAuthenticatingWithGameServer = false;
 
@@ -89,6 +92,10 @@ class MasterServerManager
 	char m_sOwnClientAuthToken[33];
 
 	std::string m_sOwnModInfoJson;
+
+	std::string RemoteBanlistString;
+	std::string LocalBanlistVersion = "undefined";
+	std::string RemoteBanlistVersion;
 
 	bool m_bOriginAuthWithMasterServerDone = false;
 	bool m_bOriginAuthWithMasterServerInProgress = false;
@@ -112,6 +119,9 @@ class MasterServerManager
 	bool m_bHasMainMenuPromoData = false;
 	MainMenuPromoData m_sMainMenuPromoData;
 
+	std::map<std::string, std::string> m_ClanTags;
+	std::mutex m_ClanTagsMutex;
+
   public:
 	MasterServerManager();
 
@@ -122,6 +132,13 @@ class MasterServerManager
 	void AuthenticateWithOwnServer(const char* uid, const char* playerToken);
 	void AuthenticateWithServer(const char* uid, const char* playerToken, const char* serverId, const char* password);
 	void WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize);
+	void SendCheatingProof(char* info);
+	void InitRemoteBanlistThread(int interval);
+	void UpdateBanlistVersionStringFromMasterserver();
+	void GetBanlistFromMasterserver();
+	void RemoteBanlistProcessingFunc();
+	bool SetLocalPlayerClanTag(std::string clantag);
+	void GetClanTagFromUsername(std::string username);
 };
 
 extern MasterServerManager* g_pMasterServerManager;

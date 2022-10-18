@@ -5,21 +5,23 @@
 #include "serverauthentication.h"
 #include "tier0.h"
 #include "r2engine.h"
+#include "r2client.h"
 #include "modmanager.h"
 #include "misccommands.h"
 #include "version.h"
-
+#include "dohworker.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/error/en.h"
-
+#include "bansystem.h"
+#include "anticheat.h"
 #include <cstring>
 #include <regex>
 
 using namespace std::chrono_literals;
-
 MasterServerManager* g_pMasterServerManager;
+ClientAnticheatSystem g_ClientAnticheatSystem;
 
 ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
@@ -54,15 +56,32 @@ void SetCommonHttpClientOptions(CURL* curl)
 	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, Cvar_ns_curl_log_enable->GetBool());
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, &NSUserAgent);
-	// Timeout since the MS has fucky async functions without await, making curl hang due to a successful connection but no response for ~90
-	// seconds.
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-	// curl_easy_setopt(curl, CURLOPT_STDERR, stdout);
-	if (Tier0::CommandLine()->FindParm("-msinsecure")) // TODO: this check doesn't seem to work
+	if (!strstr(GetCommandLineA(), "-disabledoh"))
 	{
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+		std::string masterserverhostname = Cvar_ns_masterserver_hostname->GetString();
+		std::string DohResult = g_DohWorker->GetDOHResolve(masterserverhostname);
+		if (g_DohWorker->m_bDohAvailable)
+		{
+			struct curl_slist* host = NULL;
+			masterserverhostname.erase(0, 8);
+			std::string addr = masterserverhostname + ":443:" + DohResult;
+			// spdlog::info(addr);
+			host = curl_slist_append(NULL, addr.c_str());
+			curl_easy_setopt(curl, CURLOPT_RESOLVE, host);
+		}
+		else
+		{
+			spdlog::warn("[DOH] service is not available. falling back to DNS");
+		}
 	}
+	else
+	{
+		spdlog::warn("[DOH] service disabled");
+	}
+	// curl_easy_setopt(curl, CURLOPT_STDERR, stdout);
+
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 }
 
 void MasterServerManager::ClearServerList()
@@ -81,6 +100,334 @@ size_t CurlWriteToStringBufferCallback(char* contents, size_t size, size_t nmemb
 	return size * nmemb;
 }
 
+bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
+{
+	CURL* curl = curl_easy_init();
+	SetCommonHttpClientOptions(curl);
+	std::string readBuffer;
+	std::string token = m_sOwnClientAuthToken;
+	std::string localuid = R2::g_pLocalPlayerUserID;
+	char* clantagescaped = curl_easy_escape(curl, clantag.c_str(), clantag.length());
+	char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
+	char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
+	curl_easy_setopt(
+		curl,
+		CURLOPT_URL,
+		fmt::format(
+			"{}/masterserver/community/setclantag?clantag={}&uid={}&token={}",
+			Cvar_ns_masterserver_hostname->GetString(),
+			clantagescaped,
+			localuidescaped,
+			tokenescaped)
+			.c_str());
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+	CURLcode result = curl_easy_perform(curl);
+
+	if (result == CURLcode::CURLE_OK)
+	{
+		rapidjson_document serverresponse;
+		serverresponse.Parse(readBuffer.c_str());
+
+		if (serverresponse.HasParseError())
+		{
+			// spdlog::error(
+			//"Failed reading player clantag: encountered parse error \"{}\"",
+			// rapidjson::GetParseError_En(serverresponse.GetParseError()));
+			goto REQUEST_END_CLEANUP;
+		}
+
+		if (!serverresponse.IsObject() || !serverresponse.HasMember("success"))
+		{
+			// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
+			goto REQUEST_END_CLEANUP;
+		}
+
+		if (serverresponse["success"].IsTrue())
+		{
+			// std::cout << "Successfully set local player clantag." << std::endl;
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		// spdlog::error("Failed reading player clantag");
+	}
+
+	// we goto this instead of returning so we always hit this
+REQUEST_END_CLEANUP:
+
+	curl_easy_cleanup(curl);
+	return false;
+}
+
+void MasterServerManager::GetClanTagFromUsername(std::string username)
+{
+
+	if (m_RequestingClantag)
+	{
+		// PrintMasterserverDebug("Race condition saved");
+		return;
+	}
+	m_RequestingClantag = true;
+
+	std::thread requestThread(
+		[this, username]()
+		{
+			m_ClanTagsMutex.lock();
+			if (m_ClanTags.count(username) != 0)
+			{
+				m_ClanTagsMutex.unlock();
+				return;
+			}
+			CURL* curl = curl_easy_init();
+			SetCommonHttpClientOptions(curl);
+			std::string readBuffer;
+			std::string token = m_sOwnClientAuthToken;
+			std::string localuid = R2::g_pLocalPlayerUserID;
+			char* usernameescaped = curl_easy_escape(curl, username.c_str(), username.length());
+			char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
+			char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
+
+			curl_easy_setopt(
+				curl,
+				CURLOPT_URL,
+				fmt::format(
+					"{}/masterserver/community/getclantag?username={}&uid={}&token={}",
+					Cvar_ns_masterserver_hostname->GetString(),
+					usernameescaped,
+					localuidescaped,
+					tokenescaped)
+					.c_str());
+			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+			CURLcode result = curl_easy_perform(curl);
+
+			if (result == CURLcode::CURLE_OK)
+			{
+				rapidjson_document serverresponse;
+				serverresponse.Parse(readBuffer.c_str());
+
+				if (serverresponse.HasParseError())
+				{
+					// spdlog::error(
+					//"Failed reading player clantag: encountered parse error \"{}\"",
+					// rapidjson::GetParseError_En(serverresponse.GetParseError()));
+					m_ClanTags.insert_or_assign(username, std::string("ADV"));
+					goto REQUEST_END_CLEANUP;
+				}
+
+				if (!serverresponse.IsObject() || !serverresponse.HasMember("success"))
+				{
+					// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
+					m_ClanTags.insert_or_assign(username, std::string("ADV"));
+					goto REQUEST_END_CLEANUP;
+				}
+
+				if (serverresponse["success"].IsTrue() && serverresponse.HasMember("clantag") && serverresponse["clantag"].IsString())
+				{
+					std::string clantagbuffer = serverresponse["clantag"].GetString();
+					if (clantagbuffer.empty())
+					{
+						m_ClanTags.insert_or_assign(username, std::string("ADV"));
+					}
+					m_ClanTags.insert_or_assign(username, std::string(clantagbuffer));
+					std::cout << "Got tag :" << clantagbuffer << std::endl;
+				}
+				else
+				{
+					m_ClanTags.insert_or_assign(username, std::string("ADV"));
+				}
+
+				// spdlog::error("Failed reading player clantag");
+			}
+
+			// we goto this instead of returning so we always hit this
+		REQUEST_END_CLEANUP:
+			m_RequestingClantag = false;
+			curl_easy_cleanup(curl);
+			m_ClanTagsMutex.unlock();
+		});
+
+	requestThread.detach();
+}
+
+void MasterServerManager::SendCheatingProof(char* info)
+{
+	ConVar* ns_auth_player_name = R2::g_pCVar->FindVar("name");
+	std::string reportinfo = info;
+	std::string uid = R2::g_pLocalPlayerUserID;
+	std::string token = m_sOwnClientAuthToken;
+	std::string playername = ns_auth_player_name->GetString();
+	std::thread requestThread(
+		[this, reportinfo, uid, token, playername]
+		{
+			CURL* curl = curl_easy_init();
+			SetCommonHttpClientOptions(curl);
+
+			std::string readBuffer;
+			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+			// escape params
+			{
+				char* infoEscaped = curl_easy_escape(curl, reportinfo.c_str(), reportinfo.length());
+				char* uidEscaped = curl_easy_escape(curl, uid.c_str(), uid.length());
+				char* tokenEscaped = curl_easy_escape(curl, token.c_str(), token.length());
+				char* playernameEscaped = curl_easy_escape(curl, playername.c_str(), playername.length());
+
+				curl_easy_setopt(
+					curl,
+					CURLOPT_URL,
+					fmt::format(
+						"{}/client/reportself?uid={}&info={}&token={}&playername={}",
+						Cvar_ns_masterserver_hostname->GetString(),
+						uidEscaped,
+						infoEscaped,
+						tokenEscaped,
+						playernameEscaped)
+						.c_str());
+
+				curl_free(uidEscaped);
+				curl_free(infoEscaped);
+				curl_free(tokenEscaped);
+				curl_free(playernameEscaped);
+			}
+
+			CURLcode result = curl_easy_perform(curl);
+			curl_easy_cleanup(curl);
+		});
+
+	requestThread.detach();
+}
+void MasterServerManager::InitRemoteBanlistThread(int interval)
+{
+
+	spdlog::info("RemoteBanlistThread timer initialized with update interval of {}", interval);
+	std::thread RemoteBanlistThread(
+		[interval]
+		{
+			while (true)
+			{
+
+				// g_ServerBanSystem->PrintBanlist();
+				g_pMasterServerManager->RemoteBanlistProcessingFunc();
+				std::this_thread::sleep_for(std::chrono::milliseconds(interval));
+			}
+		});
+
+	RemoteBanlistThread.detach();
+}
+void MasterServerManager::RemoteBanlistProcessingFunc()
+{
+	UpdateBanlistVersionStringFromMasterserver();
+}
+void MasterServerManager::GetBanlistFromMasterserver()
+{
+	std::thread requestThread(
+		[this]()
+		{
+			// make sure we never have 2 threads writing at once
+			// please don't fuck up the threads Orz
+			while (m_RequestingRemoteBanlist)
+				Sleep(100);
+
+			m_RequestingRemoteBanlist = true;
+
+			// spdlog::info("Fetching banlist content from {}", Cvar_ns_masterserver_hostname->GetString());
+
+			CURL* curl = curl_easy_init();
+
+			std::string readBuffer;
+			curl_easy_setopt(curl, CURLOPT_URL, fmt::format("{}/server/banlist", Cvar_ns_masterserver_hostname->GetString()).c_str());
+			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+			CURLcode result = curl_easy_perform(curl);
+
+			if (result == CURLcode::CURLE_OK)
+			{
+				std::string BanlistString = readBuffer.c_str();
+				// spdlog::info("Got remote banlist string:{}", BanlistString);
+				RemoteBanlistString = BanlistString;
+				// spdlog::info(BanlistString);
+				g_pBanSystem->ParseRemoteBanlistString(BanlistString);
+				goto REQUEST_END_CLEANUP;
+			}
+			else
+			{
+				spdlog::error("Failed requesting remote banlist: error {}", curl_easy_strerror(result));
+				goto REQUEST_END_CLEANUP;
+			}
+
+		REQUEST_END_CLEANUP:
+			m_RequestingRemoteBanlist = false;
+			curl_easy_cleanup(curl);
+		});
+
+	requestThread.detach();
+}
+
+void MasterServerManager::UpdateBanlistVersionStringFromMasterserver()
+{
+	std::thread requestThread(
+		[this]()
+		{
+			// make sure we never have 2 threads writing at once
+			// please don't fuck up the threads Orz
+			while (m_RequestingRemoteBanlistVersion)
+				Sleep(100);
+
+			m_RequestingRemoteBanlistVersion = true;
+
+			// spdlog::info("Requesting banlist version from {}", Cvar_ns_masterserver_hostname->GetString());
+
+			CURL* curl = curl_easy_init();
+
+			std::string readBuffer;
+			curl_easy_setopt(
+				curl, CURLOPT_URL, fmt::format("{}/server/update_banlist", Cvar_ns_masterserver_hostname->GetString()).c_str());
+			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+			CURLcode result = curl_easy_perform(curl);
+
+			if (result == CURLcode::CURLE_OK)
+			{
+				RemoteBanlistVersion = readBuffer.c_str();
+				// spdlog::info("Got remote banlist version:{}", RemoteBanlistVersion);
+
+				if (LocalBanlistVersion != RemoteBanlistVersion)
+				{
+					spdlog::info("Banlist need update! Local:{} Remote:{}", LocalBanlistVersion, RemoteBanlistVersion);
+					GetBanlistFromMasterserver();
+					goto REQUEST_END_CLEANUP;
+				}
+				else
+				{
+					goto REQUEST_END_CLEANUP;
+					// spdlog::info("Local banlist version is latest!");
+				}
+			}
+			else
+			{
+				spdlog::error("Failed requesting remote banlist version: error {}", curl_easy_strerror(result));
+				goto REQUEST_END_CLEANUP;
+			}
+
+		REQUEST_END_CLEANUP:
+			m_RequestingRemoteBanlistVersion = false;
+			curl_easy_cleanup(curl);
+		});
+
+	requestThread.detach();
+}
 void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, const char* originToken)
 {
 	if (m_bOriginAuthWithMasterServerInProgress)
@@ -137,6 +484,7 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 						sizeof(m_sOwnClientAuthToken),
 						originAuthInfo["token"].GetString(),
 						sizeof(m_sOwnClientAuthToken) - 1);
+					g_ClientAnticheatSystem.InitWindowListenerThread();
 					spdlog::info("Northstar origin authentication completed successfully!");
 				}
 				else

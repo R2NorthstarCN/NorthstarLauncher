@@ -45,7 +45,13 @@ void, __fastcall, (CHostState* self))
 	// don't require authentication on singleplayer startup
 	g_pServerAuthentication->m_bRequireClientAuth = strncmp(g_pHostState->m_levelName, "sp_", 3);
 
+	if (!strstr(GetCommandLineA(), "-disableglobalbanlist") && strstr(GetCommandLineA(), "-dedicated"))
+	{
+		g_pMasterServerManager->InitRemoteBanlistThread(30000);
+	}
+
 	ServerStartingOrChangingMap();
+
 
 	double dStartTime = Tier0::Plat_FloatTime();
 	CHostState__State_NewGame(self);

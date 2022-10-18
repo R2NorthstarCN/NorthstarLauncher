@@ -115,11 +115,14 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="anticheat.h" />
     <ClInclude Include="audio.h" />
     <ClInclude Include="bansystem.h" />
     <ClInclude Include="bitbuf.h" />
     <ClInclude Include="bits.h" />
     <ClInclude Include="crashhandler.h" />
+    <ClInclude Include="dohworker.h" />
+    <ClInclude Include="sigscanning.h" />
     <ClInclude Include="squirreldatatypes.h" />
     <ClInclude Include="limits.h" />
     <ClInclude Include="maxplayers.h" />
@@ -562,16 +565,19 @@
     <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="anticheat.cpp" />
     <ClCompile Include="audio.cpp" />
     <ClCompile Include="bansystem.cpp" />
     <ClCompile Include="bits.cpp" />
     <ClCompile Include="buildainfile.cpp" />
     <ClCompile Include="chatcommand.cpp" />
+    <ClCompile Include="clantag.cpp" />
     <ClCompile Include="clientauthhooks.cpp" />
     <ClCompile Include="clientchathooks.cpp" />
     <ClCompile Include="clientruihooks.cpp" />
     <ClCompile Include="clientvideooverrides.cpp" />
     <ClCompile Include="concommand.cpp" />
+    <ClCompile Include="dohworker.cpp" />
     <ClCompile Include="exploitfixes_lzss.cpp" />
     <ClCompile Include="limits.cpp" />
     <ClCompile Include="memory.cpp" />
@@ -619,6 +625,7 @@
     <ClCompile Include="scriptdatatables.cpp" />
     <ClCompile Include="scriptmainmenupromos.cpp" />
     <ClCompile Include="scriptmodmenu.cpp" />
+    <ClCompile Include="scriptplayerinfo.cpp" />
     <ClCompile Include="scriptserverbrowser.cpp" />
     <ClCompile Include="scriptsrson.cpp" />
     <ClCompile Include="scriptutility.cpp" />
@@ -627,6 +634,7 @@
     <ClCompile Include="serverchathooks.cpp" />
     <ClCompile Include="scriptservertoclientstringcommand.cpp" />
     <ClCompile Include="serverpresence.cpp" />
+    <ClCompile Include="sigscanning.cpp" />
     <ClCompile Include="sourceconsole.cpp" />
     <ClCompile Include="sourceinterface.cpp" />
     <ClCompile Include="squirrel.cpp" />
