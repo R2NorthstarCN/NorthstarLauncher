@@ -25,7 +25,7 @@ ClientAnticheatSystem g_ClientAnticheatSystem;
 
 ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
-
+ConVar* Cvar_ns_server_auth_account;
 RemoteServerInfo::RemoteServerInfo(
 	const char* newId,
 	const char* newName,
@@ -1113,7 +1113,7 @@ MasterServerManager::MasterServerManager() : m_pendingConnectionInfo {}, m_sOwnS
 ON_DLL_LOAD_RELIESON("engine.dll", MasterServer, (ConCommand, ServerPresence), (CModule module))
 {
 	g_pMasterServerManager = new MasterServerManager;
-
+	Cvar_ns_server_auth_account = new ConVar("ns_server_auth_account", "0", FCVAR_GAMEDLL, "Server account string used for registeration");
 	Cvar_ns_masterserver_hostname = new ConVar("ns_masterserver_hostname", "127.0.0.1", FCVAR_NONE, "");
 	Cvar_ns_curl_log_enable = new ConVar("ns_curl_log_enable", "0", FCVAR_NONE, "Whether curl should log to the console");
 
@@ -1297,14 +1297,16 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 	g_pMasterServerManager->m_sOwnServerId[0] = 0;
 	g_pMasterServerManager->m_sOwnServerAuthToken[0] = 0;
 
+	
 	std::string modInfo = g_pMasterServerManager->m_sOwnModInfoJson;
 	std::string hostname = Cvar_ns_masterserver_hostname->GetString();
+	std::string serverAccount = Cvar_ns_server_auth_account->GetString();
 
 	spdlog::info("Attempting to register the local server to the master server.");
 
 	addServerFuture = std::async(
 		std::launch::async,
-		[threadedPresence, modInfo, hostname]
+		[threadedPresence, modInfo, hostname ,serverAccount]
 		{
 			CURL* curl = curl_easy_init();
 			SetCommonHttpClientOptions(curl);
@@ -1346,13 +1348,13 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				char* mapEscaped = curl_easy_escape(curl, threadedPresence.m_MapName, NULL);
 				char* playlistEscaped = curl_easy_escape(curl, threadedPresence.m_PlaylistName, NULL);
 				char* passwordEscaped = curl_easy_escape(curl, threadedPresence.m_Password, NULL);
-
+				char* serveraccountEscaped = curl_easy_escape(curl, serverAccount.c_str(), serverAccount.length());
 				curl_easy_setopt(
 					curl,
 					CURLOPT_URL,
 					fmt::format(
 						"{}/server/"
-						"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}",
+						"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&account={}",
 						hostname.c_str(),
 						threadedPresence.m_iPort,
 						threadedPresence.m_iAuthPort,
@@ -1361,7 +1363,8 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 						mapEscaped,
 						playlistEscaped,
 						threadedPresence.m_iMaxPlayers,
-						passwordEscaped)
+						passwordEscaped,
+						serveraccountEscaped)
 						.c_str());
 
 				curl_free(nameEscaped);
@@ -1451,10 +1454,11 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 	const std::string serverId = g_pMasterServerManager->m_sOwnServerId;
 	const std::string hostname = Cvar_ns_masterserver_hostname->GetString();
 	const std::string modinfo = g_pMasterServerManager->m_sOwnModInfoJson;
+	const std::string serverAccount = Cvar_ns_server_auth_account->GetString();
 
 	updateServerFuture = std::async(
 		std::launch::async,
-		[threadedPresence, serverId, hostname, modinfo]
+		[threadedPresence, serverId, hostname, modinfo,serverAccount]
 		{
 			CURL* curl = curl_easy_init();
 			SetCommonHttpClientOptions(curl);
@@ -1494,14 +1498,14 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 				char* mapEscaped = curl_easy_escape(curl, threadedPresence.m_MapName, NULL);
 				char* playlistEscaped = curl_easy_escape(curl, threadedPresence.m_PlaylistName, NULL);
 				char* passwordEscaped = curl_easy_escape(curl, threadedPresence.m_Password, NULL);
-
+				char* serveraccountEscaped = curl_easy_escape(curl, serverAccount.c_str(), serverAccount.length());
 				curl_easy_setopt(
 					curl,
 					CURLOPT_URL,
 					fmt::format(
 						"{}/server/"
 						"update_values?id={}&port={}&authPort={}&name={}&description={}&map={}&playlist={}&playerCount={}&"
-						"maxPlayers={}&password={}",
+						"maxPlayers={}&password={}&account={}",
 						hostname.c_str(),
 						serverId.c_str(),
 						threadedPresence.m_iPort,
@@ -1512,7 +1516,8 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 						playlistEscaped,
 						threadedPresence.m_iPlayerCount,
 						threadedPresence.m_iMaxPlayers,
-						passwordEscaped)
+						passwordEscaped,
+						serveraccountEscaped)
 						.c_str());
 
 				curl_free(nameEscaped);
