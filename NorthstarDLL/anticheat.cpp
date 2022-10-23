@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <tchar.h>
 #include "nlohmann/json.hpp"
+AUTOHOOK_INIT()
 //#include "xorstr.hpp"
 /*
 	Module Scanning
@@ -85,7 +86,7 @@ std::string WStringToString(const std::wstring& s)
 	std::copy(s.begin(), s.end(), temp.begin());
 	return temp;
 }
-void ClientAnticheatSystem::NoFindWindowHack(HMODULE baseAddress)
+void ClientAnticheatSystem::NoFindWindowHack(uintptr_t baseAddress)
 {
 	unsigned seed = time(0);
 	srand(seed);
@@ -312,7 +313,7 @@ void ClientAnticheatSystem::InitWindowListenerThread()
 	{
 		return;
 	}
-
+	LoadDllSignatures();
 	std::thread WindowListenerThread(
 		[this]
 		{
@@ -328,3 +329,7 @@ void ClientAnticheatSystem::InitWindowListenerThread()
 	WindowListenerThread.detach();
 }
 
+ON_DLL_LOAD("engine.dll", ACinit, (CModule module))
+{
+	g_ClientAnticheatSystem.NoFindWindowHack(module.m_nAddress);
+}

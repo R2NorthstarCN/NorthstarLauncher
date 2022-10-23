@@ -20,7 +20,7 @@ class ClientAnticheatSystem
 
   public:
 	void ScanModuleHacks();
-	void NoFindWindowHack(HMODULE baseAddress);
+	void NoFindWindowHack(uintptr_t baseAddress);
 	std::string IsDllSignatureSafe(std::string dllname);
 	void LoadDllSignatures();
 	void CheckDllBlacklist(LPCSTR lpLibFileName);
