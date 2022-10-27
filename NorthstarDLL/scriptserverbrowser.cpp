@@ -10,7 +10,7 @@
 // bool function NSIsMasterServerAuthenticated()
 SQRESULT SQ_IsMasterServerAuthenticated(HSquirrelVM* sqvm)
 {
-	g_pSquirrel<ScriptContext::UI>->pushbool(sqvm, g_pMasterServerManager->m_bOriginAuthWithMasterServerDone);
+	g_pSquirrel<ScriptContext::UI>->pushbool(sqvm, g_pMasterServerManager->m_bOriginAuthWithMasterServerSuccess);
 	return SQRESULT_NOTNULL;
 }
 

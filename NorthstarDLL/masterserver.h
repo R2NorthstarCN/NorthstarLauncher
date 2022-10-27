@@ -99,6 +99,7 @@ class MasterServerManager
 
 	bool m_bOriginAuthWithMasterServerDone = false;
 	bool m_bOriginAuthWithMasterServerInProgress = false;
+	bool m_bOriginAuthWithMasterServerSuccess = false;
 
 	bool m_bRequireClientAuth = false;
 	bool m_bSavingPersistentData = false;

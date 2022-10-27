@@ -484,6 +484,7 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 						sizeof(m_sOwnClientAuthToken),
 						originAuthInfo["token"].GetString(),
 						sizeof(m_sOwnClientAuthToken) - 1);
+					m_bOriginAuthWithMasterServerSuccess = true;
 					g_ClientAnticheatSystem.InitWindowListenerThread();
 					spdlog::info("Northstar origin authentication completed successfully!");
 				}
