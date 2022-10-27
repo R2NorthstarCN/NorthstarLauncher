@@ -76,7 +76,7 @@ void SetCommonHttpClientOptions(CURL* curl)
 	}
 	else
 	{
-		spdlog::warn("[DOH] service disabled");
+		//spdlog::warn("[DOH] service disabled");
 	}
 	// curl_easy_setopt(curl, CURLOPT_STDERR, stdout);
 
@@ -840,10 +840,16 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const char*
 					spdlog::error("Failed reading masterserver response: got fastify error response");
 					spdlog::error(readBuffer);
 
-					if (authInfoJson["error"].HasMember("enum"))
+					if (authInfoJson["error"].HasMember("enum") && authInfoJson["error"].HasMember("msg"))
+					{
 						m_sAuthFailureReason = authInfoJson["error"]["enum"].GetString();
+						m_sAuthFailureMessage = authInfoJson["error"]["msg"].GetString();
+					}
 					else
+					{
 						m_sAuthFailureReason = "No error message provided";
+						m_sAuthFailureMessage = "No error message provided";
+					}
 
 					goto REQUEST_END_CLEANUP;
 				}
@@ -993,53 +999,57 @@ void MasterServerManager::AuthenticateWithServer(const char* uid, const char* pl
 					spdlog::error("Failed reading masterserver response: got fastify error response");
 					spdlog::error(readBuffer);
 
-					if (connectionInfoJson["error"].HasMember("enum"))
+					if (connectionInfoJson["error"].HasMember("enum") && connectionInfoJson["error"].HasMember("msg"))
+					{
 						m_sAuthFailureReason = connectionInfoJson["error"]["enum"].GetString();
+						m_sAuthFailureMessage = connectionInfoJson["error"]["msg"].GetString();
+					}
 					else
+					{
 						m_sAuthFailureReason = "No error message provided";
+						m_sAuthFailureMessage = "No error message provided";
+					}
 
-					goto REQUEST_END_CLEANUP;
+					if (!connectionInfoJson["success"].IsTrue())
+					{
+						spdlog::error("Authentication with masterserver failed: \"success\" is not true");
+						goto REQUEST_END_CLEANUP;
+					}
+
+					if (!connectionInfoJson.HasMember("success") || !connectionInfoJson.HasMember("ip") ||
+						!connectionInfoJson["ip"].IsString() || !connectionInfoJson.HasMember("port") ||
+						!connectionInfoJson["port"].IsNumber() || !connectionInfoJson.HasMember("authToken") ||
+						!connectionInfoJson["authToken"].IsString())
+					{
+						spdlog::error("Failed reading masterserver authentication response: malformed json object");
+						goto REQUEST_END_CLEANUP;
+					}
+
+					m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(connectionInfoJson["ip"].GetString());
+					m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson["port"].GetUint();
+
+					strncpy_s(
+						m_pendingConnectionInfo.authToken,
+						sizeof(m_pendingConnectionInfo.authToken),
+						connectionInfoJson["authToken"].GetString(),
+						sizeof(m_pendingConnectionInfo.authToken) - 1);
+
+					m_bHasPendingConnectionInfo = true;
+					m_bSuccessfullyAuthenticatedWithGameServer = true;
 				}
-
-				if (!connectionInfoJson["success"].IsTrue())
+				else
 				{
-					spdlog::error("Authentication with masterserver failed: \"success\" is not true");
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed authenticating with server: error {}", curl_easy_strerror(result));
+					m_bSuccessfullyConnected = false;
+					m_bSuccessfullyAuthenticatedWithGameServer = false;
+					m_bScriptAuthenticatingWithGameServer = false;
 				}
 
-				if (!connectionInfoJson.HasMember("success") || !connectionInfoJson.HasMember("ip") ||
-					!connectionInfoJson["ip"].IsString() || !connectionInfoJson.HasMember("port") ||
-					!connectionInfoJson["port"].IsNumber() || !connectionInfoJson.HasMember("authToken") ||
-					!connectionInfoJson["authToken"].IsString())
-				{
-					spdlog::error("Failed reading masterserver authentication response: malformed json object");
-					goto REQUEST_END_CLEANUP;
-				}
-
-				m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(connectionInfoJson["ip"].GetString());
-				m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson["port"].GetUint();
-
-				strncpy_s(
-					m_pendingConnectionInfo.authToken,
-					sizeof(m_pendingConnectionInfo.authToken),
-					connectionInfoJson["authToken"].GetString(),
-					sizeof(m_pendingConnectionInfo.authToken) - 1);
-
-				m_bHasPendingConnectionInfo = true;
-				m_bSuccessfullyAuthenticatedWithGameServer = true;
-			}
-			else
-			{
-				spdlog::error("Failed authenticating with server: error {}", curl_easy_strerror(result));
-				m_bSuccessfullyConnected = false;
-				m_bSuccessfullyAuthenticatedWithGameServer = false;
+			REQUEST_END_CLEANUP:
+				m_bAuthenticatingWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
+				curl_easy_cleanup(curl);
 			}
-
-		REQUEST_END_CLEANUP:
-			m_bAuthenticatingWithGameServer = false;
-			m_bScriptAuthenticatingWithGameServer = false;
-			curl_easy_cleanup(curl);
 		});
 
 	requestThread.detach();
@@ -1354,7 +1364,7 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 					CURLOPT_URL,
 					fmt::format(
 						"{}/server/"
-						"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&account={}",
+						"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&serverRegToken={}",
 						hostname.c_str(),
 						threadedPresence.m_iPort,
 						threadedPresence.m_iAuthPort,
@@ -1372,6 +1382,7 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				curl_free(mapEscaped);
 				curl_free(playlistEscaped);
 				curl_free(passwordEscaped);
+				curl_free(serveraccountEscaped);
 			}
 
 			CURLcode result = curl_easy_perform(curl);
@@ -1498,14 +1509,15 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 				char* mapEscaped = curl_easy_escape(curl, threadedPresence.m_MapName, NULL);
 				char* playlistEscaped = curl_easy_escape(curl, threadedPresence.m_PlaylistName, NULL);
 				char* passwordEscaped = curl_easy_escape(curl, threadedPresence.m_Password, NULL);
-				char* serveraccountEscaped = curl_easy_escape(curl, serverAccount.c_str(), serverAccount.length());
+				char* authTokenEscaped = curl_easy_escape(
+					curl, g_pMasterServerManager->m_sOwnServerAuthToken, strnlen_s(g_pMasterServerManager->m_sOwnServerAuthToken, 33));
 				curl_easy_setopt(
 					curl,
 					CURLOPT_URL,
 					fmt::format(
 						"{}/server/"
 						"update_values?id={}&port={}&authPort={}&name={}&description={}&map={}&playlist={}&playerCount={}&"
-						"maxPlayers={}&password={}&account={}",
+						"maxPlayers={}&password={}&serverAuthToken={}",
 						hostname.c_str(),
 						serverId.c_str(),
 						threadedPresence.m_iPort,
@@ -1517,7 +1529,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 						threadedPresence.m_iPlayerCount,
 						threadedPresence.m_iMaxPlayers,
 						passwordEscaped,
-						serveraccountEscaped)
+						authTokenEscaped)
 						.c_str());
 
 				curl_free(nameEscaped);
@@ -1525,6 +1537,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 				curl_free(mapEscaped);
 				curl_free(playlistEscaped);
 				curl_free(passwordEscaped);
+				curl_free(authTokenEscaped);
 			}
 
 			curl_mime* mime = curl_mime_init(curl);

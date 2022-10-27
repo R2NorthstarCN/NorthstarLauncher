@@ -415,6 +415,12 @@ SQRESULT SQ_GetAuthFailReason(HSquirrelVM* sqvm)
 	return SQRESULT_NOTNULL;
 }
 
+SQRESULT SQ_GetAuthFailMessage(HSquirrelVM* sqvm)
+{
+	g_pSquirrel<ScriptContext::UI>->pushstring(sqvm, g_pMasterServerManager->m_sAuthFailureMessage.c_str(), -1);
+	return SQRESULT_NOTNULL;
+}
+
 ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptServerBrowser, ClientSquirrel, (CModule module))
 {
 	g_pSquirrel<ScriptContext::UI>->AddFuncRegistration("bool", "NSIsMasterServerAuthenticated", "", "", SQ_IsMasterServerAuthenticated);
@@ -452,4 +458,5 @@ ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptServerBrowser, ClientSquirrel, (
 	g_pSquirrel<ScriptContext::UI>->AddFuncRegistration("void", "NSCompleteAuthWithLocalServer", "", "", SQ_CompleteAuthWithLocalServer);
 
 	g_pSquirrel<ScriptContext::UI>->AddFuncRegistration("string", "NSGetAuthFailReason", "", "", SQ_GetAuthFailReason);
+	g_pSquirrel<ScriptContext::UI>->AddFuncRegistration("string", "NSGetAuthFailMessage", "", "", SQ_GetAuthFailMessage);
 }

@@ -23,19 +23,19 @@ std::string DohWorker::GetDOHResolve(std::string domainname)
 	bool stripHeaders = false;
 	if ((domainname.find("https") != std::string::npos))
 	{
-		spdlog::info("[DOH] Found https like headers in {}", domainname);
+		//spdlog::info("[DOH] Found https like headers in {}", domainname);
 		domainname.erase(0, 8);
 		stripHeaders = true;
 	}
 	if ((domainname.find("http") != std::string::npos) && !stripHeaders)
 	{
-		spdlog::info("[DOH] Found http like headers in {}", domainname);
+		//spdlog::info("[DOH] Found http like headers in {}", domainname);
 		domainname.erase(0, 7);
 		stripHeaders = true;
 	}
 	if (localresolvcache.contains(domainname))
 	{
-		spdlog::info("[DOH] Found cache for {}", domainname);
+		//spdlog::info("[DOH] Found cache for {}", domainname);
 		return localresolvcache[domainname];
 	}
 	else
@@ -52,17 +52,17 @@ std::string DohWorker::ResolveDomain(std::string domainname)
 	is_resolving = true;
 	if ((domainname.find("https") != std::string::npos))
 	{
-		spdlog::info("[DOH] Found https like headers in {}", domainname);
+		//spdlog::info("[DOH] Found https like headers in {}", domainname);
 		domainname.erase(0, 8);
 		stripHeaders = true;
 	}
 	if ((domainname.find("http") != std::string::npos) && !stripHeaders)
 	{
-		spdlog::info("[DOH] Found http like headers in {}", domainname);
+		//spdlog::info("[DOH] Found http like headers in {}", domainname);
 		domainname.erase(0, 7);
 		stripHeaders = true;
 	}
-	spdlog::info("[DOH] Resolving {}", domainname);
+	//spdlog::info("[DOH] Resolving {}", domainname);
 	CURL* curl = curl_easy_init();
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
