@@ -42,11 +42,6 @@ void, __fastcall, (CHostState* self))
 	if (g_pServerAuthentication->m_bNeedLocalAuthForNewgame)
 		SetCurrentPlaylist("tdm");
 
-	if (!strstr(GetCommandLineA(), "-disableglobalbanlist") && strstr(GetCommandLineA(), "-dedicated"))
-	{
-		g_pMasterServerManager->InitRemoteBanlistThread(30000);
-	}
-
 	ServerStartingOrChangingMap();
 
 

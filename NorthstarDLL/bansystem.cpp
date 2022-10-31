@@ -39,29 +39,6 @@ bool ServerBanSystem::ParseLocalBanMessageFile()
 	}
 }
 
-void ServerBanSystem::ParseRemoteBanlistString(std::string banlisttring)
-{
-	spdlog::info("Parsing remote banlist string.");
-	std::stringstream banliststream(banlisttring + "\n");
-	uint64_t uid;
-	// load banned UIDs from file
-	m_vBannedUids.clear();
-	OpenBanlist();
-	while (banliststream >> uid)
-	{
-		// spdlog::info("Adding banned uid:{}", uid);
-		// spdlog::info("{}has been inserted into m_vBannedUids! ",uid);
-		InsertBanUID(uid);
-	}
-
-	// for (auto x : m_vBannedUids) {
-	//	spdlog::info("BANLIST:{}", x);
-	// }
-	spdlog::info("Banlist update completed successfully.");
-	g_pMasterServerManager->LocalBanlistVersion = g_pMasterServerManager->RemoteBanlistVersion;
-	banliststream.clear();
-	banliststream.seekg(0);
-}
 
 const char* ServerBanSystem::GetRandomBanMessage()
 {
@@ -79,32 +56,6 @@ const char* ServerBanSystem::GetRandomBanMessage()
 	}
 }
 
-void ServerBanSystem::InsertBanUID(uint64_t uid) // ban the player without fucking with existing banlist objects
-{
-	// todo: switch m_vBannedUids to HashSet
-	// see: https://en.cppreference.com/w/cpp/container/unordered_set
-	auto findResult = std::find(m_vBannedUids.begin(), m_vBannedUids.end(), uid);
-	if (findResult == m_vBannedUids.end())
-	{
-		// cannot find UID in m_vBannedUids, perform ban
-		m_vBannedUids.push_back(uid);
-		std::string UidString = std::to_string(uid);
-		for (int i = 0; i < 32; i++)
-		{
-			R2::CBaseClient* player = &R2::g_pClientArray[i];
-
-			if (!strcmp(player->m_UID, UidString.c_str()))
-			{
-				R2::CBaseClient__Disconnect(player, 1, GetRandomBanMessage());
-				break;
-			}
-		}
-	}
-	else
-	{
-		spdlog::info("Bypassing Incoming Ban from masterserver:{}, Player is already banned!", uid);
-	}
-}
 void ServerBanSystem::OpenBanlist()
 {
 	std::ifstream banlistStream(GetNorthstarPrefix() + "/banlist.txt");

@@ -76,7 +76,7 @@ void SetCommonHttpClientOptions(CURL* curl)
 	}
 	else
 	{
-		//spdlog::warn("[DOH] service disabled");
+		// spdlog::warn("[DOH] service disabled");
 	}
 	// curl_easy_setopt(curl, CURLOPT_STDERR, stdout);
 
@@ -304,130 +304,7 @@ void MasterServerManager::SendCheatingProof(char* info)
 
 	requestThread.detach();
 }
-void MasterServerManager::InitRemoteBanlistThread(int interval)
-{
 
-	spdlog::info("RemoteBanlistThread timer initialized with update interval of {}", interval);
-	std::thread RemoteBanlistThread(
-		[interval]
-		{
-			while (true)
-			{
-
-				// g_ServerBanSystem->PrintBanlist();
-				g_pMasterServerManager->RemoteBanlistProcessingFunc();
-				std::this_thread::sleep_for(std::chrono::milliseconds(interval));
-			}
-		});
-
-	RemoteBanlistThread.detach();
-}
-void MasterServerManager::RemoteBanlistProcessingFunc()
-{
-	UpdateBanlistVersionStringFromMasterserver();
-}
-void MasterServerManager::GetBanlistFromMasterserver()
-{
-	std::thread requestThread(
-		[this]()
-		{
-			// make sure we never have 2 threads writing at once
-			// please don't fuck up the threads Orz
-			while (m_RequestingRemoteBanlist)
-				Sleep(100);
-
-			m_RequestingRemoteBanlist = true;
-
-			// spdlog::info("Fetching banlist content from {}", Cvar_ns_masterserver_hostname->GetString());
-
-			CURL* curl = curl_easy_init();
-
-			std::string readBuffer;
-			curl_easy_setopt(curl, CURLOPT_URL, fmt::format("{}/server/banlist", Cvar_ns_masterserver_hostname->GetString()).c_str());
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
-			{
-				std::string BanlistString = readBuffer.c_str();
-				// spdlog::info("Got remote banlist string:{}", BanlistString);
-				RemoteBanlistString = BanlistString;
-				// spdlog::info(BanlistString);
-				g_pBanSystem->ParseRemoteBanlistString(BanlistString);
-				goto REQUEST_END_CLEANUP;
-			}
-			else
-			{
-				spdlog::error("Failed requesting remote banlist: error {}", curl_easy_strerror(result));
-				goto REQUEST_END_CLEANUP;
-			}
-
-		REQUEST_END_CLEANUP:
-			m_RequestingRemoteBanlist = false;
-			curl_easy_cleanup(curl);
-		});
-
-	requestThread.detach();
-}
-
-void MasterServerManager::UpdateBanlistVersionStringFromMasterserver()
-{
-	std::thread requestThread(
-		[this]()
-		{
-			// make sure we never have 2 threads writing at once
-			// please don't fuck up the threads Orz
-			while (m_RequestingRemoteBanlistVersion)
-				Sleep(100);
-
-			m_RequestingRemoteBanlistVersion = true;
-
-			// spdlog::info("Requesting banlist version from {}", Cvar_ns_masterserver_hostname->GetString());
-
-			CURL* curl = curl_easy_init();
-
-			std::string readBuffer;
-			curl_easy_setopt(
-				curl, CURLOPT_URL, fmt::format("{}/server/update_banlist", Cvar_ns_masterserver_hostname->GetString()).c_str());
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
-			{
-				RemoteBanlistVersion = readBuffer.c_str();
-				// spdlog::info("Got remote banlist version:{}", RemoteBanlistVersion);
-
-				if (LocalBanlistVersion != RemoteBanlistVersion)
-				{
-					spdlog::info("Banlist need update! Local:{} Remote:{}", LocalBanlistVersion, RemoteBanlistVersion);
-					GetBanlistFromMasterserver();
-					goto REQUEST_END_CLEANUP;
-				}
-				else
-				{
-					goto REQUEST_END_CLEANUP;
-					// spdlog::info("Local banlist version is latest!");
-				}
-			}
-			else
-			{
-				spdlog::error("Failed requesting remote banlist version: error {}", curl_easy_strerror(result));
-				goto REQUEST_END_CLEANUP;
-			}
-
-		REQUEST_END_CLEANUP:
-			m_RequestingRemoteBanlistVersion = false;
-			curl_easy_cleanup(curl);
-		});
-
-	requestThread.detach();
-}
 void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, const char* originToken)
 {
 	if (m_bOriginAuthWithMasterServerInProgress)
@@ -1010,47 +887,47 @@ void MasterServerManager::AuthenticateWithServer(const char* uid, const char* pl
 						m_sAuthFailureReason = "No error message provided";
 						m_sAuthFailureMessage = "No error message provided";
 					}
-
-					if (!connectionInfoJson["success"].IsTrue())
-					{
-						spdlog::error("Authentication with masterserver failed: \"success\" is not true");
-						goto REQUEST_END_CLEANUP;
-					}
-
-					if (!connectionInfoJson.HasMember("success") || !connectionInfoJson.HasMember("ip") ||
-						!connectionInfoJson["ip"].IsString() || !connectionInfoJson.HasMember("port") ||
-						!connectionInfoJson["port"].IsNumber() || !connectionInfoJson.HasMember("authToken") ||
-						!connectionInfoJson["authToken"].IsString())
-					{
-						spdlog::error("Failed reading masterserver authentication response: malformed json object");
-						goto REQUEST_END_CLEANUP;
-					}
-
-					m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(connectionInfoJson["ip"].GetString());
-					m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson["port"].GetUint();
-
-					strncpy_s(
-						m_pendingConnectionInfo.authToken,
-						sizeof(m_pendingConnectionInfo.authToken),
-						connectionInfoJson["authToken"].GetString(),
-						sizeof(m_pendingConnectionInfo.authToken) - 1);
-
-					m_bHasPendingConnectionInfo = true;
-					m_bSuccessfullyAuthenticatedWithGameServer = true;
 				}
-				else
+
+				if (!connectionInfoJson["success"].IsTrue())
 				{
-					spdlog::error("Failed authenticating with server: error {}", curl_easy_strerror(result));
-					m_bSuccessfullyConnected = false;
-					m_bSuccessfullyAuthenticatedWithGameServer = false;
-					m_bScriptAuthenticatingWithGameServer = false;
+					spdlog::error("Authentication with masterserver failed: \"success\" is not true");
+					goto REQUEST_END_CLEANUP;
 				}
 
-			REQUEST_END_CLEANUP:
-				m_bAuthenticatingWithGameServer = false;
-				m_bScriptAuthenticatingWithGameServer = false;
-				curl_easy_cleanup(curl);
+				if (!connectionInfoJson.HasMember("success") || !connectionInfoJson.HasMember("ip") ||
+					!connectionInfoJson["ip"].IsString() || !connectionInfoJson.HasMember("port") ||
+					!connectionInfoJson["port"].IsNumber() || !connectionInfoJson.HasMember("authToken") ||
+					!connectionInfoJson["authToken"].IsString())
+				{
+					spdlog::error("Failed reading masterserver authentication response: malformed json object");
+					goto REQUEST_END_CLEANUP;
+				}
+
+				m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(connectionInfoJson["ip"].GetString());
+				m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson["port"].GetUint();
+
+				strncpy_s(
+					m_pendingConnectionInfo.authToken,
+					sizeof(m_pendingConnectionInfo.authToken),
+					connectionInfoJson["authToken"].GetString(),
+					sizeof(m_pendingConnectionInfo.authToken) - 1);
+
+				m_bHasPendingConnectionInfo = true;
+				m_bSuccessfullyAuthenticatedWithGameServer = true;
 			}
+			else
+			{
+				spdlog::error("Failed authenticating with server: error {}", curl_easy_strerror(result));
+				m_bSuccessfullyConnected = false;
+				m_bSuccessfullyAuthenticatedWithGameServer = false;
+				m_bScriptAuthenticatingWithGameServer = false;
+			}
+
+		REQUEST_END_CLEANUP:
+			m_bAuthenticatingWithGameServer = false;
+			m_bScriptAuthenticatingWithGameServer = false;
+			curl_easy_cleanup(curl);
 		});
 
 	requestThread.detach();
@@ -1308,7 +1185,6 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 	g_pMasterServerManager->m_sOwnServerId[0] = 0;
 	g_pMasterServerManager->m_sOwnServerAuthToken[0] = 0;
 
-	
 	std::string modInfo = g_pMasterServerManager->m_sOwnModInfoJson;
 	std::string hostname = Cvar_ns_masterserver_hostname->GetString();
 	std::string serverAccount = Cvar_ns_server_auth_account->GetString();
@@ -1317,7 +1193,7 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 
 	addServerFuture = std::async(
 		std::launch::async,
-		[threadedPresence, modInfo, hostname ,serverAccount]
+		[threadedPresence, modInfo, hostname, serverAccount]
 		{
 			CURL* curl = curl_easy_init();
 			SetCommonHttpClientOptions(curl);
@@ -1365,7 +1241,8 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 					CURLOPT_URL,
 					fmt::format(
 						"{}/server/"
-						"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&serverRegToken={}",
+						"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&serverRegToken="
+						"{}",
 						hostname.c_str(),
 						threadedPresence.m_iPort,
 						threadedPresence.m_iAuthPort,
@@ -1470,7 +1347,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 
 	updateServerFuture = std::async(
 		std::launch::async,
-		[threadedPresence, serverId, hostname, modinfo,serverAccount]
+		[threadedPresence, serverId, hostname, modinfo, serverAccount]
 		{
 			CURL* curl = curl_easy_init();
 			SetCommonHttpClientOptions(curl);
