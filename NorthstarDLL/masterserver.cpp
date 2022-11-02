@@ -820,6 +820,8 @@ void MasterServerManager::AuthenticateWithServer(const char* uid, const char* pl
 			// esnure that any persistence saving is done, so we know masterserver has newest
 			while (m_bSavingPersistentData)
 				Sleep(100);
+			
+				
 
 			spdlog::info("Attempting authentication with server of id \"{}\"", serverIdStr);
 

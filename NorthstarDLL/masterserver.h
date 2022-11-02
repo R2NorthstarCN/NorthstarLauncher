@@ -134,10 +134,6 @@ class MasterServerManager
 	void AuthenticateWithServer(const char* uid, const char* playerToken, const char* serverId, const char* password);
 	void WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize);
 	void SendCheatingProof(char* info);
-	void InitRemoteBanlistThread(int interval);
-	void UpdateBanlistVersionStringFromMasterserver();
-	void GetBanlistFromMasterserver();
-	void RemoteBanlistProcessingFunc();
 	bool SetLocalPlayerClanTag(std::string clantag);
 	void GetClanTagFromUsername(std::string username);
 };
