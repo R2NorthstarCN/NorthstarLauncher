@@ -120,9 +120,6 @@ class MasterServerManager
 	bool m_bHasMainMenuPromoData = false;
 	MainMenuPromoData m_sMainMenuPromoData;
 
-	std::map<std::string, std::string> m_ClanTags;
-	std::mutex m_ClanTagsMutex;
-
   public:
 	MasterServerManager();
 
@@ -135,7 +132,6 @@ class MasterServerManager
 	void WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize);
 	void SendCheatingProof(char* info);
 	bool SetLocalPlayerClanTag(std::string clantag);
-	void GetClanTagFromUsername(std::string username);
 };
 
 extern MasterServerManager* g_pMasterServerManager;

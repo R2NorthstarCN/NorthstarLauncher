@@ -9,6 +9,7 @@ struct RemoteAuthData
 {
 	char uid[33];
 	char username[64];
+	std::string clantag;
 
 	// pdata
 	char* pdata;

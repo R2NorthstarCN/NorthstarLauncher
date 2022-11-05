@@ -114,7 +114,7 @@ bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
 		curl,
 		CURLOPT_URL,
 		fmt::format(
-			"{}/masterserver/community/setclantag?clantag={}&uid={}&token={}",
+			"{}/client/clantag?clantag={}&id={}&token={}",
 			Cvar_ns_masterserver_hostname->GetString(),
 			clantagescaped,
 			localuidescaped,
@@ -162,98 +162,6 @@ REQUEST_END_CLEANUP:
 	return false;
 }
 
-void MasterServerManager::GetClanTagFromUsername(std::string username)
-{
-
-	if (m_RequestingClantag)
-	{
-		// PrintMasterserverDebug("Race condition saved");
-		return;
-	}
-	m_RequestingClantag = true;
-
-	std::thread requestThread(
-		[this, username]()
-		{
-			m_ClanTagsMutex.lock();
-			if (m_ClanTags.count(username) != 0)
-			{
-				m_ClanTagsMutex.unlock();
-				return;
-			}
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-			std::string readBuffer;
-			std::string token = m_sOwnClientAuthToken;
-			std::string localuid = R2::g_pLocalPlayerUserID;
-			char* usernameescaped = curl_easy_escape(curl, username.c_str(), username.length());
-			char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
-			char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
-
-			curl_easy_setopt(
-				curl,
-				CURLOPT_URL,
-				fmt::format(
-					"{}/masterserver/community/getclantag?username={}&uid={}&token={}",
-					Cvar_ns_masterserver_hostname->GetString(),
-					usernameescaped,
-					localuidescaped,
-					tokenescaped)
-					.c_str());
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
-			{
-				rapidjson_document serverresponse;
-				serverresponse.Parse(readBuffer.c_str());
-
-				if (serverresponse.HasParseError())
-				{
-					// spdlog::error(
-					//"Failed reading player clantag: encountered parse error \"{}\"",
-					// rapidjson::GetParseError_En(serverresponse.GetParseError()));
-					m_ClanTags.insert_or_assign(username, std::string("ADV"));
-					goto REQUEST_END_CLEANUP;
-				}
-
-				if (!serverresponse.IsObject() || !serverresponse.HasMember("success"))
-				{
-					// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
-					m_ClanTags.insert_or_assign(username, std::string("ADV"));
-					goto REQUEST_END_CLEANUP;
-				}
-
-				if (serverresponse["success"].IsTrue() && serverresponse.HasMember("clantag") && serverresponse["clantag"].IsString())
-				{
-					std::string clantagbuffer = serverresponse["clantag"].GetString();
-					if (clantagbuffer.empty())
-					{
-						m_ClanTags.insert_or_assign(username, std::string("ADV"));
-					}
-					m_ClanTags.insert_or_assign(username, std::string(clantagbuffer));
-					std::cout << "Got tag :" << clantagbuffer << std::endl;
-				}
-				else
-				{
-					m_ClanTags.insert_or_assign(username, std::string("ADV"));
-				}
-
-				// spdlog::error("Failed reading player clantag");
-			}
-
-			// we goto this instead of returning so we always hit this
-		REQUEST_END_CLEANUP:
-			m_RequestingClantag = false;
-			curl_easy_cleanup(curl);
-			m_ClanTagsMutex.unlock();
-		});
-
-	requestThread.detach();
-}
 
 void MasterServerManager::SendCheatingProof(char* info)
 {

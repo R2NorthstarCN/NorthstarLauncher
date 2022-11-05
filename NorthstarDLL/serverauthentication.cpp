@@ -17,7 +17,6 @@
 #include "r2server.h"
 
 #include "httplib.h"
-
 #include <fstream>
 #include <filesystem>
 #include <thread>
@@ -47,6 +46,7 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 		{
 			// this is just a super basic way to verify that servers have ports open, masterserver will try to read this before ensuring
 			// server is legit
+
 			m_PlayerAuthServer.Get(
 				"/verify",
 				[](const httplib::Request& request, httplib::Response& response)
@@ -63,8 +63,16 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 						response.set_content("{\"success\":false}", "application/json");
 						return;
 					}
-
+					
 					RemoteAuthData newAuthData {};
+					if (request.has_param("clantag"))
+					{
+						spdlog::info(
+							"[CLANTAG] Got clantag \"{}\" for UID \"{}\"",
+							request.get_param_value("clantag"),
+							request.get_param_value("id"));
+						newAuthData.clantag = request.get_param_value("clantag");
+					}
 					strncpy_s(newAuthData.uid, sizeof(newAuthData.uid), request.get_param_value("id").c_str(), sizeof(newAuthData.uid) - 1);
 					strncpy_s(
 						newAuthData.username,
@@ -349,6 +357,16 @@ bool,, (R2::CBaseClient* self, char* name, void* netchan_ptr_arg, char b_fake_pl
 		R2::CBaseClient__Disconnect(self, 1, "Authentication Failed.\n");
 		return false;
 	}
+
+	if (!g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag.empty())
+	{
+		std::string nameWithTag = "[" + g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag + "]" + self->m_Name;
+		strncpy_s(self->m_Name, nameWithTag.c_str(), 64);
+	}
+
+	
+
+	
 
 	g_pServerAuthentication->AddPlayer(self, pNextPlayerToken);
 	g_pServerLimits->AddPlayer(self);
