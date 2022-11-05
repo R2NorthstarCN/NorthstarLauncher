@@ -1056,6 +1056,7 @@ void MasterServerPresenceReporter::RunFrame(double flCurrentTime, const ServerPr
 	{
 		// Check if the InternalUpdateServer() call completed.
 		std::future_status status = updateServerFuture.wait_for(0ms);
+		
 		if (status != std::future_status::ready)
 		{
 			// Still running, no need to do anything.
@@ -1360,7 +1361,6 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 						updatedAuthToken = serverAddedJson["serverAuthToken"].GetString();
 					}
 				}
-
 				return ReturnCleanup(MasterServerReportPresenceResult::Success, updatedId, updatedAuthToken);
 			}
 			else
