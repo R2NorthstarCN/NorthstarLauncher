@@ -982,6 +982,9 @@ void MasterServerPresenceReporter::DestroyPresence(const ServerPresence* pServer
 			SetCommonHttpClientOptions(curl);
 
 			std::string readBuffer;
+
+			char* authTokenEscaped = curl_easy_escape(
+				curl, g_pMasterServerManager->m_sOwnServerAuthToken, strnlen_s(g_pMasterServerManager->m_sOwnServerAuthToken, 33));
 			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
@@ -989,9 +992,12 @@ void MasterServerPresenceReporter::DestroyPresence(const ServerPresence* pServer
 				curl,
 				CURLOPT_URL,
 				fmt::format(
-					"{}/server/remove_server?id={}", Cvar_ns_masterserver_hostname->GetString(), g_pMasterServerManager->m_sOwnServerId)
+					"{}/server/remove_server?id={}?serverAuthToken={}",
+					Cvar_ns_masterserver_hostname->GetString(),
+					g_pMasterServerManager->m_sOwnServerId,
+					authTokenEscaped)
 					.c_str());
-
+			curl_free(authTokenEscaped);
 			CURLcode result = curl_easy_perform(curl);
 			curl_easy_cleanup(curl);
 		});
