@@ -125,6 +125,7 @@
     <ClInclude Include="dohworker.h" />
     <ClInclude Include="sigscanning.h" />
     <ClInclude Include="keyvalues.h" />
+    <ClInclude Include="loghooks.h" />
     <ClInclude Include="squirreldatatypes.h" />
     <ClInclude Include="limits.h" />
     <ClInclude Include="maxplayers.h" />
@@ -578,9 +579,12 @@
     <ClCompile Include="clientvideooverrides.cpp" />
     <ClCompile Include="concommand.cpp" />
     <ClCompile Include="dohworker.cpp" />
+    <ClCompile Include="diskvmtfixes.cpp" />
     <ClCompile Include="exploitfixes_lzss.cpp" />
     <ClCompile Include="keyvalues.cpp" />
     <ClCompile Include="limits.cpp" />
+    <ClCompile Include="color.cpp" />
+    <ClCompile Include="loghooks.cpp" />
     <ClCompile Include="memory.cpp" />
     <ClCompile Include="nsprefix.cpp" />
     <ClCompile Include="convar.cpp" />
