@@ -25,7 +25,7 @@ ClientAnticheatSystem g_ClientAnticheatSystem;
 
 ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
-ConVar* Cvar_ns_server_auth_account;
+ConVar* Cvar_ns_server_reg_token;
 RemoteServerInfo::RemoteServerInfo(
 	const char* newId,
 	const char* newName,
@@ -911,7 +911,7 @@ MasterServerManager::MasterServerManager() : m_pendingConnectionInfo {}, m_sOwnS
 ON_DLL_LOAD_RELIESON("engine.dll", MasterServer, (ConCommand, ServerPresence), (CModule module))
 {
 	g_pMasterServerManager = new MasterServerManager;
-	Cvar_ns_server_auth_account = new ConVar("ns_server_auth_account", "0", FCVAR_GAMEDLL, "Server account string used for registeration");
+	Cvar_ns_server_reg_token = new ConVar("ns_server_reg_token", "0", FCVAR_GAMEDLL, "Server account string used for registeration");
 	Cvar_ns_masterserver_hostname = new ConVar("ns_masterserver_hostname", "127.0.0.1", FCVAR_NONE, "");
 	Cvar_ns_curl_log_enable = new ConVar("ns_curl_log_enable", "0", FCVAR_NONE, "Whether curl should log to the console");
 
@@ -1104,7 +1104,7 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 
 	std::string modInfo = g_pMasterServerManager->m_sOwnModInfoJson;
 	std::string hostname = Cvar_ns_masterserver_hostname->GetString();
-	std::string serverAccount = Cvar_ns_server_auth_account->GetString();
+	std::string serverAccount = Cvar_ns_server_reg_token->GetString();
 
 	spdlog::info("Attempting to register the local server to the master server.");
 
@@ -1260,7 +1260,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 	const std::string serverId = g_pMasterServerManager->m_sOwnServerId;
 	const std::string hostname = Cvar_ns_masterserver_hostname->GetString();
 	const std::string modinfo = g_pMasterServerManager->m_sOwnModInfoJson;
-	const std::string serverAccount = Cvar_ns_server_auth_account->GetString();
+	const std::string serverAccount = Cvar_ns_server_reg_token->GetString();
 
 	updateServerFuture = std::async(
 		std::launch::async,
