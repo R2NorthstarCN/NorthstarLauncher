@@ -850,6 +850,7 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 	if (!pdataSize)
 	{
 		spdlog::warn("attempted to write pdata of size 0!");
+		m_bSavingPersistentData = false;
 		return;
 	}
 

@@ -93,6 +93,20 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 			m_PlayerAuthServer.listen("0.0.0.0", Cvar_ns_player_auth_port->GetInt());
 		});
 
+	m_PlayerAuthServer.Post(
+		"/rui_message",
+		[this](const httplib::Request& request, httplib::Response& response)
+		{
+			if (!request.has_param("serverAuthToken") ||
+				strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
+			{
+				return;
+			}
+
+			
+			response.set_content("{\"success\":true}", "application/json");
+		});
+
 	serverThread.detach();
 }
 

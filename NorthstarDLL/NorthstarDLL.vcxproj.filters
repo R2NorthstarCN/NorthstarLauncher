@@ -1488,9 +1488,15 @@
     <ClInclude Include="vector.h">
       <Filter>Header Files\Math</Filter>
     </ClInclude>
+    <ClInclude Include="anticheat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dohworker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="squirrelautobind.h">
       <Filter>Header Files\Squirrel</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="keyvalues.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1499,6 +1505,9 @@
     </ClInclude>
     <ClInclude Include="loghooks.h">
       <Filter>Header Files\Console</Filter>
+    </ClInclude>
+    <ClInclude Include="sigscanning.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1719,6 +1728,8 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="clantag.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="squirrelautobind.cpp">
       <Filter>Source Files\Squirrel</Filter>
     </ClCompile>
