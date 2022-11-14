@@ -1509,6 +1509,9 @@
     <ClInclude Include="sigscanning.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="scriptmasterservermessages.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -1747,6 +1750,9 @@
     </ClCompile>
     <ClCompile Include="loghooks.cpp">
       <Filter>Source Files\Console</Filter>
+    </ClCompile>
+    <ClCompile Include="scriptmasterservermessages.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

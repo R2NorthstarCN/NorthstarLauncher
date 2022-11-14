@@ -123,6 +123,7 @@
     <ClInclude Include="bits.h" />
     <ClInclude Include="crashhandler.h" />
     <ClInclude Include="dohworker.h" />
+    <ClInclude Include="scriptmasterservermessages.h" />
     <ClInclude Include="sigscanning.h" />
     <ClInclude Include="keyvalues.h" />
     <ClInclude Include="loghooks.h" />
@@ -632,6 +633,7 @@
     <ClCompile Include="scriptjson.cpp" />
     <ClCompile Include="scriptdatatables.cpp" />
     <ClCompile Include="scriptmainmenupromos.cpp" />
+    <ClCompile Include="scriptmasterservermessages.cpp" />
     <ClCompile Include="scriptmodmenu.cpp" />
     <ClCompile Include="scriptplayerinfo.cpp" />
     <ClCompile Include="scriptserverbrowser.cpp" />

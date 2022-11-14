@@ -15,7 +15,7 @@
 #include "r2engine.h"
 #include "r2client.h"
 #include "r2server.h"
-
+#include "scriptmasterservermessages.h"
 #include "httplib.h"
 #include <fstream>
 #include <filesystem>
@@ -97,13 +97,15 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 		"/rui_message",
 		[this](const httplib::Request& request, httplib::Response& response)
 		{
-			if (!request.has_param("serverAuthToken") ||
-				strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
-			{
-				return;
-			}
+			//if (!request.has_param("serverAuthToken") ||
+			//	strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
+			//{
+			//	return;
+			//}
 
-			
+			g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(
+				std::make_pair(request.get_param_value("type"), request.get_param_value("message")));
+
 			response.set_content("{\"success\":true}", "application/json");
 		});
 
