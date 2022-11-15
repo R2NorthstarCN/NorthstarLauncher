@@ -1754,6 +1754,9 @@
     <ClCompile Include="scriptmasterservermessages.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="scriptmatchmakingevents.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="audio_asm.asm">

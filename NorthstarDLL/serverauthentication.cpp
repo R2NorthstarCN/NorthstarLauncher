@@ -20,6 +20,7 @@
 #include <fstream>
 #include <filesystem>
 #include <thread>
+#include "zstd.h"
 
 AUTOHOOK_INIT()
 
@@ -79,15 +80,44 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 						sizeof(newAuthData.username),
 						request.get_param_value("username").c_str(),
 						sizeof(newAuthData.username) - 1);
+					// decompress here
+					size_t compressed_data_size = request.body.size();
+					const char* compressed_data = request.body.c_str();
+					// validate ZSTD data
+					unsigned long long const rSize = ZSTD_getFrameContentSize(compressed_data, compressed_data_size);
 
-					newAuthData.pdataSize = request.body.size();
-					newAuthData.pdata = new char[newAuthData.pdataSize];
-					memcpy(newAuthData.pdata, request.body.c_str(), newAuthData.pdataSize);
+					if (rSize == ZSTD_CONTENTSIZE_ERROR || rSize == ZSTD_CONTENTSIZE_UNKNOWN)
+					{
+						spdlog::error("[ZSTD] Content type or original size unknown!");
+						response.set_content("{\"success\":false}", "application/json");
+						return;
+					}
+						
+					// allocate mem for decompress target
+					char* rBuff = new char[(size_t)rSize];
+
+					size_t const decompressed_size = ZSTD_decompress(rBuff, rSize, compressed_data, compressed_data_size);
+					if (decompressed_size != rSize)
+					{
+						spdlog::error("[ZSTD] Decompressed data size mismatch!");
+						response.set_content("{\"success\":false}", "application/json");
+						delete[] rBuff;
+						return;
+					}
+						
+
+					// process data after decompression
+					newAuthData.pdataSize = decompressed_size;
+					newAuthData.pdata = new char[decompressed_size];
+					memcpy(newAuthData.pdata, rBuff, newAuthData.pdataSize);
+
+					delete[] rBuff;
 
 					std::lock_guard<std::mutex> guard(m_AuthDataMutex);
 					m_RemoteAuthenticationData.insert(std::make_pair(request.get_param_value("authToken"), newAuthData));
 
 					response.set_content("{\"success\":true}", "application/json");
+					
 				});
 
 			m_PlayerAuthServer.listen("0.0.0.0", Cvar_ns_player_auth_port->GetInt());
@@ -97,14 +127,13 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 		"/rui_message",
 		[this](const httplib::Request& request, httplib::Response& response)
 		{
-			//if (!request.has_param("serverAuthToken") ||
+			// if (!request.has_param("serverAuthToken") ||
 			//	strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
 			//{
 			//	return;
-			//}
+			// }
 
-			g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(
-				std::make_pair(request.get_param_value("type"), request.get_param_value("message")));
+			g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(request.body);
 
 			response.set_content("{\"success\":true}", "application/json");
 		});

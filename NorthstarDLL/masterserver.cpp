@@ -18,6 +18,7 @@
 #include "anticheat.h"
 #include <cstring>
 #include <regex>
+#include "zstd.h"
 
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
@@ -880,7 +881,22 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 			curl_mime* mime = curl_mime_init(curl);
 			curl_mimepart* part = curl_mime_addpart(mime);
 
-			curl_mime_data(part, strPdata.c_str(), pdataSize);
+			// encoding here
+
+			size_t const cBuffSize = ZSTD_compressBound(pdataSize);
+			char* cBuff = new char[cBuffSize];
+			size_t const cSize = ZSTD_compress(cBuff, cBuffSize, strPdata.c_str(), pdataSize, 1);
+			if (cSize == NULL || cSize == 0)
+			{
+				spdlog::error("[ZSTD] Compressed data malformed");
+				m_bSavingPersistentData = false;
+				curl_easy_cleanup(curl);
+				delete[] cBuff;
+				return;
+			}
+
+
+			curl_mime_data(part, cBuff, cSize);
 			curl_mime_name(part, "pdata");
 			curl_mime_filename(part, "file.pdata");
 			curl_mime_type(part, "application/octet-stream");
@@ -895,6 +911,7 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 				m_bSuccessfullyConnected = false;
 
 			curl_easy_cleanup(curl);
+			delete[] cBuff;
 
 			m_bSavingPersistentData = false;
 		});
