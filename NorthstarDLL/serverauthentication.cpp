@@ -127,11 +127,11 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 		"/rui_message",
 		[this](const httplib::Request& request, httplib::Response& response)
 		{
-			// if (!request.has_param("serverAuthToken") ||
-			//	strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
-			//{
-			//	return;
-			// }
+			if (!request.has_param("serverAuthToken") ||
+			strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
+			{
+			    return;
+			}
 
 			g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(request.body);
 
