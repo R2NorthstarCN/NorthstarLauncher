@@ -108,7 +108,7 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 							response.set_content("{\"success\":false}", "application/json");
 							return;
 						}
-						decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos);
+						decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos + 1);
 						lastRet = ret;
 					}
 					if (lastRet != 0)

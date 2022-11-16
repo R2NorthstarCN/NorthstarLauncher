@@ -20,7 +20,7 @@
 #include <regex>
 #include "base64.h"
 #include "zstd.h"
-
+#include "scriptgamestate.h"
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
 ClientAnticheatSystem g_ClientAnticheatSystem;
@@ -689,7 +689,7 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const char*
 						ZSTD_freeDCtx(dctx);
 						goto REQUEST_END_CLEANUP;
 					}
-					decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos);
+					decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos + 1);
 					lastRet = ret;
 				}
 				if (lastRet != 0)
@@ -1363,7 +1363,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 					fmt::format(
 						"{}/server/"
 						"update_values?id={}&port={}&authPort={}&name={}&description={}&map={}&playlist={}&playerCount={}&"
-						"maxPlayers={}&password={}&serverAuthToken={}",
+						"maxPlayers={}&password={}&gamestate={}&serverAuthToken={}",
 						hostname.c_str(),
 						serverId.c_str(),
 						threadedPresence.m_iPort,
@@ -1375,6 +1375,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 						threadedPresence.m_iPlayerCount,
 						threadedPresence.m_iMaxPlayers,
 						passwordEscaped,
+						g_pSQGameState->eGameState,
 						authTokenEscaped)
 						.c_str());
 

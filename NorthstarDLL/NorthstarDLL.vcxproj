@@ -124,6 +124,7 @@
     <ClInclude Include="bits.h" />
     <ClInclude Include="crashhandler.h" />
     <ClInclude Include="dohworker.h" />
+    <ClInclude Include="scriptgamestate.h" />
     <ClInclude Include="scriptmasterservermessages.h" />
     <ClInclude Include="sigscanning.h" />
     <ClInclude Include="keyvalues.h" />
@@ -632,6 +633,7 @@
     <ClCompile Include="rpakfilesystem.cpp" />
     <ClCompile Include="runframe.cpp" />
     <ClCompile Include="scriptbrowserhooks.cpp" />
+    <ClCompile Include="scriptgamestate.cpp" />
     <ClCompile Include="scriptjson.cpp" />
     <ClCompile Include="scriptdatatables.cpp" />
     <ClCompile Include="scriptmainmenupromos.cpp" />
