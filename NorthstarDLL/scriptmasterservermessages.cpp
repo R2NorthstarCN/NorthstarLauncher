@@ -10,7 +10,6 @@ MasterserverMessenger *g_pMasterserverMessenger = new MasterserverMessenger;
 
 ADD_SQFUNC("string", NSGetLastMasterserverMessage, "", "", ScriptContext::SERVER)
 {
-	spdlog::info("SCRIPTMASTERSERVERMESSENGER CALLED");
 	if (g_pMasterserverMessenger->m_vQueuedMasterserverMessages.empty())
 	{
 		g_pSquirrel<context>->pushstring(sqvm, "none", -1);

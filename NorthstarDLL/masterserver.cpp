@@ -18,6 +18,7 @@
 #include "anticheat.h"
 #include <cstring>
 #include <regex>
+#include "base64.h"
 #include "zstd.h"
 
 using namespace std::chrono_literals;
@@ -649,7 +650,7 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const char*
 
 				if (!authInfoJson.HasMember("success") || !authInfoJson.HasMember("id") || !authInfoJson["id"].IsString() ||
 					!authInfoJson.HasMember("authToken") || !authInfoJson["authToken"].IsString() ||
-					!authInfoJson.HasMember("persistentData") || !authInfoJson["persistentData"].IsArray())
+					!authInfoJson.HasMember("persistentData") || !authInfoJson["persistentData"].IsString())
 				{
 					spdlog::error("Failed reading masterserver authentication response: malformed json object");
 					goto REQUEST_END_CLEANUP;
@@ -657,24 +658,56 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const char*
 
 				RemoteAuthData newAuthData {};
 				strncpy_s(newAuthData.uid, sizeof(newAuthData.uid), authInfoJson["id"].GetString(), sizeof(newAuthData.uid) - 1);
+				// 1. decode base64
 
-				newAuthData.pdataSize = authInfoJson["persistentData"].GetArray().Size();
-				newAuthData.pdata = new char[newAuthData.pdataSize];
-				// memcpy(newAuthData.pdata, authInfoJson["persistentData"].GetString(), newAuthData.pdataSize);
+				std::string original = authInfoJson["persistentData"].GetString();
 
-				int i = 0;
-				// note: persistentData is a uint8array because i had problems getting strings to behave, it sucks but it's just how it be
-				// unfortunately potentially refactor later
-				for (auto& byte : authInfoJson["persistentData"].GetArray())
+				auto decoded = base64_decode(original);
+
+				// 2. decompress zstd
+
+				ZSTD_DCtx* const dctx = ZSTD_createDCtx();
+				if (dctx == nullptr)
 				{
-					if (!byte.IsUint() || byte.GetUint() > 255)
+					spdlog::error("[ZSTD] unable to create dctx");
+					goto REQUEST_END_CLEANUP;
+				}
+
+				ZSTD_inBuffer input = {decoded.data(), decoded.size(), 0};
+				std::vector<char> decompressed;
+				size_t const buffOutSize = ZSTD_DStreamOutSize();
+				size_t lastRet = 0;
+				char* buffOut = new char[buffOutSize];
+				while (input.pos < input.size)
+				{
+					ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
+					size_t const ret = ZSTD_decompressStream(dctx, &output, &input);
+					if (ZSTD_isError(ret))
 					{
-						spdlog::error("Failed reading masterserver authentication response: malformed json object");
+						spdlog::error("[ZSTD] {}", ZSTD_getErrorName(ret));
+						delete[] buffOut;
+						ZSTD_freeDCtx(dctx);
 						goto REQUEST_END_CLEANUP;
 					}
-
-					newAuthData.pdata[i++] = static_cast<char>(byte.GetUint());
+					decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos);
+					lastRet = ret;
 				}
+				if (lastRet != 0)
+				{
+					spdlog::error("[ZSTD] EOF before end of stream: {}", lastRet);
+					delete[] buffOut;
+					ZSTD_freeDCtx(dctx);
+					goto REQUEST_END_CLEANUP;
+				}
+
+				// 3. memcpy
+
+				newAuthData.pdataSize = decompressed.size();
+				newAuthData.pdata = new char[newAuthData.pdataSize];
+				memcpy(newAuthData.pdata, decompressed.data(), newAuthData.pdataSize);
+
+				delete[] buffOut;
+				ZSTD_freeDCtx(dctx);
 
 				std::lock_guard<std::mutex> guard(g_pServerAuthentication->m_AuthDataMutex);
 				g_pServerAuthentication->m_RemoteAuthenticationData.clear();

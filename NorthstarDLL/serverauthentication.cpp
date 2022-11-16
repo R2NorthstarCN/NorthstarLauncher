@@ -81,37 +81,52 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 						request.get_param_value("username").c_str(),
 						sizeof(newAuthData.username) - 1);
 					// decompress here
-					size_t compressed_data_size = request.body.size();
-					const char* compressed_data = request.body.c_str();
+
 					// validate ZSTD data
-					unsigned long long const rSize = ZSTD_getFrameContentSize(compressed_data, compressed_data_size);
-
-					if (rSize == ZSTD_CONTENTSIZE_ERROR || rSize == ZSTD_CONTENTSIZE_UNKNOWN)
+					ZSTD_DCtx* const dctx = ZSTD_createDCtx();
+					if (dctx == nullptr)
 					{
-						spdlog::error("[ZSTD] Content type or original size unknown!");
+						spdlog::error("[ZSTD] unable to create dctx");
+						response.set_content("{\"success\":false}", "application/json");
+						return;
+					}
+
+					ZSTD_inBuffer input = {request.body.c_str(), request.body.size(), 0};
+					std::vector<char> decompressed;
+					size_t const buffOutSize = ZSTD_DStreamOutSize();
+					size_t lastRet = 0;
+					char* buffOut = new char[buffOutSize];
+					while (input.pos < input.size)
+					{
+						ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
+						size_t const ret = ZSTD_decompressStream(dctx, &output, &input);
+						if (ZSTD_isError(ret))
+						{
+							spdlog::error("[ZSTD] {}", ZSTD_getErrorName(ret));
+							delete[] buffOut;
+							ZSTD_freeDCtx(dctx);
+							response.set_content("{\"success\":false}", "application/json");
+							return;
+						}
+						decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos);
+						lastRet = ret;
+					}
+					if (lastRet != 0)
+					{
+						spdlog::error("[ZSTD] EOF before end of stream: {}", lastRet);
+						delete[] buffOut;
+						ZSTD_freeDCtx(dctx);
 						response.set_content("{\"success\":false}", "application/json");
 						return;
 					}
 						
-					// allocate mem for decompress target
-					char* rBuff = new char[(size_t)rSize];
 
-					size_t const decompressed_size = ZSTD_decompress(rBuff, rSize, compressed_data, compressed_data_size);
-					if (decompressed_size != rSize)
-					{
-						spdlog::error("[ZSTD] Decompressed data size mismatch!");
-						response.set_content("{\"success\":false}", "application/json");
-						delete[] rBuff;
-						return;
-					}
-						
+					newAuthData.pdataSize = decompressed.size();
+					newAuthData.pdata = new char[newAuthData.pdataSize];
+					memcpy(newAuthData.pdata, decompressed.data(), newAuthData.pdataSize);
 
-					// process data after decompression
-					newAuthData.pdataSize = decompressed_size;
-					newAuthData.pdata = new char[decompressed_size];
-					memcpy(newAuthData.pdata, rBuff, newAuthData.pdataSize);
-
-					delete[] rBuff;
+					delete[] buffOut;
+					ZSTD_freeDCtx(dctx);
 
 					std::lock_guard<std::mutex> guard(m_AuthDataMutex);
 					m_RemoteAuthenticationData.insert(std::make_pair(request.get_param_value("authToken"), newAuthData));
