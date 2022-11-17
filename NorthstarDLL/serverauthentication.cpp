@@ -420,8 +420,11 @@ bool,, (R2::CBaseClient* self, char* name, void* netchan_ptr_arg, char b_fake_pl
 
 	if (!g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag.empty())
 	{
-		std::string nameWithTag = "[" + g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag + "]" + self->m_Name;
-		strncpy_s(self->m_Name, nameWithTag.c_str(), 64);
+		//std::string nameWithTag = "[" + g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag + "]" + self->m_Name;
+		//strncpy_s(self->m_Name, nameWithTag.c_str(), 64);
+		char* clantag = ((char*)self + 0x318 + 64);
+		strncpy(clantag, g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag.c_str(), 16);
+		clantag[15] = '\0';
 	}
 
 	

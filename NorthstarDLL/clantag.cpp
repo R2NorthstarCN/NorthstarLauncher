@@ -6,19 +6,11 @@
 #include "squirrel.h"
 #include "r2engine.h"
 #include "hooks.h"
+#include <cstring>
 
 
 AUTOHOOK_INIT()
 
-std::map<std::string,std::string> m_ClanTags;
-
-
-
-
-std::string GetClanTagFromUsername(std::string uid)
-{
-	
-}
 
 
 static SQRESULT SQ_SetLocalPlayerClanTag(HSquirrelVM* sqvm)
@@ -29,15 +21,6 @@ static SQRESULT SQ_SetLocalPlayerClanTag(HSquirrelVM* sqvm)
 	return SQRESULT_NOTNULL;
 }
 
-
-AUTOHOOK(CBaseClient__SetName, engine.dll + 0x105ED0, void, __fastcall, (R2::CBaseClient * player, char* name))
-{
-
-	
-	char* clantag = ((char*)player + 0x318 + 64);
-	strcpy(clantag, "TEST");
-	return CBaseClient__SetName(player,name);
-}
 
 
 
@@ -62,33 +45,11 @@ AUTOHOOK(StryderShit,engine.dll + 0x1712F0, char*,__fastcall,
 	return StryderShit(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,Src,a13,a14,a15,a16,a17,a18);
 }
 
-/*
-AUTOHOOK(GetClanTag, client.dll + 0x164600, char*, __fastcall, (void* arraybase, int playerindex))
-{
-	char* playerName = GetClanTag(arraybase, playerindex);
-	std::string convertedName(playerName);
-
-	if (m_ClanTags.count(convertedName) == 0)
-	{
-		GetClanTagFromUsername(convertedName);
-		return playerName;
-	}
-	std::string clantagbuffer = g_pMasterServerManager->m_ClanTags[convertedName];
-	if (clantagbuffer.empty())
-		clantagbuffer = "ADV";
-	char finalname[288] = {'\0'};
-	strcat_s(finalname, "[");
-	strcat_s(finalname, clantagbuffer.c_str());
-	strcat_s(finalname, "] ");
-	strcat_s(finalname, playerName);
-	return finalname;
-}
-*/
-ON_DLL_LOAD_CLIENT("engine.dll", RespawnShit, (CModule module))
+ON_DLL_LOAD_CLIENT("engine.dll", ClantagInitializeServer, (CModule module))
 {
 	AUTOHOOK_DISPATCH();
 }
-ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ClantagInitialize, ClientSquirrel, (CModule module))
+ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ClantagInitializeClient, ClientSquirrel, (CModule module))
 {
 	
 	if (IsDedicatedServer())
