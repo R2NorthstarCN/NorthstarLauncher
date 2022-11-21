@@ -49,7 +49,7 @@ RemoteServerInfo::RemoteServerInfo(
 
 	strncpy_s((char*)map, sizeof(map), newMap, sizeof(map) - 1);
 	strncpy_s((char*)playlist, sizeof(playlist), newPlaylist, sizeof(playlist) - 1);
-
+	gameState = newGameState;
 	playerCount = newPlayerCount;
 	maxPlayers = newMaxPlayers;
 }
