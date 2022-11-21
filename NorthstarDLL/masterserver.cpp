@@ -34,6 +34,7 @@ RemoteServerInfo::RemoteServerInfo(
 	const char* newDescription,
 	const char* newMap,
 	const char* newPlaylist,
+	int newGameState,
 	int newPlayerCount,
 	int newMaxPlayers,
 	bool newRequiresPassword)
@@ -272,11 +273,16 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 						originAuthInfo["token"].GetString(),
 						sizeof(m_sOwnClientAuthToken) - 1);
 					m_bOriginAuthWithMasterServerSuccess = true;
-					g_ClientAnticheatSystem.InitWindowListenerThread();
+					//g_ClientAnticheatSystem.InitWindowListenerThread();
 					spdlog::info("Northstar origin authentication completed successfully!");
 				}
 				else
-					spdlog::error("Northstar origin authentication failed");
+				{
+					m_sAuthFailureReason = originAuthInfo["error"]["enum"].GetString();
+					m_sAuthFailureMessage = originAuthInfo["error"]["msg"].GetString();
+					spdlog::error("Northstar origin authentication failed:{}", originAuthInfo["error"].GetString());
+				}
+
 			}
 			else
 			{
@@ -368,7 +374,8 @@ void MasterServerManager::RequestServerList()
 						!serverObj["name"].IsString() || !serverObj.HasMember("description") || !serverObj["description"].IsString() ||
 						!serverObj.HasMember("map") || !serverObj["map"].IsString() || !serverObj.HasMember("playlist") ||
 						!serverObj["playlist"].IsString() || !serverObj.HasMember("playerCount") || !serverObj["playerCount"].IsNumber() ||
-						!serverObj.HasMember("maxPlayers") || !serverObj["maxPlayers"].IsNumber() || !serverObj.HasMember("hasPassword") ||
+						!serverObj.HasMember("maxPlayers") || !serverObj["maxPlayers"].IsNumber() || !serverObj.HasMember("gameState") ||
+						!serverObj["gameState"].IsNumber() || !serverObj.HasMember("hasPassword") ||
 						!serverObj["hasPassword"].IsBool() || !serverObj.HasMember("modInfo") || !serverObj["modInfo"].HasMember("Mods") ||
 						!serverObj["modInfo"]["Mods"].IsArray())
 					{
@@ -392,6 +399,7 @@ void MasterServerManager::RequestServerList()
 								serverObj["description"].GetString(),
 								serverObj["map"].GetString(),
 								serverObj["playlist"].GetString(),
+								serverObj["gameState"].GetInt(),
 								serverObj["playerCount"].GetInt(),
 								serverObj["maxPlayers"].GetInt(),
 								serverObj["hasPassword"].IsTrue());
@@ -409,6 +417,7 @@ void MasterServerManager::RequestServerList()
 							serverObj["description"].GetString(),
 							serverObj["map"].GetString(),
 							serverObj["playlist"].GetString(),
+							serverObj["gameState"].GetInt(),
 							serverObj["playerCount"].GetInt(),
 							serverObj["maxPlayers"].GetInt(),
 							serverObj["hasPassword"].IsTrue());
@@ -1363,7 +1372,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 					fmt::format(
 						"{}/server/"
 						"update_values?id={}&port={}&authPort={}&name={}&description={}&map={}&playlist={}&playerCount={}&"
-						"maxPlayers={}&password={}&gamestate={}&serverAuthToken={}",
+						"maxPlayers={}&password={}&gameState={}&serverAuthToken={}",
 						hostname.c_str(),
 						serverId.c_str(),
 						threadedPresence.m_iPort,

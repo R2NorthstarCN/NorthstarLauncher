@@ -28,7 +28,7 @@ class RemoteServerInfo
 	char map[32];
 	char playlist[16];
 	std::vector<RemoteModInfo> requiredMods;
-
+	int gameState;
 	int playerCount;
 	int maxPlayers;
 
@@ -42,6 +42,7 @@ class RemoteServerInfo
 		const char* newDescription,
 		const char* newMap,
 		const char* newPlaylist,
+		int newGameState,
 		int newPlayerCount,
 		int newMaxPlayers,
 		bool newRequiresPassword);

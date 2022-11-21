@@ -13,6 +13,12 @@ ADD_SQFUNC("bool", NSIsMasterServerAuthenticated, "", "", ScriptContext::UI)
 	return SQRESULT_NOTNULL;
 }
 
+ADD_SQFUNC("bool", NSIsMasterServerAuthenticateSuccess, "", "", ScriptContext::UI)
+{
+	g_pSquirrel<context>->pushbool(sqvm, g_pMasterServerManager->m_bOriginAuthWithMasterServerSuccess);
+	return SQRESULT_NOTNULL;
+}
+
 ADD_SQFUNC("void", NSRequestServerList, "", "", ScriptContext::UI)
 {
 	g_pMasterServerManager->RequestServerList();
@@ -156,7 +162,25 @@ ADD_SQFUNC("int", NSGetServerMaxPlayerCount, "int serverIndex", "", ScriptContex
 	g_pSquirrel<context>->pushinteger(sqvm, g_pMasterServerManager->m_vRemoteServers[serverIndex].maxPlayers);
 	return SQRESULT_NOTNULL;
 }
+ADD_SQFUNC("int", NSGetServerGameState, "int serverIndex", "", ScriptContext::UI)
+{
+	SQInteger serverIndex = g_pSquirrel<context>->getinteger(sqvm, 1);
 
+	if (serverIndex >= g_pMasterServerManager->m_vRemoteServers.size())
+	{
+		g_pSquirrel<context>->raiseerror(
+			sqvm,
+			fmt::format(
+				"Tried to get gamestate of server index {} when only {} servers are available",
+				serverIndex,
+				g_pMasterServerManager->m_vRemoteServers.size())
+				.c_str());
+		return SQRESULT_ERROR;
+	}
+
+	g_pSquirrel<context>->pushinteger(sqvm, g_pMasterServerManager->m_vRemoteServers[serverIndex].gameState);
+	return SQRESULT_NOTNULL;
+}
 ADD_SQFUNC("string", NSGetServerID, "int serverIndex", "", ScriptContext::UI)
 {
 	SQInteger serverIndex = g_pSquirrel<context>->getinteger(sqvm, 1);
