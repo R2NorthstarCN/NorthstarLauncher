@@ -1384,10 +1384,10 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 						threadedPresence.m_iPlayerCount,
 						threadedPresence.m_iMaxPlayers,
 						passwordEscaped,
-						g_pSQGameState->eGameState,
+						std::to_string(g_pSQGameState->eGameState).c_str(),
 						authTokenEscaped)
 						.c_str());
-
+				//spdlog::info("GAMESTATE UPDATEVALUES: {}", g_pSQGameState->eGameState);
 				curl_free(nameEscaped);
 				curl_free(descEscaped);
 				curl_free(mapEscaped);
