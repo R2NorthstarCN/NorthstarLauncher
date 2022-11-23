@@ -297,6 +297,7 @@ template <ScriptContext context> SQInteger SQPrintHook(HSquirrelVM* sqvm, const 
 	{
 		if (buf[charsWritten - 1] == '\n')
 			buf[charsWritten - 1] = '\0';
+		//spdlog::info("[{} SCRIPT] {}", GetContextName(context), buf);
 		g_pSquirrel<context>->logger->info("{}", buf);
 	}
 
@@ -359,7 +360,12 @@ void __fastcall ScriptCompileErrorHook(HSquirrelVM* sqvm, const char* error, con
 	{
 		// kill dedicated server if we hit this
 		if (IsDedicatedServer())
+		{
+			// flush the logger before we abort so things gets saved to log file
+			logger->flush();
 			abort();
+		}
+			
 		else
 		{
 			R2::Cbuf_AddText(
