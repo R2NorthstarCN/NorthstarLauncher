@@ -27,6 +27,7 @@ class RemoteServerInfo
 	std::string description;
 	char map[32];
 	char playlist[16];
+	char region[32];
 	std::vector<RemoteModInfo> requiredMods;
 	int gameState;
 	int playerCount;
