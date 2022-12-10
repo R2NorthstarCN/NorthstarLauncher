@@ -19,8 +19,8 @@
 #include <cstring>
 #include <regex>
 #include "base64.h"
-#include "zstd.h"
 #include "scriptgamestate.h"
+#include "zstd.h"
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
 ClientAnticheatSystem g_ClientAnticheatSystem;
