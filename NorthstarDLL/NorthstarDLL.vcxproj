@@ -401,6 +401,7 @@
     <ClInclude Include="scriptgamestate.h" />
     <ClInclude Include="scriptmasterservermessages.h" />
     <ClInclude Include="sigscanning.h" />
+    <ClInclude Include="httprequesthandler.h" />
     <ClInclude Include="keyvalues.h" />
     <ClInclude Include="loghooks.h" />
     <ClInclude Include="squirrelclasstypes.h" />
@@ -465,6 +466,7 @@
     <ClCompile Include="dohworker.cpp" />
     <ClCompile Include="diskvmtfixes.cpp" />
     <ClCompile Include="exploitfixes_lzss.cpp" />
+    <ClCompile Include="httprequesthandler.cpp" />
     <ClCompile Include="kb_act.cpp" />
     <ClCompile Include="keyvalues.cpp" />
     <ClCompile Include="limits.cpp" />

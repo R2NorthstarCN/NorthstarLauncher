@@ -326,8 +326,7 @@ template <ScriptContext context> void __fastcall DestroyVMHook(void* a1, CSquirr
 	{
 		realContext = ScriptContext::UI;
 		g_pSquirrel<ScriptContext::UI>->VMDestroyed();
-		// Don't call DestroyVM here because it crashes.
-		// Respawn Code :tm:
+		DestroyVM<ScriptContext::CLIENT>(a1, sqvm); // If we pass UI here it crashes
 	}
 	else
 	{
@@ -530,10 +529,8 @@ template <ScriptContext context> void SquirrelManager<context>::ProcessMessageBu
 	int result = sq_getfunction(m_pSQVM->sqvm, message.functionName.c_str(), &functionobj, 0);
 	if (result != 0) // This func returns 0 on success for some reason
 	{
-		spdlog::error(
-			"ProcessMessageBuffer was unable to find function with name '{}' on {}. Is it global?",
-			message.functionName,
-			GetContextName(context));
+		NS::log::squirrel_logger<context>()->error(
+			"ProcessMessageBuffer was unable to find function with name '{}'. Is it global?", message.functionName);
 		return;
 	}
 	pushobject(m_pSQVM->sqvm, &functionobj); // Push the function object
