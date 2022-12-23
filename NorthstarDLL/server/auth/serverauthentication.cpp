@@ -15,7 +15,7 @@
 #include "engine/r2engine.h"
 #include "client/r2client.h"
 #include "server/r2server.h"
-
+#include "scripts/scriptmasterservermessages.h"
 #include "httplib.h"
 #include <fstream>
 #include <filesystem>

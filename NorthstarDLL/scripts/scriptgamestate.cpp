@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "scriptgamestate.h"
-#include "squirrel.h"
+#include "squirrel/squirrel.h"
 
 SQGameState* g_pSQGameState = new SQGameState;
 

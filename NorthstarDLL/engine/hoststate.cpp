@@ -8,7 +8,8 @@
 #include "engine/r2engine.h"
 #include "shared/exploit_fixes/ns_limits.h"
 #include "squirrel/squirrel.h"
-
+#include "server/auth/serverauthentication.h"
+#include "dedicated/dedicated.h"
 AUTOHOOK_INIT()
 
 using namespace R2;

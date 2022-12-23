@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "squirrel.h"
-#include "masterserver.h"
-#include "serverauthentication.h"
-#include "hooks.h"
-#include "r2client.h"
+#include "squirrel/squirrel.h"
+#include "masterserver/masterserver.h"
+#include "server/auth/serverauthentication.h"
+#include "core/hooks.h"
+#include "client/r2client.h"
 #include "scriptmasterservermessages.h"
 
 MasterserverMessenger *g_pMasterserverMessenger = new MasterserverMessenger;

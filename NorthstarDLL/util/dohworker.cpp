@@ -6,7 +6,7 @@
 #include "rapidjson/error/en.h"
 #include <chrono>
 #include <cstring>
-#include "masterserver.h"
+#include "masterserver/masterserver.h"
 AUTOHOOK_INIT()
 
 DohWorker* g_DohWorker = new(DohWorker);

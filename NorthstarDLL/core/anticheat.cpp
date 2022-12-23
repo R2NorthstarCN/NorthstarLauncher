@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "hooks.h"
-#include "sigscanning.h"
+#include "util/sigscanning.h"
 #include <string>
 #include "anticheat.h"
 #include <wchar.h>
@@ -11,7 +11,7 @@
 #include <sstream>
 #include <filesystem>
 #include <Psapi.h>
-#include "masterserver.h"
+#include "masterserver/masterserver.h"
 #include <windows.h>
 #include <tchar.h>
 #include "nlohmann/json.hpp"

@@ -5,20 +5,21 @@
 #include "server/auth/serverauthentication.h"
 #include "core/tier0.h"
 #include "engine/r2engine.h"
+#include "client/r2client.h"
 #include "mods/modmanager.h"
 #include "shared/misccommands.h"
 #include "util/version.h"
-
+#include "util/dohworker.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/error/en.h"
-#include "bansystem.h"
-#include "anticheat.h"
+#include "server/auth/bansystem.h"
+#include "core/anticheat.h"
 #include <cstring>
 #include <regex>
-#include "base64.h"
-#include "scriptgamestate.h"
+#include "util/base64.h"
+#include "scripts/scriptgamestate.h"
 #include "zstd.h"
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;

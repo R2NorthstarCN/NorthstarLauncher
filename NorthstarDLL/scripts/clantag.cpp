@@ -1,11 +1,11 @@
 #include "pch.h"
-#include "dedicated.h"
+#include "dedicated/dedicated.h"
 #include <cstring>
-#include "masterserver.h"
+#include "masterserver/masterserver.h"
 #include <mutex>
-#include "squirrel.h"
-#include "r2engine.h"
-#include "hooks.h"
+#include "squirrel/squirrel.h"
+#include "engine/r2engine.h"
+#include "core/hooks.h"
 #include <cstring>
 
 

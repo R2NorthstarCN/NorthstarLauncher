@@ -1,10 +1,10 @@
 #include "pch.h"
-#include "squirrel.h"
-#include "masterserver.h"
-#include "serverauthentication.h"
-#include "hooks.h"
-#include "anticheat.h"
-#include "r2client.h"
+#include "squirrel/squirrel.h"
+#include "masterserver/masterserver.h"
+#include "server/auth/serverauthentication.h"
+#include "core/hooks.h"
+#include "core/anticheat.h"
+#include "client/r2client.h"
 AUTOHOOK_INIT()
 
 // string function NSGetLocalPlayerUID()
