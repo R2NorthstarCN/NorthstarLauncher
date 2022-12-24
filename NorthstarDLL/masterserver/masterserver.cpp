@@ -280,7 +280,7 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 				{
 					m_sAuthFailureReason = originAuthInfo["error"]["enum"].GetString();
 					m_sAuthFailureMessage = originAuthInfo["error"]["msg"].GetString();
-					spdlog::error("Northstar origin authentication failed:{}", originAuthInfo["error"].GetString());
+					spdlog::error("Northstar origin authentication failed:{}", m_sAuthFailureMessage);
 				}
 
 			}
