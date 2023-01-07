@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -433,6 +433,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="plugins\plugins.h" />
     <ClInclude Include="plugins\plugin_abi.h" />
+    <ClInclude Include="scriptmatchmakingevents.h" />
     <ClInclude Include="scripts\scriptgamestate.h" />
     <ClInclude Include="scripts\scripthttprequesthandler.h" />
     <ClInclude Include="scripts\scriptmasterservermessages.h" />

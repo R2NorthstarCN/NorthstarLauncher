@@ -120,7 +120,15 @@ ADD_SQFUNC("void", NSSendMessage, "int playerIndex, string text, bool isTeam", "
 	const char* text = g_pSquirrel<ScriptContext::SERVER>->getstring(sqvm, 2);
 	bool isTeam = g_pSquirrel<ScriptContext::SERVER>->getbool(sqvm, 3);
 
+	ChatSendMessage(playerIndex, text, isTeam);
+
+	return SQRESULT_NULL;
+}
+
+ADD_SQFUNC(
+	"void",
 	NSBroadcastMessage,
+	"int fromPlayerIndex, int toPlayerIndex, string text, bool isTeam, bool isDead, int messageType",
 	"",
 	ScriptContext::SERVER)
 {
