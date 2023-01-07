@@ -34,23 +34,84 @@ void(__fastcall* MessageWriteByte)(int iValue);
 void(__fastcall* MessageWriteString)(const char* sz);
 void(__fastcall* MessageWriteBool)(bool bValue);
 
-static char* skip_valid_ansi_csi_sgr(char* str)
+bool skip_valid_ansi_csi_sgr1(char*& str)
 {
 	if (*str++ != '\x1B')
-		return NULL;
+		return false;
 	if (*str++ != '[') // CSI
-		return NULL;
+		return false;
 	for (char* c = str; *c; c++)
 	{
 		if (*c >= '0' && *c <= '9')
 			continue;
-		if (*c == ';')
+		if (*c == ';' || *c == ':')
 			continue;
 		if (*c == 'm') // SGR
 			break;
-		return NULL;
+		return false;
 	}
-	return str;
+	return true;
+}
+
+void RemoveAsciiControlSequences1(char* str, bool allow_color_codes)
+{
+	for (char *pc = str, c = *pc; c = *pc; pc++)
+	{
+		// skip UTF-8 characters
+		int bytesToSkip = 0;
+		if ((c & 0xE0) == 0xC0)
+			bytesToSkip = 1; // skip 2-byte UTF-8 sequence
+		if ((c & 0xF0) == 0xE0)
+			bytesToSkip = 2; // skip 3-byte UTF-8 sequence
+		if ((c & 0xF8) == 0xF0)
+			bytesToSkip = 3; // skip 4-byte UTF-8 sequence
+		if ((c & 0xFC) == 0xF8)
+			bytesToSkip = 4; // skip 5-byte UTF-8 sequence
+		if ((c & 0xFE) == 0xFC)
+			bytesToSkip = 5; // skip 6-byte UTF-8 sequence
+
+		bool invalid = false;
+		char* orgpc = pc;
+		for (int i = 0; i < bytesToSkip; i++)
+		{
+			char next = pc[1];
+
+			// valid UTF-8 part
+			if ((next & 0xC0) == 0x80)
+			{
+				pc++;
+				continue;
+			}
+
+			// invalid UTF-8 part or encountered \0
+			invalid = true;
+			break;
+		}
+		if (invalid)
+		{
+			// erase the whole "UTF-8" sequence
+			for (char* x = orgpc; x <= pc; x++)
+				if (*x != '\0')
+					*x = ' ';
+				else
+					break;
+		}
+		if (bytesToSkip > 0)
+			continue; // this byte was already handled as UTF-8
+
+		// an invalid control character or an UTF-8 part outside of UTF-8 sequence
+		if ((iscntrl(c) && c != '\n' && c != '\r' && c != '\x1B') || (c & 0x80) != 0)
+		{
+			*pc = ' ';
+			continue;
+		}
+
+		if (c == '\x1B') // separate handling for this escape sequence...
+			if (allow_color_codes && skip_valid_ansi_csi_sgr1(pc)) // ...which we allow for color codes...
+				pc--;
+			else // ...but remove it otherwise
+				*pc = ' ';
+	}
 }
 
 bool bShouldCallSayTextHook = false;
@@ -59,13 +120,7 @@ AUTOHOOK(_CServerGameDLL__OnReceivedSayTextMessage, server.dll + 0x1595C0,
 void, __fastcall, (CServerGameDLL* self, unsigned int senderPlayerId, const char* text, bool isTeam))
 // clang-format on
 {
-	for (char* c = const_cast<char*>(text); *c; c++)
-	{
-		if (*c == '\x1B' && (c = skip_valid_ansi_csi_sgr(c)))
-			c--;
-		else if (*c <= 9 || (*c >= 12 && *c <= 31))
-			*c = ' ';
-	}
+	RemoveAsciiControlSequences1(const_cast<char*>(text), true);
 
 	// MiniHook doesn't allow calling the base function outside of anywhere but the hook function.
 	// To allow bypassing the hook, isSkippingHook can be set.
