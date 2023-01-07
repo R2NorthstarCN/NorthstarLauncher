@@ -1191,6 +1191,9 @@
     <ClInclude Include="scripts\scriptgamestate.h">
       <Filter>Header Files\scripts</Filter>
     </ClInclude>
+    <ClInclude Include="util\utils.h">
+      <Filter>Header Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\include\spdlog\fmt\bundled\LICENSE.rst">
@@ -1455,6 +1458,12 @@
     </ClCompile>
     <ClCompile Include="scripts\scriptgamestate.cpp">
       <Filter>Source Files\scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="client\rejectconnectionfixes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="util\utils.cpp">
+      <Filter>Source Files\util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
