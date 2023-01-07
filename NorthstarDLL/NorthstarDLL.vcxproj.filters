@@ -1194,6 +1194,9 @@
     <ClInclude Include="util\utils.h">
       <Filter>Header Files\util</Filter>
     </ClInclude>
+    <ClInclude Include="scriptmatchmakingevents.h">
+      <Filter>Header Files\scripts</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\include\spdlog\fmt\bundled\LICENSE.rst">
