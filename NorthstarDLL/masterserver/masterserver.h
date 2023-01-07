@@ -133,6 +133,7 @@ class MasterServerManager
 	void AuthenticateWithServer(const char* uid, const char* playerToken, const char* serverId, const char* password);
 	void WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize);
 	bool SetLocalPlayerClanTag(std::string clantag);
+	bool StartMatchmaking(std::string playlistlist);
 };
 
 extern MasterServerManager* g_pMasterServerManager;

@@ -103,6 +103,68 @@ size_t CurlWriteToStringBufferCallback(char* contents, size_t size, size_t nmemb
 	return size * nmemb;
 }
 
+bool MasterServerManager::StartMatchmaking(std::string playlistlist)
+{
+	CURL* curl = curl_easy_init();
+	SetCommonHttpClientOptions(curl);
+	std::string readBuffer;
+	std::string token = m_sOwnClientAuthToken;
+	std::string localuid = R2::g_pLocalPlayerUserID;
+	char* playlistlistescaped = curl_easy_escape(curl, playlistlist.c_str(), playlistlist.length());
+	char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
+	char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
+	curl_easy_setopt(
+		curl,
+		CURLOPT_URL,
+		fmt::format(
+			"{}/client/matchmake?id={}&token={}&playlistlist={}",
+			Cvar_ns_masterserver_hostname->GetString(),
+			localuidescaped,
+			tokenescaped,
+			playlistlistescaped)
+			.c_str());
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+	CURLcode result = curl_easy_perform(curl);
+
+	if (result == CURLcode::CURLE_OK)
+	{
+		rapidjson_document serverresponse;
+		serverresponse.Parse(readBuffer.c_str());
+
+		if (serverresponse.HasParseError())
+		{
+			// spdlog::error(
+			//"Failed reading player clantag: encountered parse error \"{}\"",
+			// rapidjson::GetParseError_En(serverresponse.GetParseError()));
+			goto REQUEST_END_CLEANUP;
+		}
+
+		if (!serverresponse.IsObject() || !serverresponse.HasMember("success"))
+		{
+			// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
+			goto REQUEST_END_CLEANUP;
+		}
+
+		if (serverresponse["success"].IsTrue())
+		{
+			// std::cout << "Successfully set local player clantag." << std::endl;
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		// spdlog::error("Failed reading player clantag");
+	}
+
+	// we goto this instead of returning so we always hit this
+REQUEST_END_CLEANUP:
+
+	curl_easy_cleanup(curl);
+	return false;
+}
+
 bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
 {
 	CURL* curl = curl_easy_init();

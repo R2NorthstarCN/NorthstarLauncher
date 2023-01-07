@@ -5,26 +5,47 @@
 #include "core/hooks.h"
 #include "client/r2client.h"
 #include "scriptmasterservermessages.h"
-AUTOHOOK_INIT();
+#include "scriptmatchmakingevents.h"
 
-const std::string MatchMakingStatus[] = {
-	"#MATCH_NOTHING",
-	"#MATCHMAKING_SEARCHING_FOR_MATCH",
-	"#MATCHMAKING_QUEUED",
-	"#MATCHMAKING_ALLOCATING_SERVER",
-	"#MATCHMAKING_MATCH_CONNECTING"};
+AUTOHOOK_INIT()
 
-struct DummyMatchmakingParamData
+std::string MatchmakeStatus::GetByParam(int idx)
 {
-	std::string playlistName = "ps";
-	std::string etaSeconds = "30";
-	std::string mapIdx = "1";
-	std::string modeIdx = "1";
-	std::string PlaylistList = "ps,aitdm";
-};
+	switch (idx)
+	{
+	case 1:
+		return this->playlistName;
+	case 2:
+		return this->etaSeconds;
+	case 3:
+		return this->mapIdx;
+	case 4:
+		return this->modeIdx;
+	case 5:
+		return this->PlaylistList;
+	}
+}
+void MatchmakeStatus::UpdateValues(
+	std::string playlistname, std::string etaseconds, std::string mapidx, std::string modeidx, std::string playlistlist)
+{
+	this->playlistName = playlistname;
+	this->etaSeconds = etaseconds;
+	this->mapIdx = mapidx;
+	this->modeIdx = modeidx;
+	this->PlaylistList = playlistlist;
+}
+
+Matchmaker::Matchmaker(std::string playlistlist)
+{
+	spdlog::info("[Matchmaker] Starting new matchmaker of playlistlist:{}", playlistlist);
+	MatchmakeStatus *statusptr = new MatchmakeStatus;
+	this->status = statusptr;
+	this->playlistlist = playlistlist;
+}
 
 int CurrentMatchmakingStatus = 0;
 bool AreWeMatchMakingTemp = false;
+
 // clang-format off
 AUTOHOOK(CCLIENT__StartMatchmaking, client.dll + 0x213D00, SQRESULT, __fastcall, (HSquirrelVM* clientsqvm))
 // clang-format on
@@ -34,14 +55,14 @@ AUTOHOOK(CCLIENT__StartMatchmaking, client.dll + 0x213D00, SQRESULT, __fastcall,
 	AreWeMatchMakingTemp = true;
 	return SQRESULT_NOTNULL;
 }
-
+// clang-format off
 AUTOHOOK(CCLIENT__AreWeMatchmaking, client.dll + 0x211970, SQRESULT, __fastcall, (HSquirrelVM * clientsqvm))
 // clang-format on
 {
 	g_pSquirrel<ScriptContext::CLIENT>->pushbool(clientsqvm, AreWeMatchMakingTemp);
 	return SQRESULT_NOTNULL;
 }
-
+// clang-format off
 AUTOHOOK(CCLIENT__GetMyMatchmakingStatusParam, client.dll + 0x3B3570, SQRESULT, __fastcall, (HSquirrelVM * clientsqvm))
 // clang-format on
 {
@@ -64,7 +85,7 @@ AUTOHOOK(CCLIENT__GetMyMatchmakingStatusParam, client.dll + 0x3B3570, SQRESULT, 
 
 	return SQRESULT_NOTNULL;
 }
-
+// clang-format off
 AUTOHOOK(CCLIENT__GetMyMatchmakingStatus, client.dll + 0x3B1B70, SQRESULT, __fastcall, (HSquirrelVM * clientsqvm))
 // clang-format on
 {
