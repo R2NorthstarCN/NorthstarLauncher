@@ -166,56 +166,6 @@ REQUEST_END_CLEANUP:
 }
 
 
-void MasterServerManager::SendCheatingProof(char* info)
-{
-	ConVar* ns_auth_player_name = R2::g_pCVar->FindVar("name");
-	std::string reportinfo = info;
-	std::string uid = R2::g_pLocalPlayerUserID;
-	std::string token = m_sOwnClientAuthToken;
-	std::string playername = ns_auth_player_name->GetString();
-	std::thread requestThread(
-		[this, reportinfo, uid, token, playername]
-		{
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-
-			std::string readBuffer;
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			// escape params
-			{
-				char* infoEscaped = curl_easy_escape(curl, reportinfo.c_str(), reportinfo.length());
-				char* uidEscaped = curl_easy_escape(curl, uid.c_str(), uid.length());
-				char* tokenEscaped = curl_easy_escape(curl, token.c_str(), token.length());
-				char* playernameEscaped = curl_easy_escape(curl, playername.c_str(), playername.length());
-
-				curl_easy_setopt(
-					curl,
-					CURLOPT_URL,
-					fmt::format(
-						"{}/client/reportself?uid={}&info={}&token={}&playername={}",
-						Cvar_ns_masterserver_hostname->GetString(),
-						uidEscaped,
-						infoEscaped,
-						tokenEscaped,
-						playernameEscaped)
-						.c_str());
-
-				curl_free(uidEscaped);
-				curl_free(infoEscaped);
-				curl_free(tokenEscaped);
-				curl_free(playernameEscaped);
-			}
-
-			CURLcode result = curl_easy_perform(curl);
-			curl_easy_cleanup(curl);
-		});
-
-	requestThread.detach();
-}
-
 void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, const char* originToken)
 {
 	if (m_bOriginAuthWithMasterServerInProgress)
