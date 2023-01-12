@@ -17,8 +17,9 @@ AUTOHOOK(AuthWithStryder, engine.dll + 0x1843A0,
 void, __fastcall, (void* a1))
 // clang-format on
 {
-	// game will call this forever, until it gets a valid auth key
-	// so, we need to manually invalidate our key until we're authed with northstar, then we'll allow game to auth with stryder
+	// spdlog::info("IS THIS EVEN FUCKING CALLED????");
+	//  game will call this forever, until it gets a valid auth key
+	//  so, we need to manually invalidate our key until we're authed with northstar, then we'll allow game to auth with stryder
 	if (!g_pMasterServerManager->m_bOriginAuthWithMasterServerDone && Cvar_ns_has_agreed_to_send_token->GetInt() != DISAGREED_TO_SEND_TOKEN)
 	{
 		// if player has agreed to send token and we aren't already authing, try to auth

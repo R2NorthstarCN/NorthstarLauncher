@@ -6,7 +6,7 @@
 #include "client/r2client.h"
 #include "scriptmasterservermessages.h"
 
-MasterserverMessenger *g_pMasterserverMessenger = new MasterserverMessenger;
+MasterserverMessenger* g_pMasterserverMessenger = new MasterserverMessenger;
 
 ADD_SQFUNC("string", NSGetLastMasterserverMessage, "", "", ScriptContext::SERVER)
 {
@@ -20,4 +20,3 @@ ADD_SQFUNC("string", NSGetLastMasterserverMessage, "", "", ScriptContext::SERVER
 	g_pMasterserverMessenger->m_vQueuedMasterserverMessages.pop();
 	return SQRESULT_NOTNULL;
 }
-

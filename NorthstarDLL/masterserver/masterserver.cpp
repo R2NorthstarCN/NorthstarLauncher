@@ -21,6 +21,7 @@
 #include "util/base64.h"
 #include "scripts/scriptgamestate.h"
 #include "zstd.h"
+#include "scriptmatchmakingevents.h"
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
 ClientAnticheatSystem g_ClientAnticheatSystem;
@@ -102,26 +103,81 @@ size_t CurlWriteToStringBufferCallback(char* contents, size_t size, size_t nmemb
 	((std::string*)userp)->append((char*)contents, size * nmemb);
 	return size * nmemb;
 }
-
-bool MasterServerManager::StartMatchmaking(std::string playlistlist)
+bool MasterServerManager::StartMatchmaking(MatchmakeInfo* status)
 {
+	// no need for a request thread here cuz we always call this function in a new thread.
+	// ps,aitdm,ttdm
 	CURL* curl = curl_easy_init();
 	SetCommonHttpClientOptions(curl);
 	std::string readBuffer;
 	std::string token = m_sOwnClientAuthToken;
 	std::string localuid = R2::g_pLocalPlayerUserID;
-	char* playlistlistescaped = curl_easy_escape(curl, playlistlist.c_str(), playlistlist.length());
 	char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
 	char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
+	std::string queryfmtstr = "{}/matchmaking/join?id={}&token={}";
+	for (int i = 0; i < status->playlistList.size(); i++)
+	{
+		queryfmtstr.append(fmt::format("&playlistList[{}]={}", i, status->playlistList[i]));
+	}
+	spdlog::warn("{}", queryfmtstr);
+	curl_easy_setopt(
+		curl, CURLOPT_URL, fmt::format(queryfmtstr, Cvar_ns_masterserver_hostname->GetString(), localuidescaped, tokenescaped).c_str());
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+	CURLcode result = curl_easy_perform(curl);
+
+	if (result == CURLcode::CURLE_OK)
+	{
+		rapidjson_document serverresponse;
+		serverresponse.Parse(readBuffer.c_str());
+
+		if (serverresponse.HasParseError())
+		{
+			// spdlog::error(
+			//"Failed reading player clantag: encountered parse error \"{}\"",
+			// rapidjson::GetParseError_En(serverresponse.GetParseError()));
+			goto REQUEST_END_CLEANUP;
+		}
+
+		if (!serverresponse.IsObject() || !serverresponse.HasMember("success"))
+		{
+			// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
+			goto REQUEST_END_CLEANUP;
+		}
+
+		if (serverresponse["success"].IsTrue())
+		{
+			// std::cout << "Successfully set local player clantag." << std::endl;
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		// spdlog::error("Failed reading player clantag");
+	}
+
+	// we goto this instead of returning so we always hit this
+REQUEST_END_CLEANUP:
+
+	curl_easy_cleanup(curl);
+	return false;
+}
+bool MasterServerManager::CancelMatchmaking()
+{
+	// no need for a request thread here cuz we always call this function in a new thread.
+	// ps,aitdm,ttdm
+	CURL* curl = curl_easy_init();
+	SetCommonHttpClientOptions(curl);
+	std::string readBuffer;
+	std::string token = m_sOwnClientAuthToken;
+	char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
+	std::string localuid = R2::g_pLocalPlayerUserID;
+	char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
 	curl_easy_setopt(
 		curl,
 		CURLOPT_URL,
-		fmt::format(
-			"{}/client/matchmake?id={}&token={}&playlistlist={}",
-			Cvar_ns_masterserver_hostname->GetString(),
-			localuidescaped,
-			tokenescaped,
-			playlistlistescaped)
+		fmt::format("{}/matchmaking/quit?id={}&token={}", Cvar_ns_masterserver_hostname->GetString(), localuidescaped, tokenescaped)
 			.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
@@ -156,6 +212,128 @@ bool MasterServerManager::StartMatchmaking(std::string playlistlist)
 		}
 
 		// spdlog::error("Failed reading player clantag");
+	}
+
+	// we goto this instead of returning so we always hit this
+REQUEST_END_CLEANUP:
+
+	curl_easy_cleanup(curl);
+	return false;
+}
+
+bool MasterServerManager::UpdateMatchmakingStatus(MatchmakeInfo* status)
+{
+	// no need for a request thread here cuz we always call this function in a new thread.
+	// ps,aitdm,ttdm
+	CURL* curl = curl_easy_init();
+	SetCommonHttpClientOptions(curl);
+	std::string readBuffer;
+	std::string token = m_sOwnClientAuthToken;
+	std::string localuid = R2::g_pLocalPlayerUserID;
+	char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
+	char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
+	curl_easy_setopt(
+		curl,
+		CURLOPT_URL,
+		fmt::format("{}/matchmaking/state?id={}&token={}", Cvar_ns_masterserver_hostname->GetString(), localuidescaped, tokenescaped)
+			.c_str());
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+	CURLcode result = curl_easy_perform(curl);
+
+	if (result == CURLcode::CURLE_OK)
+	{
+		rapidjson_document serverresponse;
+		serverresponse.Parse(readBuffer.c_str());
+
+		if (serverresponse.HasParseError())
+		{
+
+			goto REQUEST_END_CLEANUP;
+		}
+
+		if (!serverresponse.IsObject() || !serverresponse.HasMember("success") && serverresponse.HasMember("state") &&
+											  serverresponse["state"].HasMember("type") && serverresponse["success"].IsTrue())
+		{
+
+			goto REQUEST_END_CLEANUP;
+		}
+		// spdlog::info("{}", serverresponse["state"]["type"].GetString());
+		if (!strcmp(serverresponse["state"]["type"].GetString(), "#MATCHMAKING_QUEUED"))
+		{
+			if (!serverresponse["state"].HasMember("eta_seconds") || !serverresponse["state"]["eta_seconds"].IsNumber())
+				goto REQUEST_END_CLEANUP;
+			status->etaSeconds = std::to_string(serverresponse["info"]["etaSeconds"].GetInt());
+			status->status = serverresponse["state"]["type"].GetString();
+			spdlog::info("[Matchmaker] MATCHMAKING_QUEUED");
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		if (!strcmp(serverresponse["state"]["type"].GetString(), "#MATCHMAKING_CONFIRMING"))
+		{
+			if (!serverresponse["state"].HasMember("timeout") || !serverresponse["state"]["timeout"].IsNumber() ||
+				!serverresponse["state"].HasMember("playlist_name") || !serverresponse["state"]["playlist_name"].IsString())
+				goto REQUEST_END_CLEANUP;
+			status->timeout = std::to_string(serverresponse["info"]["timeout"].GetInt());
+			status->playlistName = serverresponse["info"]["playlist_name"].GetString();
+			status->status = serverresponse["state"]["type"].GetString();
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		if (!strcmp(serverresponse["state"]["type"].GetString(), "#MATCHMAKING_CONFIRMED"))
+		{
+			spdlog::info("[Matchmaker] TODO: MATCHMAKING_CONFIRMED");
+			status->status = serverresponse["state"]["type"].GetString();
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		if (!strcmp(serverresponse["state"]["type"].GetString(), "#MATCHMAKING_ALLOCATING"))
+		{
+			spdlog::info("[Matchmaker] TODO: MATCHMAKING_ALLOCATING");
+			status->status = serverresponse["state"]["type"].GetString();
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		if (!strcmp(serverresponse["state"]["type"].GetString(), "#MATCHMAKING_CONNECTING"))
+		{
+			if (!serverresponse["state"].HasMember("ip") || !serverresponse["state"]["ip"].IsString() ||
+				!serverresponse["state"].HasMember("auth_token") || !serverresponse["state"]["auth_token"].IsString() ||
+				!serverresponse["state"].HasMember("port") || !serverresponse["state"]["port"].IsNumber())
+				goto REQUEST_END_CLEANUP;
+
+			status->etaSeconds = std::to_string(serverresponse["state"]["etaSeconds"].GetInt());
+			MatchmakeConnectionInfo* connctionInfo = new MatchmakeConnectionInfo;
+			connctionInfo->ip.S_un.S_addr = inet_addr(serverresponse["state"]["ip"].GetString());
+			connctionInfo->port = (unsigned short)serverresponse["state"]["port"].GetUint();
+
+			strncpy_s(
+				connctionInfo->authToken,
+				sizeof(m_pendingConnectionInfo.authToken),
+				serverresponse["state"]["authToken"].GetString(),
+				sizeof(m_pendingConnectionInfo.authToken) - 1);
+
+			status->connectionInfo = connctionInfo;
+			status->serverReady = true;
+			status->status = serverresponse["state"]["type"].GetString();
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		if (!strcmp(serverresponse["state"]["type"].GetString(), "#MATCHMAKING_NOTHING"))
+		{
+			spdlog::info("[Matchmaker] TODO: MATCHMAKING_NOTHING");
+			status->status = serverresponse["state"]["type"].GetString();
+			curl_easy_cleanup(curl);
+			return true;
+		}
+
+		spdlog::error("Failed reading matchmaking status");
 	}
 
 	// we goto this instead of returning so we always hit this
@@ -227,7 +405,6 @@ REQUEST_END_CLEANUP:
 	return false;
 }
 
-
 void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, const char* originToken)
 {
 	if (m_bOriginAuthWithMasterServerInProgress)
@@ -285,7 +462,7 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 						originAuthInfo["token"].GetString(),
 						sizeof(m_sOwnClientAuthToken) - 1);
 					m_bOriginAuthWithMasterServerSuccess = true;
-					//g_ClientAnticheatSystem.InitWindowListenerThread();
+					// g_ClientAnticheatSystem.InitWindowListenerThread();
 					spdlog::info("Northstar origin authentication completed successfully!");
 				}
 				else
@@ -294,7 +471,6 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 					m_sAuthFailureMessage = originAuthInfo["error"]["msg"].GetString();
 					spdlog::error("Northstar origin authentication failed:{}", m_sAuthFailureMessage);
 				}
-
 			}
 			else
 			{
@@ -387,8 +563,8 @@ void MasterServerManager::RequestServerList()
 						!serverObj.HasMember("map") || !serverObj["map"].IsString() || !serverObj.HasMember("playlist") ||
 						!serverObj["playlist"].IsString() || !serverObj.HasMember("playerCount") || !serverObj["playerCount"].IsNumber() ||
 						!serverObj.HasMember("maxPlayers") || !serverObj["maxPlayers"].IsNumber() || !serverObj.HasMember("gameState") ||
-						!serverObj["gameState"].IsNumber() || !serverObj.HasMember("hasPassword") ||
-						!serverObj["hasPassword"].IsBool() || !serverObj.HasMember("modInfo") || !serverObj["modInfo"].HasMember("Mods") ||
+						!serverObj["gameState"].IsNumber() || !serverObj.HasMember("hasPassword") || !serverObj["hasPassword"].IsBool() ||
+						!serverObj.HasMember("modInfo") || !serverObj["modInfo"].HasMember("Mods") ||
 						!serverObj["modInfo"]["Mods"].IsArray())
 					{
 						spdlog::error("Failed reading masterserver response: malformed server object");
@@ -783,8 +959,6 @@ void MasterServerManager::AuthenticateWithServer(const char* uid, const char* pl
 			// esnure that any persistence saving is done, so we know masterserver has newest
 			while (m_bSavingPersistentData)
 				Sleep(100);
-			
-				
 
 			spdlog::info("Attempting authentication with server of id \"{}\"", serverIdStr);
 
@@ -948,7 +1122,6 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 				delete[] cBuff;
 				return;
 			}
-
 
 			curl_mime_data(part, cBuff, cSize);
 			curl_mime_name(part, "pdata");
@@ -1134,7 +1307,7 @@ void MasterServerPresenceReporter::RunFrame(double flCurrentTime, const ServerPr
 	{
 		// Check if the InternalUpdateServer() call completed.
 		std::future_status status = updateServerFuture.wait_for(0ms);
-		
+
 		if (status != std::future_status::ready)
 		{
 			// Still running, no need to do anything.
@@ -1399,7 +1572,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 						std::to_string(g_pSQGameState->eGameState).c_str(),
 						authTokenEscaped)
 						.c_str());
-				//spdlog::info("GAMESTATE UPDATEVALUES: {}", g_pSQGameState->eGameState);
+				// spdlog::info("GAMESTATE UPDATEVALUES: {}", g_pSQGameState->eGameState);
 				curl_free(nameEscaped);
 				curl_free(descEscaped);
 				curl_free(mapEscaped);

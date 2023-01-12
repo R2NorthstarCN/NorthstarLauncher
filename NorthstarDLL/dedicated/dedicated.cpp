@@ -225,6 +225,7 @@ ON_DLL_LOAD_DEDI_RELIESON("engine.dll", DedicatedServer, ServerPresence, (CModul
 	Tier0::CommandLine()->AppendParm("+host_preload_shaders", "0");
 	Tier0::CommandLine()->AppendParm("+net_usesocketsforloopback", "1");
 	Tier0::CommandLine()->AppendParm("+community_frame_run", "0");
+	// Tier0::CommandLine()->AppendParm("+sv_shiftPlayerSimTimeBackwards ", 0);
 
 	// use presence reporter for console title
 	DedicatedConsoleServerPresence* presenceReporter = new DedicatedConsoleServerPresence;
