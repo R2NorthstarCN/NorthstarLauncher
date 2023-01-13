@@ -392,7 +392,7 @@ ADD_SQFUNC("void", NSConnectToAuthedServer, "", "", ScriptContext::UI)
 
 	// set auth token, then try to connect
 	// i'm honestly not entirely sure how silentconnect works regarding ports and encryption so using connect for now
-	R2::g_pCVar->FindVar("serverfilter")->SetValue(info.authToken);
+	R2::g_pCVar->FindVar("serverfilter")->SetValue(info.authToken.c_str());
 	R2::Cbuf_AddText(
 		R2::Cbuf_GetCurrentPlayer(),
 		fmt::format(
@@ -433,7 +433,7 @@ ADD_SQFUNC("string", NSGetAuthFailReason, "", "", ScriptContext::UI)
 	return SQRESULT_NOTNULL;
 }
 
-ADD_SQFUNC("string",NSGetAuthFailMessage,"","",ScriptContext::UI)
+ADD_SQFUNC("string", NSGetAuthFailMessage, "", "", ScriptContext::UI)
 {
 	g_pSquirrel<ScriptContext::UI>->pushstring(sqvm, g_pMasterServerManager->m_sAuthFailureMessage.c_str(), -1);
 	return SQRESULT_NOTNULL;

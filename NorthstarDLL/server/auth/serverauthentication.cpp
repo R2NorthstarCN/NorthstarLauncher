@@ -8,6 +8,7 @@
 #include "engine/hoststate.h"
 #include "shared/maxplayers.h"
 #include "bansystem.h"
+#include "util/base64.h"
 #include "core/convar/concommand.h"
 #include "dedicated/dedicated.h"
 #include "config/profile.h"
@@ -20,7 +21,6 @@
 #include <fstream>
 #include <filesystem>
 #include <thread>
-#include "zstd.h"
 
 AUTOHOOK_INIT()
 
@@ -64,75 +64,20 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 						response.set_content("{\"success\":false}", "application/json");
 						return;
 					}
-					
-					RemoteAuthData newAuthData {};
+
+					RemoteAuthData newAuthData;
 					if (request.has_param("clantag"))
 					{
-						spdlog::info(
-							"[CLANTAG] Got clantag \"{}\" for UID \"{}\"",
-							request.get_param_value("clantag"),
-							request.get_param_value("id"));
 						newAuthData.clantag = request.get_param_value("clantag");
 					}
-					strncpy_s(newAuthData.uid, sizeof(newAuthData.uid), request.get_param_value("id").c_str(), sizeof(newAuthData.uid) - 1);
-					strncpy_s(
-						newAuthData.username,
-						sizeof(newAuthData.username),
-						request.get_param_value("username").c_str(),
-						sizeof(newAuthData.username) - 1);
-					// decompress here
-
-					// validate ZSTD data
-					ZSTD_DCtx* const dctx = ZSTD_createDCtx();
-					if (dctx == nullptr)
-					{
-						spdlog::error("[ZSTD] unable to create dctx");
-						response.set_content("{\"success\":false}", "application/json");
-						return;
-					}
-
-					ZSTD_inBuffer input = {request.body.c_str(), request.body.size(), 0};
-					std::vector<char> decompressed;
-					size_t const buffOutSize = ZSTD_DStreamOutSize();
-					size_t lastRet = 0;
-					char* buffOut = new char[buffOutSize];
-					while (input.pos < input.size)
-					{
-						ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
-						size_t const ret = ZSTD_decompressStream(dctx, &output, &input);
-						if (ZSTD_isError(ret))
-						{
-							spdlog::error("[ZSTD] {}", ZSTD_getErrorName(ret));
-							delete[] buffOut;
-							ZSTD_freeDCtx(dctx);
-							response.set_content("{\"success\":false}", "application/json");
-							return;
-						}
-						decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos + 1);
-						lastRet = ret;
-					}
-					if (lastRet != 0)
-					{
-						spdlog::error("[ZSTD] EOF before end of stream: {}", lastRet);
-						delete[] buffOut;
-						ZSTD_freeDCtx(dctx);
-						response.set_content("{\"success\":false}", "application/json");
-						return;
-					}
-						
-
-					newAuthData.pdataSize = decompressed.size();
-					newAuthData.pdata = new char[newAuthData.pdataSize];
-					memcpy(newAuthData.pdata, decompressed.data(), newAuthData.pdataSize);
-
-					delete[] buffOut;
-					ZSTD_freeDCtx(dctx);
+					newAuthData.uid = request.get_param_value("id");
+					newAuthData.username = request.get_param_value("username");
+					newAuthData.pdata = base64_decode(request.body);
 
 					std::lock_guard<std::mutex> guard(m_AuthDataMutex);
 					m_RemoteAuthenticationData.insert(std::make_pair(request.get_param_value("authToken"), newAuthData));
 
 					response.set_content("{\"success\":true}", "application/json");
-					
 				});
 
 			m_PlayerAuthServer.listen("0.0.0.0", Cvar_ns_player_auth_port->GetInt());
@@ -143,9 +88,9 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 		[this](const httplib::Request& request, httplib::Response& response)
 		{
 			if (!request.has_param("serverAuthToken") ||
-			strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
+				strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
 			{
-			   //return;
+				// return;
 			}
 
 			g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(request.body);
@@ -174,7 +119,7 @@ void ServerAuthenticationManager::AddPlayer(R2::CBaseClient* pPlayer, const char
 
 	auto remoteAuthData = m_RemoteAuthenticationData.find(pToken);
 	if (remoteAuthData != m_RemoteAuthenticationData.end())
-		additionalData.pdataSize = remoteAuthData->second.pdataSize;
+		additionalData.pdataSize = remoteAuthData->second.pdata.size();
 	else
 		additionalData.pdataSize = R2::PERSISTENCE_MAX_SIZE;
 
@@ -196,8 +141,8 @@ bool ServerAuthenticationManager::VerifyPlayerName(const char* pAuthToken, const
 	// always use name from masterserver if available
 	// use of strncpy_s here should verify that this is always nullterminated within valid buffer size
 	auto authData = m_RemoteAuthenticationData.find(pAuthToken);
-	if (authData != m_RemoteAuthenticationData.end() && *authData->second.username)
-		strncpy_s(pOutVerifiedName, 64, authData->second.username, 63);
+	if (authData != m_RemoteAuthenticationData.end() && !authData->second.username.empty())
+		strncpy_s(pOutVerifiedName, 64, authData->second.username.c_str(), 63);
 	else
 		strncpy_s(pOutVerifiedName, 64, pName, 63);
 
@@ -248,7 +193,7 @@ bool ServerAuthenticationManager::CheckAuthentication(R2::CBaseClient* pPlayer, 
 
 	std::lock_guard<std::mutex> guard(m_AuthDataMutex);
 	auto authData = m_RemoteAuthenticationData.find(pAuthToken);
-	if (authData != m_RemoteAuthenticationData.end() && !strcmp(sUid.c_str(), authData->second.uid))
+	if (authData != m_RemoteAuthenticationData.end() && sUid == authData->second.uid)
 		return true;
 
 	return false;
@@ -273,7 +218,7 @@ void ServerAuthenticationManager::AuthenticatePlayer(R2::CBaseClient* pPlayer, u
 		if (!m_bForceResetLocalPlayerPersistence || strcmp(sUid.c_str(), R2::g_pLocalPlayerUserID))
 		{
 			// copy pdata into buffer
-			memcpy(pPlayer->m_PersistenceBuffer, authData->second.pdata, authData->second.pdataSize);
+			memcpy(pPlayer->m_PersistenceBuffer, authData->second.pdata.data(), authData->second.pdata.size());
 		}
 
 		// set persistent data as ready
@@ -300,13 +245,11 @@ bool ServerAuthenticationManager::RemovePlayerAuthData(R2::CBaseClient* pPlayer)
 	// we don't have our auth token at this point, so lookup authdata by uid
 	for (auto& auth : m_RemoteAuthenticationData)
 	{
-		if (!strcmp(pPlayer->m_UID, auth.second.uid))
+		if (pPlayer->m_UID == auth.second.uid)
 		{
 			// pretty sure this is fine, since we don't iterate after the erase
 			// i think if we iterated after it'd be undefined behaviour tho
 			std::lock_guard<std::mutex> guard(m_AuthDataMutex);
-
-			delete[] auth.second.pdata;
 			m_RemoteAuthenticationData.erase(auth.first);
 			return true;
 		}
@@ -403,16 +346,12 @@ bool,, (R2::CBaseClient* self, char* pName, void* pNetChannel, char bFakePlayer,
 
 	if (!g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag.empty())
 	{
-		//std::string nameWithTag = "[" + g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag + "]" + self->m_Name;
-		//strncpy_s(self->m_Name, nameWithTag.c_str(), 64);
+		// std::string nameWithTag = "[" + g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag + "]" +
+		// self->m_Name; strncpy_s(self->m_Name, nameWithTag.c_str(), 64);
 		char* clantag = ((char*)self + 0x318 + 64);
 		strncpy(clantag, g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag.c_str(), 16);
 		clantag[15] = '\0';
 	}
-
-	
-
-	
 
 	g_pServerAuthentication->AddPlayer(self, pNextPlayerToken);
 	g_pServerLimits->AddPlayer(self);

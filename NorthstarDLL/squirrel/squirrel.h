@@ -159,6 +159,11 @@ class SquirrelManagerBase
 		__sq_pushstring(sqvm, sVal, length);
 	}
 
+	inline void pushstring(HSquirrelVM* sqvm, const std::string& sVal, int length = -1)
+	{
+		pushstring(sqvm, sVal.c_str(), length);
+	}
+
 	inline void pushinteger(HSquirrelVM* sqvm, const SQInteger iVal)
 	{
 		__sq_pushinteger(sqvm, iVal);

@@ -4,6 +4,7 @@
 #include "server/serverpresence.h"
 #include <winsock2.h>
 #include <string>
+#include <shared_mutex>
 #include <cstring>
 #include <future>
 #include "scriptmatchmakingevents.h"
@@ -12,22 +13,18 @@ extern ConVar* Cvar_ns_curl_log_enable;
 
 struct RemoteModInfo
 {
-  public:
 	std::string Name;
 	std::string Version;
 };
 
-class RemoteServerInfo
+struct RemoteServerInfo
 {
-  public:
-	char id[33]; // 32 bytes + nullterminator
-
-	// server info
-	char name[64];
+	std::string id;
+	std::string name;
 	std::string description;
-	char map[32];
-	char playlist[16];
-	char region[32];
+	std::string map;
+	std::string playlist;
+	std::string region;
 	std::vector<RemoteModInfo> requiredMods;
 	int gameState;
 	int playerCount;
@@ -35,32 +32,17 @@ class RemoteServerInfo
 
 	// connection stuff
 	bool requiresPassword;
-
-  public:
-	RemoteServerInfo(
-		const char* newId,
-		const char* newName,
-		const char* newDescription,
-		const char* newMap,
-		const char* newPlaylist,
-		int newGameState,
-		int newPlayerCount,
-		int newMaxPlayers,
-		bool newRequiresPassword);
 };
 
 struct RemoteServerConnectionInfo
 {
-  public:
-	char authToken[32];
-
+	std::string authToken;
 	in_addr ip;
 	unsigned short port;
 };
 
 struct MainMenuPromoData
 {
-  public:
 	std::string newInfoTitle1;
 	std::string newInfoTitle2;
 	std::string newInfoTitle3;
@@ -91,7 +73,7 @@ class MasterServerManager
   public:
 	char m_sOwnServerId[33];
 	char m_sOwnServerAuthToken[33];
-	char m_sOwnClientAuthToken[33];
+	std::string m_sOwnClientAuthToken;
 
 	std::string m_sOwnModInfoJson;
 
@@ -129,8 +111,8 @@ class MasterServerManager
 	void RequestServerList();
 	void RequestMainMenuPromos();
 	void AuthenticateOriginWithMasterServer(const char* uid, const char* originToken);
-	void AuthenticateWithOwnServer(const char* uid, const char* playerToken);
-	void AuthenticateWithServer(const char* uid, const char* playerToken, const char* serverId, const char* password);
+	void AuthenticateWithOwnServer(const char* uid, const std::string& playerToken);
+	void AuthenticateWithServer(const char* uid, const std::string& playerToken, const std::string& serverId, const char* password);
 	void WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize);
 	bool SetLocalPlayerClanTag(std::string clantag);
 	bool StartMatchmaking(MatchmakeInfo* status);

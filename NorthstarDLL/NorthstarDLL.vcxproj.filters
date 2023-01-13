@@ -88,12 +88,6 @@
     <Filter Include="Source Files\util">
       <UniqueIdentifier>{d60e54d0-b4e4-4210-af6b-59bdd84bed0f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\client">
-      <UniqueIdentifier>{06c7928e-bf66-446e-9cde-c8135c79d14b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\config">
-      <UniqueIdentifier>{0b8b4a41-6131-4388-85d2-f5754a304610}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\dedicated">
       <UniqueIdentifier>{9ccd8616-d961-4c37-96e0-3219bd293afb}</UniqueIdentifier>
     </Filter>
@@ -148,9 +142,6 @@
     <Filter Include="Header Files\core">
       <UniqueIdentifier>{7ee4b436-a5d3-4680-bf99-bc6d7640ded3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\core\convar">
-      <UniqueIdentifier>{53a84980-9a1c-46b0-9b6d-06ec35781297}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\core\filesystem">
       <UniqueIdentifier>{01e215c3-9fa2-4de1-a3e0-b6a27396c68c}</UniqueIdentifier>
     </Filter>
@@ -180,6 +171,15 @@
     </Filter>
     <Filter Include="Header Files\shared\exploit_fixes">
       <UniqueIdentifier>{1a377c09-bd3d-4757-b3bc-9cd0a1e6ac0d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\client">
+      <UniqueIdentifier>{06c7928e-bf66-446e-9cde-c8135c79d14b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core\convar">
+      <UniqueIdentifier>{53a84980-9a1c-46b0-9b6d-06ec35781297}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\config">
+      <UniqueIdentifier>{0b8b4a41-6131-4388-85d2-f5754a304610}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

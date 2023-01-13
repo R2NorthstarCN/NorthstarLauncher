@@ -7,13 +7,10 @@
 
 struct RemoteAuthData
 {
-	char uid[33];
-	char username[64];
+	std::string uid;
+	std::string username;
 	std::string clantag;
-
-	// pdata
-	char* pdata;
-	size_t pdataSize;
+	std::vector<BYTE> pdata;
 };
 
 struct PlayerAuthenticationData

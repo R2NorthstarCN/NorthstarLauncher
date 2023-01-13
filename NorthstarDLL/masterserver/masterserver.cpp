@@ -20,8 +20,8 @@
 #include <regex>
 #include "util/base64.h"
 #include "scripts/scriptgamestate.h"
-#include "zstd.h"
 #include "scriptmatchmakingevents.h"
+#include "nlohmann/json.hpp"
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
 ClientAnticheatSystem g_ClientAnticheatSystem;
@@ -29,31 +29,6 @@ ClientAnticheatSystem g_ClientAnticheatSystem;
 ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
 ConVar* Cvar_ns_server_reg_token;
-RemoteServerInfo::RemoteServerInfo(
-	const char* newId,
-	const char* newName,
-	const char* newDescription,
-	const char* newMap,
-	const char* newPlaylist,
-	int newGameState,
-	int newPlayerCount,
-	int newMaxPlayers,
-	bool newRequiresPassword)
-{
-	// passworded servers don't have public ips
-	requiresPassword = newRequiresPassword;
-
-	strncpy_s((char*)id, sizeof(id), newId, sizeof(id) - 1);
-	strncpy_s((char*)name, sizeof(name), newName, sizeof(name) - 1);
-
-	description = std::string(newDescription);
-
-	strncpy_s((char*)map, sizeof(map), newMap, sizeof(map) - 1);
-	strncpy_s((char*)playlist, sizeof(playlist), newPlaylist, sizeof(playlist) - 1);
-	gameState = newGameState;
-	playerCount = newPlayerCount;
-	maxPlayers = newMaxPlayers;
-}
 
 void SetCommonHttpClientOptions(CURL* curl)
 {
@@ -86,6 +61,30 @@ void SetCommonHttpClientOptions(CURL* curl)
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+}
+
+httplib::Client SetupHttpClient()
+{
+	std::string msaddr = Cvar_ns_masterserver_hostname->GetString();
+	httplib::Client cli(msaddr);
+	cli.set_compress(true);
+	cli.set_decompress(true);
+
+	cli.set_default_headers({{"User-Agent", NSUserAgent}, {"Accept-Encoding", "gzip"}});
+
+	if (!strstr(GetCommandLineA(), "-disabledoh"))
+	{
+		std::string DohResult = g_DohWorker->GetDOHResolve(msaddr);
+		if (g_DohWorker->m_bDohAvailable)
+		{
+			cli.set_hostname_addr_map({{msaddr, DohResult}});
+		}
+		else
+		{
+			spdlog::warn("[DOH] service is not available. falling back to DNS");
+		}
+	}
+	return cli;
 }
 
 void MasterServerManager::ClearServerList()
@@ -345,64 +344,41 @@ REQUEST_END_CLEANUP:
 
 bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
 {
-	CURL* curl = curl_easy_init();
-	SetCommonHttpClientOptions(curl);
-	std::string readBuffer;
-	std::string token = m_sOwnClientAuthToken;
-	std::string localuid = R2::g_pLocalPlayerUserID;
-	char* clantagescaped = curl_easy_escape(curl, clantag.c_str(), clantag.length());
-	char* localuidescaped = curl_easy_escape(curl, localuid.c_str(), localuid.length());
-	char* tokenescaped = curl_easy_escape(curl, token.c_str(), token.length());
-	curl_easy_setopt(
-		curl,
-		CURLOPT_URL,
-		fmt::format(
-			"{}/client/clantag?clantag={}&id={}&token={}",
-			Cvar_ns_masterserver_hostname->GetString(),
-			clantagescaped,
-			localuidescaped,
-			tokenescaped)
-			.c_str());
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
 
-	CURLcode result = curl_easy_perform(curl);
+	httplib::Client cli = SetupHttpClient();
+	std::string querystring = fmt::format(
+		"{}/client/clantag?clantag={}&id={}&token={}",
+		Cvar_ns_masterserver_hostname->GetString(),
+		clantag,
+		R2::g_pLocalPlayerUserID,
+		m_sOwnClientAuthToken);
 
-	if (result == CURLcode::CURLE_OK)
+	auto res = cli.Post(querystring);
+	if (res && res->status == 200)
 	{
-		rapidjson_document serverresponse;
-		serverresponse.Parse(readBuffer.c_str());
-
-		if (serverresponse.HasParseError())
+		try
 		{
-			// spdlog::error(
-			//"Failed reading player clantag: encountered parse error \"{}\"",
-			// rapidjson::GetParseError_En(serverresponse.GetParseError()));
-			goto REQUEST_END_CLEANUP;
+			nlohmann::json setclantagJson = nlohmann::json::parse(res->body);
+			if (setclantagJson.at("success"))
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+		catch (nlohmann::json::parse_error& e)
+		{
+			spdlog::error("Failed setting local player clantag: \"{}\"", e.what());
+		}
+		catch (nlohmann::json::out_of_range& e)
+		{
+			spdlog::error("Failed setting local player clantag: \"{}\"", e.what());
 		}
 
-		if (!serverresponse.IsObject() || !serverresponse.HasMember("success"))
-		{
-			// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
-			goto REQUEST_END_CLEANUP;
-		}
-
-		if (serverresponse["success"].IsTrue())
-		{
-			// std::cout << "Successfully set local player clantag." << std::endl;
-			curl_easy_cleanup(curl);
-			return true;
-		}
-
-		// spdlog::error("Failed reading player clantag");
+		return false;
 	}
-
-	// we goto this instead of returning so we always hit this
-REQUEST_END_CLEANUP:
-
-	curl_easy_cleanup(curl);
-	return false;
 }
 
 void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, const char* originToken)
@@ -420,69 +396,46 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 		{
 			spdlog::info("Trying to authenticate with northstar masterserver for user {}", uidStr);
 
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-			std::string readBuffer;
-			curl_easy_setopt(
-				curl,
-				CURLOPT_URL,
-				fmt::format("{}/client/origin_auth?id={}&token={}", Cvar_ns_masterserver_hostname->GetString(), uidStr, tokenStr).c_str());
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+			httplib::Client cli = SetupHttpClient();
+			std::string endpoint = fmt::format("/client/origin_auth?id={}&token={}", uidStr, tokenStr);
 
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
+			if (auto res = cli.Get(endpoint))
 			{
 				m_bSuccessfullyConnected = true;
-
-				rapidjson_document originAuthInfo;
-				originAuthInfo.Parse(readBuffer.c_str());
-
-				if (originAuthInfo.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading origin auth info response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(originAuthInfo.GetParseError()));
-					goto REQUEST_END_CLEANUP;
+					nlohmann::json originAuthInfo = nlohmann::json::parse(res->body);
+					if (originAuthInfo["success"])
+					{
+						m_sOwnClientAuthToken = originAuthInfo.at("token");
+						m_bOriginAuthWithMasterServerSuccess = true;
+						spdlog::info("Northstar origin authentication completed successfully!");
+					}
+					else
+					{
+						m_sAuthFailureReason = originAuthInfo.at("error").at("enum");
+						m_sAuthFailureMessage = originAuthInfo.at("error").at("msg");
+						spdlog::error("Northstar origin authentication failed: {}", m_sAuthFailureMessage);
+					}
 				}
-
-				if (!originAuthInfo.IsObject() || !originAuthInfo.HasMember("success"))
+				catch (nlohmann::json::parse_error& e)
 				{
-					spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed reading origin auth info response: encountered parse error \"{}\"", e.what());
 				}
-
-				if (originAuthInfo["success"].IsTrue() && originAuthInfo.HasMember("token") && originAuthInfo["token"].IsString())
+				catch (nlohmann::json::out_of_range& e)
 				{
-					strncpy_s(
-						m_sOwnClientAuthToken,
-						sizeof(m_sOwnClientAuthToken),
-						originAuthInfo["token"].GetString(),
-						sizeof(m_sOwnClientAuthToken) - 1);
-					m_bOriginAuthWithMasterServerSuccess = true;
-					// g_ClientAnticheatSystem.InitWindowListenerThread();
-					spdlog::info("Northstar origin authentication completed successfully!");
-				}
-				else
-				{
-					m_sAuthFailureReason = originAuthInfo["error"]["enum"].GetString();
-					m_sAuthFailureMessage = originAuthInfo["error"]["msg"].GetString();
-					spdlog::error("Northstar origin authentication failed:{}", m_sAuthFailureMessage);
+					spdlog::error("Failed reading origin auth info response: encountered data error \"{}\"", e.what());
 				}
 			}
 			else
 			{
-				spdlog::error("Failed performing northstar origin auth: error {}", curl_easy_strerror(result));
+				auto err = res.error();
+				spdlog::error("Failed performing northstar origin auth: {}", httplib::to_string(err));
 				m_bSuccessfullyConnected = false;
 			}
 
-			// we goto this instead of returning so we always hit this
-		REQUEST_END_CLEANUP:
 			m_bOriginAuthWithMasterServerInProgress = false;
 			m_bOriginAuthWithMasterServerDone = true;
-			curl_easy_cleanup(curl);
 		});
 
 	requestThread.detach();
@@ -504,154 +457,68 @@ void MasterServerManager::RequestServerList()
 			m_bRequestingServerList = true;
 			m_bScriptRequestingServerList = true;
 
-			spdlog::info("Requesting server list from {}", Cvar_ns_masterserver_hostname->GetString());
+			httplib::Client cli = SetupHttpClient();
 
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-
-			std::string readBuffer;
-			curl_easy_setopt(curl, CURLOPT_URL, fmt::format("{}/client/servers", Cvar_ns_masterserver_hostname->GetString()).c_str());
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
+			if (auto res = cli.Get("/client/servers"))
 			{
 				m_bSuccessfullyConnected = true;
-
-				rapidjson_document serverInfoJson;
-				serverInfoJson.Parse(readBuffer.c_str());
-
-				if (serverInfoJson.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading masterserver response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(serverInfoJson.GetParseError()));
-					goto REQUEST_END_CLEANUP;
-				}
+					nlohmann::json serverListJson = nlohmann::json::parse(res->body);
 
-				if (serverInfoJson.IsObject() && serverInfoJson.HasMember("error"))
-				{
-					spdlog::error("Failed reading masterserver response: got fastify error response");
-					spdlog::error(readBuffer);
-					goto REQUEST_END_CLEANUP;
-				}
+					m_vRemoteServers.clear();
 
-				if (!serverInfoJson.IsArray())
-				{
-					spdlog::error("Failed reading masterserver response: root object is not an array");
-					goto REQUEST_END_CLEANUP;
-				}
-
-				rapidjson::GenericArray<false, rapidjson_document::GenericValue> serverArray = serverInfoJson.GetArray();
-
-				spdlog::info("Got {} servers", serverArray.Size());
-
-				for (auto& serverObj : serverArray)
-				{
-					if (!serverObj.IsObject())
+					for (auto& serverObj : serverListJson)
 					{
-						spdlog::error("Failed reading masterserver response: member of server array is not an object");
-						goto REQUEST_END_CLEANUP;
-					}
+						RemoteServerInfo server;
 
-					// todo: verify json props are fine before adding to m_remoteServers
-					if (!serverObj.HasMember("id") || !serverObj["id"].IsString() || !serverObj.HasMember("name") ||
-						!serverObj["name"].IsString() || !serverObj.HasMember("description") || !serverObj["description"].IsString() ||
-						!serverObj.HasMember("map") || !serverObj["map"].IsString() || !serverObj.HasMember("playlist") ||
-						!serverObj["playlist"].IsString() || !serverObj.HasMember("playerCount") || !serverObj["playerCount"].IsNumber() ||
-						!serverObj.HasMember("maxPlayers") || !serverObj["maxPlayers"].IsNumber() || !serverObj.HasMember("gameState") ||
-						!serverObj["gameState"].IsNumber() || !serverObj.HasMember("hasPassword") || !serverObj["hasPassword"].IsBool() ||
-						!serverObj.HasMember("modInfo") || !serverObj["modInfo"].HasMember("Mods") ||
-						!serverObj["modInfo"]["Mods"].IsArray())
-					{
-						spdlog::error("Failed reading masterserver response: malformed server object");
-						continue;
-					};
+						server.id = serverObj.at("id");
+						server.name = serverObj.at("name");
+						server.description = serverObj.at("description");
+						server.map = serverObj.at("map");
+						server.playlist = serverObj.at("playlist");
+						server.gameState = serverObj.at("gameState");
+						server.playerCount = serverObj.at("playerCount");
+						server.maxPlayers = serverObj.at("maxPlayers");
+						server.requiresPassword = serverObj.at("hasPassword");
 
-					const char* id = serverObj["id"].GetString();
-
-					RemoteServerInfo* newServer = nullptr;
-
-					bool createNewServerInfo = true;
-					for (RemoteServerInfo& server : m_vRemoteServers)
-					{
-						// if server already exists, update info rather than adding to it
-						if (!strncmp((const char*)server.id, id, 32))
+						for (auto& mod : serverObj.at("modInfo").at("Mods"))
 						{
-							server = RemoteServerInfo(
-								id,
-								serverObj["name"].GetString(),
-								serverObj["description"].GetString(),
-								serverObj["map"].GetString(),
-								serverObj["playlist"].GetString(),
-								serverObj["gameState"].GetInt(),
-								serverObj["playerCount"].GetInt(),
-								serverObj["maxPlayers"].GetInt(),
-								serverObj["hasPassword"].IsTrue());
-							newServer = &server;
-							createNewServerInfo = false;
-							break;
+							if (mod.at("RequiredOnClient"))
+							{
+								RemoteModInfo modInfo;
+
+								modInfo.Name = mod.at("Name");
+								modInfo.Version = mod.at("Version");
+								server.requiredMods.push_back(modInfo);
+							}
 						}
+
+						m_vRemoteServers.push_back(server);
 					}
 
-					// server didn't exist
-					if (createNewServerInfo)
-						newServer = &m_vRemoteServers.emplace_back(
-							id,
-							serverObj["name"].GetString(),
-							serverObj["description"].GetString(),
-							serverObj["map"].GetString(),
-							serverObj["playlist"].GetString(),
-							serverObj["gameState"].GetInt(),
-							serverObj["playerCount"].GetInt(),
-							serverObj["maxPlayers"].GetInt(),
-							serverObj["hasPassword"].IsTrue());
-
-					newServer->requiredMods.clear();
-					for (auto& requiredMod : serverObj["modInfo"]["Mods"].GetArray())
-					{
-						RemoteModInfo modInfo;
-
-						if (!requiredMod.HasMember("RequiredOnClient") || !requiredMod["RequiredOnClient"].IsTrue())
-							continue;
-
-						if (!requiredMod.HasMember("Name") || !requiredMod["Name"].IsString())
-							continue;
-						modInfo.Name = requiredMod["Name"].GetString();
-
-						if (!requiredMod.HasMember("Version") || !requiredMod["Version"].IsString())
-							continue;
-						modInfo.Version = requiredMod["Version"].GetString();
-
-						newServer->requiredMods.push_back(modInfo);
-					}
-					// Can probably re-enable this later with a -verbose flag, but slows down loading of the server browser quite a bit as
-					// is
-					// spdlog::info(
-					//	"Server {} on map {} with playlist {} has {}/{} players", serverObj["name"].GetString(),
-					//	serverObj["map"].GetString(), serverObj["playlist"].GetString(), serverObj["playerCount"].GetInt(),
-					//	serverObj["maxPlayers"].GetInt());
+					std::sort(
+						m_vRemoteServers.begin(),
+						m_vRemoteServers.end(),
+						[](RemoteServerInfo& a, RemoteServerInfo& b) { return a.playerCount > b.playerCount; });
 				}
-
-				std::sort(
-					m_vRemoteServers.begin(),
-					m_vRemoteServers.end(),
-					[](RemoteServerInfo& a, RemoteServerInfo& b) { return a.playerCount > b.playerCount; });
+				catch (nlohmann::json::parse_error& e)
+				{
+					spdlog::error("Failed reading origin auth info response: encountered parse error \"{}\"", e.what());
+				}
+				catch (nlohmann::json::out_of_range& e)
+				{
+					spdlog::error("Failed reading origin auth info response: encountered data error \"{}\"", e.what());
+				}
 			}
 			else
 			{
-				spdlog::error("Failed requesting servers: error {}", curl_easy_strerror(result));
+				auto err = res.error();
+				spdlog::error("Failed requesting servers: error {}", err);
 				m_bSuccessfullyConnected = false;
 			}
-
-			// we goto this instead of returning so we always hit this
-		REQUEST_END_CLEANUP:
 			m_bRequestingServerList = false;
 			m_bScriptRequestingServerList = false;
-			curl_easy_cleanup(curl);
 		});
 
 	requestThread.detach();
@@ -667,261 +534,109 @@ void MasterServerManager::RequestMainMenuPromos()
 			while (m_bOriginAuthWithMasterServerInProgress || !m_bOriginAuthWithMasterServerDone)
 				Sleep(500);
 
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-
-			std::string readBuffer;
-			curl_easy_setopt(
-				curl, CURLOPT_URL, fmt::format("{}/client/mainmenupromos", Cvar_ns_masterserver_hostname->GetString()).c_str());
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
+			httplib::Client cli = SetupHttpClient();
+			if (auto res = cli.Get("/client/mainmenupromos"))
 			{
 				m_bSuccessfullyConnected = true;
-
-				rapidjson_document mainMenuPromoJson;
-				mainMenuPromoJson.Parse(readBuffer.c_str());
-
-				if (mainMenuPromoJson.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading masterserver main menu promos response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(mainMenuPromoJson.GetParseError()));
-					goto REQUEST_END_CLEANUP;
-				}
+					nlohmann::json mainMenuPromoJson = nlohmann::json::parse(res->body);
+					m_sMainMenuPromoData.newInfoTitle1 = mainMenuPromoJson.at("newInfo").at("Title1");
+					m_sMainMenuPromoData.newInfoTitle2 = mainMenuPromoJson.at("newInfo").at("Title2");
+					m_sMainMenuPromoData.newInfoTitle3 = mainMenuPromoJson.at("newInfo").at("Title3");
 
-				if (!mainMenuPromoJson.IsObject())
+					m_sMainMenuPromoData.largeButtonTitle = mainMenuPromoJson.at("largeButton").at("Title");
+					m_sMainMenuPromoData.largeButtonText = mainMenuPromoJson.at("largeButton").at("Text");
+					m_sMainMenuPromoData.largeButtonUrl = mainMenuPromoJson.at("largeButton").at("Url");
+					m_sMainMenuPromoData.largeButtonImageIndex = mainMenuPromoJson.at("largeButton").at("ImageIndex");
+
+					m_sMainMenuPromoData.smallButton1Title = mainMenuPromoJson.at("smallButton1").at("Title");
+					m_sMainMenuPromoData.smallButton1Url = mainMenuPromoJson.at("smallButton1").at("Url");
+					m_sMainMenuPromoData.smallButton1ImageIndex = mainMenuPromoJson.at("smallButton1").at("ImageIndex");
+
+					m_sMainMenuPromoData.smallButton2Title = mainMenuPromoJson.at("smallButton2").at("Title");
+					m_sMainMenuPromoData.smallButton2Url = mainMenuPromoJson.at("smallButton2").at("Url");
+					m_sMainMenuPromoData.smallButton2ImageIndex = mainMenuPromoJson.at("smallButton2").at("ImageIndex");
+
+					m_bHasMainMenuPromoData = true;
+				}
+				catch (nlohmann::json::parse_error& e)
 				{
-					spdlog::error("Failed reading masterserver main menu promos response: root object is not an object");
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed reading masterserver main menu promos response: encountered parse error \"{}\"", e.what());
 				}
-
-				if (mainMenuPromoJson.HasMember("error"))
+				catch (nlohmann::json::out_of_range& e)
 				{
-					spdlog::error("Failed reading masterserver response: got fastify error response");
-					spdlog::error(readBuffer);
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed reading masterserver main menu promos response: encountered data error \"{}\"", e.what());
 				}
-
-				if (!mainMenuPromoJson.HasMember("newInfo") || !mainMenuPromoJson["newInfo"].IsObject() ||
-					!mainMenuPromoJson["newInfo"].HasMember("Title1") || !mainMenuPromoJson["newInfo"]["Title1"].IsString() ||
-					!mainMenuPromoJson["newInfo"].HasMember("Title2") || !mainMenuPromoJson["newInfo"]["Title2"].IsString() ||
-					!mainMenuPromoJson["newInfo"].HasMember("Title3") || !mainMenuPromoJson["newInfo"]["Title3"].IsString() ||
-
-					!mainMenuPromoJson.HasMember("largeButton") || !mainMenuPromoJson["largeButton"].IsObject() ||
-					!mainMenuPromoJson["largeButton"].HasMember("Title") || !mainMenuPromoJson["largeButton"]["Title"].IsString() ||
-					!mainMenuPromoJson["largeButton"].HasMember("Text") || !mainMenuPromoJson["largeButton"]["Text"].IsString() ||
-					!mainMenuPromoJson["largeButton"].HasMember("Url") || !mainMenuPromoJson["largeButton"]["Url"].IsString() ||
-					!mainMenuPromoJson["largeButton"].HasMember("ImageIndex") ||
-					!mainMenuPromoJson["largeButton"]["ImageIndex"].IsNumber() ||
-
-					!mainMenuPromoJson.HasMember("smallButton1") || !mainMenuPromoJson["smallButton1"].IsObject() ||
-					!mainMenuPromoJson["smallButton1"].HasMember("Title") || !mainMenuPromoJson["smallButton1"]["Title"].IsString() ||
-					!mainMenuPromoJson["smallButton1"].HasMember("Url") || !mainMenuPromoJson["smallButton1"]["Url"].IsString() ||
-					!mainMenuPromoJson["smallButton1"].HasMember("ImageIndex") ||
-					!mainMenuPromoJson["smallButton1"]["ImageIndex"].IsNumber() ||
-
-					!mainMenuPromoJson.HasMember("smallButton2") || !mainMenuPromoJson["smallButton2"].IsObject() ||
-					!mainMenuPromoJson["smallButton2"].HasMember("Title") || !mainMenuPromoJson["smallButton2"]["Title"].IsString() ||
-					!mainMenuPromoJson["smallButton2"].HasMember("Url") || !mainMenuPromoJson["smallButton2"]["Url"].IsString() ||
-					!mainMenuPromoJson["smallButton2"].HasMember("ImageIndex") ||
-					!mainMenuPromoJson["smallButton2"]["ImageIndex"].IsNumber())
-				{
-					spdlog::error("Failed reading masterserver main menu promos response: malformed json object");
-					goto REQUEST_END_CLEANUP;
-				}
-
-				m_sMainMenuPromoData.newInfoTitle1 = mainMenuPromoJson["newInfo"]["Title1"].GetString();
-				m_sMainMenuPromoData.newInfoTitle2 = mainMenuPromoJson["newInfo"]["Title2"].GetString();
-				m_sMainMenuPromoData.newInfoTitle3 = mainMenuPromoJson["newInfo"]["Title3"].GetString();
-
-				m_sMainMenuPromoData.largeButtonTitle = mainMenuPromoJson["largeButton"]["Title"].GetString();
-				m_sMainMenuPromoData.largeButtonText = mainMenuPromoJson["largeButton"]["Text"].GetString();
-				m_sMainMenuPromoData.largeButtonUrl = mainMenuPromoJson["largeButton"]["Url"].GetString();
-				m_sMainMenuPromoData.largeButtonImageIndex = mainMenuPromoJson["largeButton"]["ImageIndex"].GetInt();
-
-				m_sMainMenuPromoData.smallButton1Title = mainMenuPromoJson["smallButton1"]["Title"].GetString();
-				m_sMainMenuPromoData.smallButton1Url = mainMenuPromoJson["smallButton1"]["Url"].GetString();
-				m_sMainMenuPromoData.smallButton1ImageIndex = mainMenuPromoJson["smallButton1"]["ImageIndex"].GetInt();
-
-				m_sMainMenuPromoData.smallButton2Title = mainMenuPromoJson["smallButton2"]["Title"].GetString();
-				m_sMainMenuPromoData.smallButton2Url = mainMenuPromoJson["smallButton2"]["Url"].GetString();
-				m_sMainMenuPromoData.smallButton2ImageIndex = mainMenuPromoJson["smallButton2"]["ImageIndex"].GetInt();
-
-				m_bHasMainMenuPromoData = true;
 			}
 			else
 			{
-				spdlog::error("Failed requesting main menu promos: error {}", curl_easy_strerror(result));
+				auto err = res.error();
+				spdlog::error("Failed reading masterserver main menu promos response:: {}", httplib::to_string(err));
 				m_bSuccessfullyConnected = false;
 			}
-
-		REQUEST_END_CLEANUP:
-			// nothing lol
-			curl_easy_cleanup(curl);
 		});
 
 	requestThread.detach();
 }
 
-void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const char* playerToken)
+void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::string& playerToken)
 {
 	// dont wait, just stop if we're trying to do 2 auth requests at once
 	if (m_bAuthenticatingWithGameServer)
 		return;
 
+	m_sAuthFailureReason = "No error message provided";
+	m_sAuthFailureMessage = "No error message provided";
+
 	m_bAuthenticatingWithGameServer = true;
 	m_bScriptAuthenticatingWithGameServer = true;
 	m_bSuccessfullyAuthenticatedWithGameServer = false;
-
 	std::string uidStr(uid);
 	std::string tokenStr(playerToken);
-
 	std::thread requestThread(
 		[this, uidStr, tokenStr]()
 		{
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
+			std::string querystring = fmt::format("/client/auth_with_self?id={}&playerToken={}", uidStr, tokenStr);
+			httplib::Client cli = SetupHttpClient();
 
-			std::string readBuffer;
-			curl_easy_setopt(
-				curl,
-				CURLOPT_URL,
-				fmt::format("{}/client/auth_with_self?id={}&playerToken={}", Cvar_ns_masterserver_hostname->GetString(), uidStr, tokenStr)
-					.c_str());
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
+			if (auto res = cli.Post(querystring))
 			{
-				m_bSuccessfullyConnected = true;
-
-				rapidjson_document authInfoJson;
-				authInfoJson.Parse(readBuffer.c_str());
-
-				if (authInfoJson.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading masterserver authentication response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(authInfoJson.GetParseError()));
-					goto REQUEST_END_CLEANUP;
-				}
+					// spdlog::info("{}", res->status);
+					nlohmann::json authInfoJson = nlohmann::json::parse(res->body);
+					RemoteAuthData newAuthData;
 
-				if (!authInfoJson.IsObject())
+					newAuthData.uid = authInfoJson.at("id");
+
+					std::string original = authInfoJson.at("persistentData");
+					newAuthData.pdata = base64_decode(original);
+
+					std::lock_guard<std::mutex> guard(g_pServerAuthentication->m_AuthDataMutex);
+					g_pServerAuthentication->m_RemoteAuthenticationData.clear();
+					g_pServerAuthentication->m_RemoteAuthenticationData.insert(std::make_pair(authInfoJson.at("authToken"), newAuthData));
+
+					m_bSuccessfullyAuthenticatedWithGameServer = true;
+				}
+				catch (nlohmann::json::parse_error& e)
 				{
-					spdlog::error("Failed reading masterserver authentication response: root object is not an object");
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed authenticating with local server: encountered parse error \"{}\"", e.what());
 				}
-
-				if (authInfoJson.HasMember("error"))
+				catch (nlohmann::json::out_of_range& e)
 				{
-					spdlog::error("Failed reading masterserver response: got fastify error response");
-					spdlog::error(readBuffer);
-
-					if (authInfoJson["error"].HasMember("enum") && authInfoJson["error"].HasMember("msg"))
-					{
-						m_sAuthFailureReason = authInfoJson["error"]["enum"].GetString();
-						m_sAuthFailureMessage = authInfoJson["error"]["msg"].GetString();
-					}
-					else
-					{
-						m_sAuthFailureReason = "No error message provided";
-						m_sAuthFailureMessage = "No error message provided";
-					}
-
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed authenticating with local server: encountered data error \"{}\"", e.what());
 				}
-
-				if (!authInfoJson["success"].IsTrue())
-				{
-					spdlog::error("Authentication with masterserver failed: \"success\" is not true");
-					goto REQUEST_END_CLEANUP;
-				}
-
-				if (!authInfoJson.HasMember("success") || !authInfoJson.HasMember("id") || !authInfoJson["id"].IsString() ||
-					!authInfoJson.HasMember("authToken") || !authInfoJson["authToken"].IsString() ||
-					!authInfoJson.HasMember("persistentData") || !authInfoJson["persistentData"].IsString())
-				{
-					spdlog::error("Failed reading masterserver authentication response: malformed json object");
-					goto REQUEST_END_CLEANUP;
-				}
-
-				RemoteAuthData newAuthData {};
-				strncpy_s(newAuthData.uid, sizeof(newAuthData.uid), authInfoJson["id"].GetString(), sizeof(newAuthData.uid) - 1);
-				// 1. decode base64
-
-				std::string original = authInfoJson["persistentData"].GetString();
-
-				auto decoded = base64_decode(original);
-
-				// 2. decompress zstd
-
-				ZSTD_DCtx* const dctx = ZSTD_createDCtx();
-				if (dctx == nullptr)
-				{
-					spdlog::error("[ZSTD] unable to create dctx");
-					goto REQUEST_END_CLEANUP;
-				}
-
-				ZSTD_inBuffer input = {decoded.data(), decoded.size(), 0};
-				std::vector<char> decompressed;
-				size_t const buffOutSize = ZSTD_DStreamOutSize();
-				size_t lastRet = 0;
-				char* buffOut = new char[buffOutSize];
-				while (input.pos < input.size)
-				{
-					ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
-					size_t const ret = ZSTD_decompressStream(dctx, &output, &input);
-					if (ZSTD_isError(ret))
-					{
-						spdlog::error("[ZSTD] {}", ZSTD_getErrorName(ret));
-						delete[] buffOut;
-						ZSTD_freeDCtx(dctx);
-						goto REQUEST_END_CLEANUP;
-					}
-					decompressed.insert(decompressed.end(), buffOut, buffOut + output.pos + 1);
-					lastRet = ret;
-				}
-				if (lastRet != 0)
-				{
-					spdlog::error("[ZSTD] EOF before end of stream: {}", lastRet);
-					delete[] buffOut;
-					ZSTD_freeDCtx(dctx);
-					goto REQUEST_END_CLEANUP;
-				}
-
-				// 3. memcpy
-
-				newAuthData.pdataSize = decompressed.size();
-				newAuthData.pdata = new char[newAuthData.pdataSize];
-				memcpy(newAuthData.pdata, decompressed.data(), newAuthData.pdataSize);
-
-				delete[] buffOut;
-				ZSTD_freeDCtx(dctx);
-
-				std::lock_guard<std::mutex> guard(g_pServerAuthentication->m_AuthDataMutex);
-				g_pServerAuthentication->m_RemoteAuthenticationData.clear();
-				g_pServerAuthentication->m_RemoteAuthenticationData.insert(
-					std::make_pair(authInfoJson["authToken"].GetString(), newAuthData));
-
-				m_bSuccessfullyAuthenticatedWithGameServer = true;
 			}
 			else
 			{
-				spdlog::error("Failed authenticating with own server: error {}", curl_easy_strerror(result));
+				auto err = res.error();
+				spdlog::error("Failed authenticating with own server: error {}", err);
 				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
 			}
 
-		REQUEST_END_CLEANUP:
 			m_bAuthenticatingWithGameServer = false;
 			m_bScriptAuthenticatingWithGameServer = false;
 
@@ -931,18 +646,19 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const char*
 				R2::Cbuf_AddText(R2::Cbuf_GetCurrentPlayer(), "ns_end_reauth_and_leave_to_lobby", R2::cmd_source_t::kCommandSrcCode);
 				m_bNewgameAfterSelfAuth = false;
 			}
-
-			curl_easy_cleanup(curl);
 		});
 
 	requestThread.detach();
 }
 
-void MasterServerManager::AuthenticateWithServer(const char* uid, const char* playerToken, const char* serverId, const char* password)
+void MasterServerManager::AuthenticateWithServer(
+	const char* uid, const std::string& playerToken, const std::string& serverId, const char* password)
 {
 	// dont wait, just stop if we're trying to do 2 auth requests at once
 	if (m_bAuthenticatingWithGameServer)
 		return;
+	m_sAuthFailureReason = "No error message provided";
+	m_sAuthFailureMessage = "No error message provided";
 
 	m_bAuthenticatingWithGameServer = true;
 	m_bScriptAuthenticatingWithGameServer = true;
@@ -962,111 +678,52 @@ void MasterServerManager::AuthenticateWithServer(const char* uid, const char* pl
 
 			spdlog::info("Attempting authentication with server of id \"{}\"", serverIdStr);
 
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
+			httplib::Client cli = SetupHttpClient();
+			std::string querystring = fmt::format(
+				"/client/auth_with_server?id={}&playerToken={}&server={}&password={}", uidStr, tokenStr, serverIdStr, passwordStr);
+			auto res = cli.Post(querystring);
 
-			std::string readBuffer;
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			{
-				char* escapedPassword = curl_easy_escape(curl, passwordStr.c_str(), passwordStr.length());
-
-				curl_easy_setopt(
-					curl,
-					CURLOPT_URL,
-					fmt::format(
-						"{}/client/auth_with_server?id={}&playerToken={}&server={}&password={}",
-						Cvar_ns_masterserver_hostname->GetString(),
-						uidStr,
-						tokenStr,
-						serverIdStr,
-						escapedPassword)
-						.c_str());
-
-				curl_free(escapedPassword);
-			}
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
+			if (res && res->status == 200)
 			{
 				m_bSuccessfullyConnected = true;
-
-				rapidjson_document connectionInfoJson;
-				connectionInfoJson.Parse(readBuffer.c_str());
-
-				if (connectionInfoJson.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading masterserver authentication response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(connectionInfoJson.GetParseError()));
-					goto REQUEST_END_CLEANUP;
-				}
-
-				if (!connectionInfoJson.IsObject())
-				{
-					spdlog::error("Failed reading masterserver authentication response: root object is not an object");
-					goto REQUEST_END_CLEANUP;
-				}
-
-				if (connectionInfoJson.HasMember("error"))
-				{
-					spdlog::error("Failed reading masterserver response: got fastify error response");
-					spdlog::error(readBuffer);
-
-					if (connectionInfoJson["error"].HasMember("enum") && connectionInfoJson["error"].HasMember("msg"))
+					nlohmann::json connectionInfoJson = nlohmann::json::parse(res->body);
+					if (connectionInfoJson.at("success") == true)
 					{
-						m_sAuthFailureReason = connectionInfoJson["error"]["enum"].GetString();
-						m_sAuthFailureMessage = connectionInfoJson["error"]["msg"].GetString();
+						m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(std::string(connectionInfoJson.at("ip")).c_str());
+						m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson.at("port");
+						m_pendingConnectionInfo.authToken = connectionInfoJson.at("authToken");
+						m_bHasPendingConnectionInfo = true;
+						m_bSuccessfullyAuthenticatedWithGameServer = true;
 					}
 					else
 					{
-						m_sAuthFailureReason = "No error message provided";
-						m_sAuthFailureMessage = "No error message provided";
+						m_sAuthFailureReason = connectionInfoJson.at("error").at("enum");
+						m_sAuthFailureMessage = connectionInfoJson.at("error").at("msg");
 					}
 				}
-
-				if (!connectionInfoJson["success"].IsTrue())
+				catch (nlohmann::json::parse_error& e)
 				{
-					spdlog::error("Authentication with masterserver failed: \"success\" is not true");
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed authenticating with local server: encountered parse error \"{}\"", e.what());
 				}
-
-				if (!connectionInfoJson.HasMember("success") || !connectionInfoJson.HasMember("ip") ||
-					!connectionInfoJson["ip"].IsString() || !connectionInfoJson.HasMember("port") ||
-					!connectionInfoJson["port"].IsNumber() || !connectionInfoJson.HasMember("authToken") ||
-					!connectionInfoJson["authToken"].IsString())
+				catch (nlohmann::json::out_of_range& e)
 				{
-					spdlog::error("Failed reading masterserver authentication response: malformed json object");
-					goto REQUEST_END_CLEANUP;
+					spdlog::error("Failed authenticating with local server: encountered data error \"{}\"", e.what());
 				}
-
-				m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(connectionInfoJson["ip"].GetString());
-				m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson["port"].GetUint();
-
-				strncpy_s(
-					m_pendingConnectionInfo.authToken,
-					sizeof(m_pendingConnectionInfo.authToken),
-					connectionInfoJson["authToken"].GetString(),
-					sizeof(m_pendingConnectionInfo.authToken) - 1);
-
-				m_bHasPendingConnectionInfo = true;
-				m_bSuccessfullyAuthenticatedWithGameServer = true;
 			}
 			else
 			{
-				spdlog::error("Failed authenticating with server: error {}", curl_easy_strerror(result));
+				spdlog::error(
+					"Failed authenticating with server: {}",
+					res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
+														   : std::to_string((int)res.error()));
 				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
 			}
-
-		REQUEST_END_CLEANUP:
 			m_bAuthenticatingWithGameServer = false;
 			m_bScriptAuthenticatingWithGameServer = false;
-			curl_easy_cleanup(curl);
 		});
 
 	requestThread.detach();
@@ -1084,61 +741,28 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 	}
 
 	std::string strPlayerId(playerId);
-	std::string strPdata(pdata, pdataSize);
+	std::vector<BYTE> strPdata(pdataSize);
+	memcpy(strPdata.data(), pdata, pdataSize);
 
 	std::thread requestThread(
 		[this, strPlayerId, strPdata, pdataSize]
 		{
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-
-			std::string readBuffer;
-			curl_easy_setopt(
-				curl,
-				CURLOPT_URL,
-				fmt::format(
-					"{}/accounts/write_persistence?id={}&serverId={}",
-					Cvar_ns_masterserver_hostname->GetString(),
-					strPlayerId,
-					m_sOwnServerId)
-					.c_str());
-			curl_easy_setopt(curl, CURLOPT_POST, 1L);
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			curl_mime* mime = curl_mime_init(curl);
-			curl_mimepart* part = curl_mime_addpart(mime);
-
-			// encoding here
-
-			size_t const cBuffSize = ZSTD_compressBound(pdataSize);
-			char* cBuff = new char[cBuffSize];
-			size_t const cSize = ZSTD_compress(cBuff, cBuffSize, strPdata.c_str(), pdataSize, 1);
-			if (cSize == NULL || cSize == 0)
+			spdlog::info("[Pdata] Writing persistence for user: {}", strPlayerId);
+			httplib::Client cli = SetupHttpClient();
+			std::string querystring = fmt::format("/accounts/write_persistence?id={}&serverId={}", strPlayerId, m_sOwnServerId);
+			std::string encoded = base64_encode(strPdata.data(), pdataSize);
+			if (auto res = cli.Post(querystring, encoded, "text/plain"))
 			{
-				spdlog::error("[ZSTD] Compressed data malformed");
-				m_bSavingPersistentData = false;
-				curl_easy_cleanup(curl);
-				delete[] cBuff;
-				return;
-			}
-
-			curl_mime_data(part, cBuff, cSize);
-			curl_mime_name(part, "pdata");
-			curl_mime_filename(part, "file.pdata");
-			curl_mime_type(part, "application/octet-stream");
-
-			curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
+				spdlog::error("[Pdata] Status: {}", res->status);
+				spdlog::error("[Pdata] Body: {}", res->body);
 				m_bSuccessfullyConnected = true;
+			}
 			else
+			{
+				auto err = res.error();
+				spdlog::error("[Pdata] Write persistence failed: {}", err);
 				m_bSuccessfullyConnected = false;
-
-			curl_easy_cleanup(curl);
-			delete[] cBuff;
+			}
 
 			m_bSavingPersistentData = false;
 		});
@@ -1223,28 +847,12 @@ void MasterServerPresenceReporter::DestroyPresence(const ServerPresence* pServer
 	std::thread requestThread(
 		[this]
 		{
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-
-			std::string readBuffer;
-
-			char* authTokenEscaped = curl_easy_escape(
-				curl, g_pMasterServerManager->m_sOwnServerAuthToken, strnlen_s(g_pMasterServerManager->m_sOwnServerAuthToken, 33));
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-			curl_easy_setopt(
-				curl,
-				CURLOPT_URL,
-				fmt::format(
-					"{}/server/remove_server?id={}?serverAuthToken={}",
-					Cvar_ns_masterserver_hostname->GetString(),
-					g_pMasterServerManager->m_sOwnServerId,
-					authTokenEscaped)
-					.c_str());
-			curl_free(authTokenEscaped);
-			CURLcode result = curl_easy_perform(curl);
-			curl_easy_cleanup(curl);
+			httplib::Client cli = SetupHttpClient();
+			std::string querystring = fmt::format(
+				"/server/remove_server?id={}?serverAuthToken={}",
+				g_pMasterServerManager->m_sOwnServerId,
+				g_pMasterServerManager->m_sOwnServerAuthToken);
+			cli.Delete(querystring);
 		});
 
 	requestThread.detach();
@@ -1357,139 +965,71 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 		std::launch::async,
 		[threadedPresence, modInfo, hostname, serverAccount]
 		{
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-
-			std::string readBuffer;
-			curl_easy_setopt(curl, CURLOPT_POST, 1L);
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-
-			curl_mime* mime = curl_mime_init(curl);
-			curl_mimepart* part = curl_mime_addpart(mime);
+			httplib::Client cli = SetupHttpClient();
+			std::string querystring = fmt::format(
+				"/server/"
+				"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&serverRegToken="
+				"{}",
+				threadedPresence.m_iPort,
+				threadedPresence.m_iAuthPort,
+				threadedPresence.m_sServerName,
+				threadedPresence.m_sServerDesc,
+				threadedPresence.m_MapName,
+				threadedPresence.m_PlaylistName,
+				threadedPresence.m_iMaxPlayers,
+				threadedPresence.m_Password,
+				serverAccount);
 
 			// Lambda to quickly cleanup resources and return a value.
-			auto ReturnCleanup =
-				[curl, mime](MasterServerReportPresenceResult result, const char* id = "", const char* serverAuthToken = "")
+			auto ReturnCleanup = [](MasterServerReportPresenceResult result, std::string id = "", std::string serverAuthToken = "")
 			{
-				curl_easy_cleanup(curl);
-				curl_mime_free(mime);
-
 				MasterServerPresenceReporter::ReportPresenceResultData data;
 				data.result = result;
 				data.id = id;
 				data.serverAuthToken = serverAuthToken;
-
 				return data;
 			};
 
-			curl_mime_data(part, modInfo.c_str(), modInfo.size());
-			curl_mime_name(part, "modinfo");
-			curl_mime_filename(part, "modinfo.json");
-			curl_mime_type(part, "application/json");
+			auto res = cli.Post(querystring);
 
-			curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
-
-			// format every paramter because computers hate me
+			if (res && res->status == 200)
 			{
-				char* nameEscaped = curl_easy_escape(curl, threadedPresence.m_sServerName.c_str(), NULL);
-				char* descEscaped = curl_easy_escape(curl, threadedPresence.m_sServerDesc.c_str(), NULL);
-				char* mapEscaped = curl_easy_escape(curl, threadedPresence.m_MapName, NULL);
-				char* playlistEscaped = curl_easy_escape(curl, threadedPresence.m_PlaylistName, NULL);
-				char* passwordEscaped = curl_easy_escape(curl, threadedPresence.m_Password, NULL);
-				char* serveraccountEscaped = curl_easy_escape(curl, serverAccount.c_str(), serverAccount.length());
-				curl_easy_setopt(
-					curl,
-					CURLOPT_URL,
-					fmt::format(
-						"{}/server/"
-						"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&serverRegToken="
-						"{}",
-						hostname.c_str(),
-						threadedPresence.m_iPort,
-						threadedPresence.m_iAuthPort,
-						nameEscaped,
-						descEscaped,
-						mapEscaped,
-						playlistEscaped,
-						threadedPresence.m_iMaxPlayers,
-						passwordEscaped,
-						serveraccountEscaped)
-						.c_str());
-
-				curl_free(nameEscaped);
-				curl_free(descEscaped);
-				curl_free(mapEscaped);
-				curl_free(playlistEscaped);
-				curl_free(passwordEscaped);
-				curl_free(serveraccountEscaped);
-			}
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
-			{
-				rapidjson_document serverAddedJson;
-				serverAddedJson.Parse(readBuffer.c_str());
-
-				// If we could not parse the JSON or it isn't an object, assume the MS is either wrong or we're completely out of date.
-				// No retry.
-				if (serverAddedJson.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading masterserver authentication response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(serverAddedJson.GetParseError()));
-					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
-				}
-
-				if (!serverAddedJson.IsObject())
-				{
-					spdlog::error("Failed reading masterserver authentication response: root object is not an object");
-					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
-				}
-
-				if (serverAddedJson.HasMember("error"))
-				{
-					spdlog::error("Failed reading masterserver response: got fastify error response");
-					spdlog::error(readBuffer);
-
-					// If this is DUPLICATE_SERVER, we'll retry adding the server every 20 seconds.
-					// The master server will only update its internal server list and clean up dead servers on certain events.
-					// And then again, only if a player requests the server list after the cooldown (1 second by default), or a server is
-					// added/updated/removed. In any case this needs to be fixed in the master server rewrite.
-					if (serverAddedJson["error"].HasMember("enum") &&
-						strcmp(serverAddedJson["error"]["enum"].GetString(), "DUPLICATE_SERVER") == 0)
+					nlohmann::json serverAddedJson = nlohmann::json::parse(res->body);
+					if (serverAddedJson["success"])
 					{
-						spdlog::error("Cooling down while the master server cleans the dead server entry, if any.");
-						return ReturnCleanup(MasterServerReportPresenceResult::FailedDuplicateServer);
+						spdlog::info("Successfully registered the local server to the master server.");
+						return ReturnCleanup(
+							MasterServerReportPresenceResult::Success, serverAddedJson.at("id"), serverAddedJson.at("serverAuthToken"));
 					}
-
-					// Retry until we reach max retries.
-					return ReturnCleanup(MasterServerReportPresenceResult::Failed);
+					else
+					{
+						if (!strcmp(std::string(serverAddedJson.at("error").at("enum")).c_str(), "DUPLICATE_SERVER"))
+						{
+							spdlog::error("Cooling down while the master server cleans the dead server entry, if any.");
+							return ReturnCleanup(MasterServerReportPresenceResult::FailedDuplicateServer);
+						}
+						return ReturnCleanup(MasterServerReportPresenceResult::Failed);
+					}
 				}
-
-				if (!serverAddedJson["success"].IsTrue())
+				catch (nlohmann::json::parse_error& e)
 				{
-					spdlog::error("Adding server to masterserver failed: \"success\" is not true");
+					spdlog::error("Failed registering server: encountered parse error \"{}\"", e.what());
 					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
 				}
-
-				if (!serverAddedJson.HasMember("id") || !serverAddedJson["id"].IsString() ||
-					!serverAddedJson.HasMember("serverAuthToken") || !serverAddedJson["serverAuthToken"].IsString())
+				catch (nlohmann::json::out_of_range& e)
 				{
-					spdlog::error("Failed reading masterserver response: malformed json object");
+					spdlog::error("Failed registering server: encountered data error \"{}\"", e.what());
 					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
 				}
-
-				spdlog::info("Successfully registered the local server to the master server.");
-				return ReturnCleanup(
-					MasterServerReportPresenceResult::Success,
-					serverAddedJson["id"].GetString(),
-					serverAddedJson["serverAuthToken"].GetString());
 			}
 			else
 			{
-				spdlog::error("Failed adding self to server list: error {}", curl_easy_strerror(result));
+				spdlog::error(
+					"Failed adding self to server list: error {}",
+					res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
+														   : std::to_string((int)res.error()));
 				return ReturnCleanup(MasterServerReportPresenceResult::FailedNoConnect);
 			}
 		});
@@ -1511,23 +1051,18 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 		std::launch::async,
 		[threadedPresence, serverId, hostname, modinfo, serverAccount]
 		{
-			CURL* curl = curl_easy_init();
-			SetCommonHttpClientOptions(curl);
-
 			// Lambda to quickly cleanup resources and return a value.
-			auto ReturnCleanup = [curl](MasterServerReportPresenceResult result, const char* id = "", const char* serverAuthToken = "")
+			auto ReturnCleanup = [](MasterServerReportPresenceResult result, std::string id = "", std::string serverAuthToken = "")
 			{
-				curl_easy_cleanup(curl);
-
 				MasterServerPresenceReporter::ReportPresenceResultData data;
 				data.result = result;
 
-				if (id != nullptr)
+				if (!id.empty())
 				{
 					data.id = id;
 				}
 
-				if (serverAuthToken != nullptr)
+				if (!serverAuthToken.empty())
 				{
 					data.serverAuthToken = serverAuthToken;
 				}
@@ -1535,89 +1070,57 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 				return data;
 			};
 
-			std::string readBuffer;
-			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-			curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+			httplib::Client cli = SetupHttpClient();
+			std::string querystring = fmt::format(
+				"/server/"
+				"update_values?id={}&port={}&authPort={}&name={}&description={}&map={}&playlist={}&playerCount={}&"
+				"maxPlayers={}&password={}&gameState={}&serverAuthToken={}",
+				serverId.c_str(),
+				threadedPresence.m_iPort,
+				threadedPresence.m_iAuthPort,
+				threadedPresence.m_sServerName,
+				threadedPresence.m_sServerDesc,
+				threadedPresence.m_MapName,
+				threadedPresence.m_PlaylistName,
+				threadedPresence.m_iPlayerCount,
+				threadedPresence.m_iMaxPlayers,
+				threadedPresence.m_Password,
+				std::to_string(g_pSQGameState->eGameState),
+				g_pMasterServerManager->m_sOwnServerAuthToken);
 
-			// send all registration info so we have all necessary info to reregister our server if masterserver goes down,
-			// without a restart this isn't threadsafe :terror:
+			httplib::MultipartFormDataItems items = {
+				{"modinfo", modinfo, "modinfo.json", "application/json"},
+			};
+
+			auto res = cli.Post(querystring, items);
+			std::string updatedId;
+			std::string updatedAuthToken;
+			if (res && res->status == 200)
 			{
-				char* nameEscaped = curl_easy_escape(curl, threadedPresence.m_sServerName.c_str(), NULL);
-				char* descEscaped = curl_easy_escape(curl, threadedPresence.m_sServerDesc.c_str(), NULL);
-				char* mapEscaped = curl_easy_escape(curl, threadedPresence.m_MapName, NULL);
-				char* playlistEscaped = curl_easy_escape(curl, threadedPresence.m_PlaylistName, NULL);
-				char* passwordEscaped = curl_easy_escape(curl, threadedPresence.m_Password, NULL);
-				char* authTokenEscaped = curl_easy_escape(
-					curl, g_pMasterServerManager->m_sOwnServerAuthToken, strnlen_s(g_pMasterServerManager->m_sOwnServerAuthToken, 33));
-				curl_easy_setopt(
-					curl,
-					CURLOPT_URL,
-					fmt::format(
-						"{}/server/"
-						"update_values?id={}&port={}&authPort={}&name={}&description={}&map={}&playlist={}&playerCount={}&"
-						"maxPlayers={}&password={}&gameState={}&serverAuthToken={}",
-						hostname.c_str(),
-						serverId.c_str(),
-						threadedPresence.m_iPort,
-						threadedPresence.m_iAuthPort,
-						nameEscaped,
-						descEscaped,
-						mapEscaped,
-						playlistEscaped,
-						threadedPresence.m_iPlayerCount,
-						threadedPresence.m_iMaxPlayers,
-						passwordEscaped,
-						std::to_string(g_pSQGameState->eGameState).c_str(),
-						authTokenEscaped)
-						.c_str());
-				// spdlog::info("GAMESTATE UPDATEVALUES: {}", g_pSQGameState->eGameState);
-				curl_free(nameEscaped);
-				curl_free(descEscaped);
-				curl_free(mapEscaped);
-				curl_free(playlistEscaped);
-				curl_free(passwordEscaped);
-				curl_free(authTokenEscaped);
-			}
-
-			curl_mime* mime = curl_mime_init(curl);
-			curl_mimepart* part = curl_mime_addpart(mime);
-
-			curl_mime_data(part, modinfo.c_str(), modinfo.size());
-			curl_mime_name(part, "modinfo");
-			curl_mime_filename(part, "modinfo.json");
-			curl_mime_type(part, "application/json");
-
-			curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
-
-			CURLcode result = curl_easy_perform(curl);
-
-			if (result == CURLcode::CURLE_OK)
-			{
-				rapidjson_document serverAddedJson;
-				serverAddedJson.Parse(readBuffer.c_str());
-
-				const char* updatedId = nullptr;
-				const char* updatedAuthToken = nullptr;
-
-				if (!serverAddedJson.HasParseError() && serverAddedJson.IsObject())
+				try
 				{
-					if (serverAddedJson.HasMember("id") && serverAddedJson["id"].IsString())
-					{
-						updatedId = serverAddedJson["id"].GetString();
-					}
-
-					if (serverAddedJson.HasMember("serverAuthToken") && serverAddedJson["serverAuthToken"].IsString())
-					{
-						updatedAuthToken = serverAddedJson["serverAuthToken"].GetString();
-					}
+					nlohmann::json serverAddedJson = nlohmann::json::parse(res->body);
+					updatedId = serverAddedJson.at("id");
+					updatedAuthToken = serverAddedJson.at("serverAuthToken");
+					return ReturnCleanup(MasterServerReportPresenceResult::Success, updatedId, updatedAuthToken);
 				}
-				return ReturnCleanup(MasterServerReportPresenceResult::Success, updatedId, updatedAuthToken);
+				catch (nlohmann::json::parse_error& e)
+				{
+					spdlog::error("Failed reading masterserver heartbeat response: encountered parse error \"{}\"", e.what());
+					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
+				}
+				catch (nlohmann::json::out_of_range& e)
+				{
+					spdlog::error("Failed reading masterserver heartbeat response: encountered data error \"{}\"", e.what());
+					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
+				}
 			}
 			else
 			{
-				spdlog::warn("Heartbeat failed with error {}", curl_easy_strerror(result));
+				spdlog::error(
+					"Failed during heartbeat request: {}",
+					res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
+														   : std::to_string((int)res.error()));
 				return ReturnCleanup(MasterServerReportPresenceResult::Failed);
 			}
 		});

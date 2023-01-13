@@ -41,7 +41,7 @@ AUTOHOOK(Auth3PToken, engine.dll + 0x183760,
 char*, __fastcall, ())
 // clang-format on
 {
-	if (g_pMasterServerManager->m_sOwnClientAuthToken[0])
+	if (!g_pMasterServerManager->m_sOwnClientAuthToken.empty())
 	{
 		memset(p3PToken, 0x0, 1024);
 		strcpy(p3PToken, "Protocol 3: Protect the Pilot");
