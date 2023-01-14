@@ -346,12 +346,8 @@ bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
 {
 
 	httplib::Client cli = SetupHttpClient();
-	std::string querystring = fmt::format(
-		"{}/client/clantag?clantag={}&id={}&token={}",
-		Cvar_ns_masterserver_hostname->GetString(),
-		clantag,
-		R2::g_pLocalPlayerUserID,
-		m_sOwnClientAuthToken);
+	std::string querystring =
+		fmt::format("/client/clantag?clantag={}&id={}&token={}", clantag, R2::g_pLocalPlayerUserID, m_sOwnClientAuthToken);
 
 	auto res = cli.Post(querystring);
 	if (res && res->status == 200)
@@ -989,8 +985,8 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				data.serverAuthToken = serverAuthToken;
 				return data;
 			};
-
-			auto res = cli.Post(querystring);
+			spdlog::info("{}", modInfo);
+			auto res = cli.Post(querystring, modInfo, "application/json");
 
 			if (res && res->status == 200)
 			{
@@ -1087,12 +1083,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 				threadedPresence.m_Password,
 				std::to_string(g_pSQGameState->eGameState),
 				g_pMasterServerManager->m_sOwnServerAuthToken);
-
-			httplib::MultipartFormDataItems items = {
-				{"modinfo", modinfo, "modinfo.json", "application/json"},
-			};
-
-			auto res = cli.Post(querystring, items);
+			auto res = cli.Post(querystring, modinfo, "application/json");
 			std::string updatedId;
 			std::string updatedAuthToken;
 			if (res && res->status == 200)
