@@ -63,11 +63,11 @@ void SetCommonHttpClientOptions(CURL* curl)
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 }
 
-httplib::Client SetupHttpClient()
+httplib::Client SetupHttpClient(bool compress = true)
 {
 	std::string msaddr = Cvar_ns_masterserver_hostname->GetString();
 	httplib::Client cli(msaddr);
-	cli.set_compress(true);
+	cli.set_compress(compress);
 	cli.set_decompress(true);
 
 	cli.set_default_headers({{"User-Agent", NSUserAgent}, {"Accept-Encoding", "gzip"}});
@@ -747,7 +747,7 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 			httplib::Client cli = SetupHttpClient();
 			std::string querystring = fmt::format("/accounts/write_persistence?id={}&serverId={}", strPlayerId, m_sOwnServerId);
 			std::string encoded = base64_encode(strPdata.data(), pdataSize);
-			if (auto res = cli.Post(querystring, encoded, "text/plain"))
+			if (auto res = cli.Post(querystring, encoded.c_str(), "text/plain"))
 			{
 				spdlog::error("[Pdata] Status: {}", res->status);
 				spdlog::error("[Pdata] Body: {}", res->body);

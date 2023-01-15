@@ -7,7 +7,7 @@
 #include "core/filesystem/filesystem.h"
 #include "core/filesystem/rpakfilesystem.h"
 #include "config/profile.h"
-
+#include "nlohmann/json.hpp"
 #include "rapidjson/error/en.h"
 #include "rapidjson/document.h"
 #include "rapidjson/ostreamwrapper.h"
@@ -690,31 +690,22 @@ void ModManager::LoadMods()
 	}
 
 	// build modinfo obj for masterserver
-	rapidjson_document modinfoDoc;
-	auto& alloc = modinfoDoc.GetAllocator();
-	modinfoDoc.SetObject();
-	modinfoDoc.AddMember("Mods", rapidjson::kArrayType, alloc);
-
+	nlohmann::json modinfoDoc;
 	int currentModIndex = 0;
 	for (Mod& mod : m_LoadedMods)
 	{
 		if (!mod.m_bEnabled || (!mod.RequiredOnClient && !mod.Pdiff.size()))
 			continue;
 
-		modinfoDoc["Mods"].PushBack(rapidjson::kObjectType, modinfoDoc.GetAllocator());
-		modinfoDoc["Mods"][currentModIndex].AddMember("Name", rapidjson::StringRef(&mod.Name[0]), modinfoDoc.GetAllocator());
-		modinfoDoc["Mods"][currentModIndex].AddMember("Version", rapidjson::StringRef(&mod.Version[0]), modinfoDoc.GetAllocator());
-		modinfoDoc["Mods"][currentModIndex].AddMember("RequiredOnClient", mod.RequiredOnClient, modinfoDoc.GetAllocator());
-		modinfoDoc["Mods"][currentModIndex].AddMember("Pdiff", rapidjson::StringRef(&mod.Pdiff[0]), modinfoDoc.GetAllocator());
+		modinfoDoc["Mods"][currentModIndex]["Name"] = &mod.Name[0];
+		modinfoDoc["Mods"][currentModIndex]["Version"] = &mod.Version[0];
+		modinfoDoc["Mods"][currentModIndex]["RequiredOnClient"] = mod.RequiredOnClient;
+		modinfoDoc["Mods"][currentModIndex]["Pdiff"] = &mod.Pdiff[0];
 
 		currentModIndex++;
 	}
 
-	rapidjson::StringBuffer buffer;
-	buffer.Clear();
-	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-	modinfoDoc.Accept(writer);
-	g_pMasterServerManager->m_sOwnModInfoJson = std::string(buffer.GetString());
+	g_pMasterServerManager->m_sOwnModInfoJson = modinfoDoc.dump();
 
 	m_bHasLoadedMods = true;
 }
