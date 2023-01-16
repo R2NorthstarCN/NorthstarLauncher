@@ -747,7 +747,7 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 			httplib::Client cli = SetupHttpClient();
 			std::string querystring = fmt::format("/accounts/write_persistence?id={}&serverId={}", strPlayerId, m_sOwnServerId);
 			std::string encoded = base64_encode(strPdata.data(), pdataSize);
-			if (auto res = cli.Post(querystring, encoded.c_str(), "text/plain"))
+			if (auto res = cli.Post(querystring, encoded, "text/plain"))
 			{
 				spdlog::error("[Pdata] Status: {}", res->status);
 				spdlog::error("[Pdata] Body: {}", res->body);
