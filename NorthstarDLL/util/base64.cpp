@@ -1,5 +1,6 @@
 #include "base64.h"
 #include "pch.h"
+#include <string>
 #include <iostream>
 
 static const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

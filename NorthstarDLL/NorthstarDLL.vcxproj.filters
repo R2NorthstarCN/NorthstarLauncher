@@ -181,6 +181,12 @@
     <Filter Include="Header Files\config">
       <UniqueIdentifier>{0b8b4a41-6131-4388-85d2-f5754a304610}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\ingameime">
+      <UniqueIdentifier>{708af130-6f6b-4d12-a9d4-6b7b53d7179a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ingameime">
+      <UniqueIdentifier>{9c824558-7a6c-4c4c-af63-d197789e5555}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\httplib.h">
@@ -1197,6 +1203,12 @@
     <ClInclude Include="scriptmatchmakingevents.h">
       <Filter>Header Files\scripts</Filter>
     </ClInclude>
+    <ClInclude Include="inputsystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ingamechatime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\include\spdlog\fmt\bundled\LICENSE.rst">
@@ -1467,6 +1479,12 @@
     </ClCompile>
     <ClCompile Include="util\utils.cpp">
       <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="inputsystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ingamechatime.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

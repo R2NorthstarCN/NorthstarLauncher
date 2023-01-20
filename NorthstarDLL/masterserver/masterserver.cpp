@@ -63,15 +63,16 @@ void SetCommonHttpClientOptions(CURL* curl)
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 }
 
-httplib::Client SetupHttpClient(bool compress = true)
+httplib::Client SetupHttpClient()
 {
 	std::string msaddr = Cvar_ns_masterserver_hostname->GetString();
 	httplib::Client cli(msaddr);
-	cli.set_compress(compress);
+	//, {"Accept-Encoding", "gzip"}, {"Content-Encoding", "gzip"}
+	cli.set_default_headers({{"User-Agent", NSUserAgent}});
+	cli.set_compress(true);
 	cli.set_decompress(true);
-
-	cli.set_default_headers({{"User-Agent", NSUserAgent}, {"Accept-Encoding", "gzip"}});
-
+	cli.set_read_timeout(10, 0);
+	cli.set_write_timeout(10, 0);
 	if (!strstr(GetCommandLineA(), "-disabledoh"))
 	{
 		std::string DohResult = g_DohWorker->GetDOHResolve(msaddr);
@@ -426,6 +427,8 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 			else
 			{
 				auto err = res.error();
+				m_sAuthFailureReason = std::string("ERROR_NO_CONNECTION");
+				m_sAuthFailureMessage = fmt::format("与主服务器进行初始化通信时出现错误：{}", httplib::to_string(err));
 				spdlog::error("Failed performing northstar origin auth: {}", httplib::to_string(err));
 				m_bSuccessfullyConnected = false;
 			}

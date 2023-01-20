@@ -30,7 +30,10 @@ class MemoryAddress
 	{
 		return reinterpret_cast<T>(m_nAddress);
 	}
-
+	template <class T> T& GetValueRef()
+	{
+		return *reinterpret_cast<T*>(m_nAddress);
+	}
 	// traversal
 	MemoryAddress Offset(const uintptr_t nOffset) const;
 	MemoryAddress Deref(const int nNumDerefs = 1) const;

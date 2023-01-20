@@ -54,6 +54,9 @@
     <TargetName>Northstar</TargetName>
     <LibraryPath>C:\Users\wolf109909\Desktop\Coding\Repositories\NorthstarLauncher\include;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnabled>false</VcpkgEnabled>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -103,7 +106,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>$(SolutionDir)include\MinHook.x64.lib;$(SolutionDir)include\zlibstatic.lib;$(SolutionDir)include\libcrypto_static.lib;$(SolutionDir)include\libssl_static.lib;$(SolutionDir)include\libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)include\MinHook.x64.lib;$(SolutionDir)include\zlibstatic.lib;$(SolutionDir)include\libcrypto_static.lib;$(SolutionDir)include\libssl_static.lib;$(SolutionDir)include\libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceSymbolReferences>
       </ForceSymbolReferences>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -423,6 +426,8 @@
     <ClInclude Include="hooks\memory.h" />
     <ClInclude Include="hooks\sourceinterface.h" />
     <ClInclude Include="hooks\tier0.h" />
+    <ClInclude Include="ingamechatime.h" />
+    <ClInclude Include="inputsystem.h" />
     <ClInclude Include="logging\crashhandler.h" />
     <ClInclude Include="logging\logging.h" />
     <ClInclude Include="logging\loghooks.h" />
@@ -497,6 +502,8 @@
     <ClCompile Include="engine\hoststate.cpp" />
     <ClCompile Include="engine\r2engine.cpp" />
     <ClCompile Include="engine\runframe.cpp" />
+    <ClCompile Include="ingamechatime.cpp" />
+    <ClCompile Include="inputsystem.cpp" />
     <ClCompile Include="logging\crashhandler.cpp" />
     <ClCompile Include="logging\logging.cpp" />
     <ClCompile Include="logging\loghooks.cpp" />
