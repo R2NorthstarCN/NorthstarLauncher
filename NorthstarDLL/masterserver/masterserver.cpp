@@ -30,6 +30,50 @@ ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
 ConVar* Cvar_ns_server_reg_token;
 
+void MasterServerManager::HandleHttpException(httplib::Result&& res, std::string defaultType = "", std::string defaultMsg = "")
+{
+	if (!defaultType.empty() && !defaultMsg.empty())
+	{
+		m_sAuthFailureReason = defaultType;
+		m_sAuthFailureMessage = defaultMsg;
+	}
+	try
+	{
+
+		nlohmann::json jsondocument = nlohmann::json::parse(res->body);
+		m_sAuthFailureReason = jsondocument.at("error").at("enum");
+		m_sAuthFailureMessage = jsondocument.at("error").at("msg");
+		spdlog::error("An error occurred while requesting masterserver: {} ({})", m_sAuthFailureReason, m_sAuthFailureMessage);
+	}
+	catch (nlohmann::json::parse_error& e)
+	{
+		std::string XRequestId = res->get_header_value("X-Request-ID");
+		if (XRequestId.empty())
+		{
+			spdlog::error("Oops! An error occurred while requesting masterserver and we don't know why. Please check your internet "
+						  "connection and try again.");
+		}
+		spdlog::error(
+			"Oops! An error occurred while requesting masterserver and we don't know why. here is the information we have: \"{}\",Please "
+			"contact us with this string: \"{}\"",
+			res->body,
+			XRequestId);
+	}
+	catch (nlohmann::json::out_of_range& e)
+	{
+		std::string XRequestId = res->get_header_value("X-Request-ID");
+		if (XRequestId.empty())
+		{
+			spdlog::error("Oops! An error occurred while requesting masterserver and we don't know why. Please check your internet "
+						  "connection and try again.");
+		}
+		spdlog::error(
+			"Oops! An error occurred while requesting masterserver and we don't know why. here is the information we have: \"{}\",Please "
+			"contact us with this string: \"{}\"",
+			res->body,
+			XRequestId);
+	}
+}
 void SetCommonHttpClientOptions(CURL* curl)
 {
 	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
@@ -353,27 +397,11 @@ bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
 	auto res = cli.Post(querystring);
 	if (res && res->status == 200)
 	{
-		try
-		{
-			nlohmann::json setclantagJson = nlohmann::json::parse(res->body);
-			if (setclantagJson.at("success"))
-			{
-				return true;
-			}
-			else
-			{
-				return false;
-			}
-		}
-		catch (nlohmann::json::parse_error& e)
-		{
-			spdlog::error("Failed setting local player clantag: \"{}\"", e.what());
-		}
-		catch (nlohmann::json::out_of_range& e)
-		{
-			spdlog::error("Failed setting local player clantag: \"{}\"", e.what());
-		}
-
+		return true;
+	}
+	else
+	{
+		HandleHttpException(std::move(res));
 		return false;
 	}
 }
@@ -394,26 +422,19 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 			spdlog::info("Trying to authenticate with northstar masterserver for user {}", uidStr);
 
 			httplib::Client cli = SetupHttpClient();
-			std::string endpoint = fmt::format("/client/origin_auth?id={}&token={}", uidStr, tokenStr);
+			std::string querystring = fmt::format("/client/origin_auth?id={}&token={}", uidStr, tokenStr);
 
-			if (auto res = cli.Get(endpoint))
+			auto res = cli.Get(querystring);
+
+			if (res && res->status == 200)
 			{
 				m_bSuccessfullyConnected = true;
 				try
 				{
 					nlohmann::json originAuthInfo = nlohmann::json::parse(res->body);
-					if (originAuthInfo["success"])
-					{
-						m_sOwnClientAuthToken = originAuthInfo.at("token");
-						m_bOriginAuthWithMasterServerSuccess = true;
-						spdlog::info("Northstar origin authentication completed successfully!");
-					}
-					else
-					{
-						m_sAuthFailureReason = originAuthInfo.at("error").at("enum");
-						m_sAuthFailureMessage = originAuthInfo.at("error").at("msg");
-						spdlog::error("Northstar origin authentication failed: {}", m_sAuthFailureMessage);
-					}
+					m_sOwnClientAuthToken = originAuthInfo.at("token");
+					m_bOriginAuthWithMasterServerSuccess = true;
+					spdlog::info("Northstar origin authentication completed successfully!");
 				}
 				catch (nlohmann::json::parse_error& e)
 				{
@@ -426,10 +447,7 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 			}
 			else
 			{
-				auto err = res.error();
-				m_sAuthFailureReason = std::string("ERROR_NO_CONNECTION");
-				m_sAuthFailureMessage = fmt::format("与主服务器进行初始化通信时出现错误：{}", httplib::to_string(err));
-				spdlog::error("Failed performing northstar origin auth: {}", httplib::to_string(err));
+				HandleHttpException(std::move(res), "ERROR_NO_CONNECTION", "我操你妈");
 				m_bSuccessfullyConnected = false;
 			}
 
@@ -457,8 +475,8 @@ void MasterServerManager::RequestServerList()
 			m_bScriptRequestingServerList = true;
 
 			httplib::Client cli = SetupHttpClient();
-
-			if (auto res = cli.Get("/client/servers"))
+			auto res = cli.Get("/client/servers");
+			if (res && res->status == 200)
 			{
 				m_bSuccessfullyConnected = true;
 				try
@@ -512,8 +530,7 @@ void MasterServerManager::RequestServerList()
 			}
 			else
 			{
-				auto err = res.error();
-				spdlog::error("Failed requesting servers: error {}", err);
+				HandleHttpException(std::move(res));
 				m_bSuccessfullyConnected = false;
 			}
 			m_bRequestingServerList = false;
@@ -534,7 +551,8 @@ void MasterServerManager::RequestMainMenuPromos()
 				Sleep(500);
 
 			httplib::Client cli = SetupHttpClient();
-			if (auto res = cli.Get("/client/mainmenupromos"))
+			auto res = cli.Get("/client/mainmenupromos");
+			if (res && res->status == 200)
 			{
 				m_bSuccessfullyConnected = true;
 				try
@@ -570,8 +588,7 @@ void MasterServerManager::RequestMainMenuPromos()
 			}
 			else
 			{
-				auto err = res.error();
-				spdlog::error("Failed reading masterserver main menu promos response:: {}", httplib::to_string(err));
+				HandleHttpException(std::move(res));
 				m_bSuccessfullyConnected = false;
 			}
 		});
@@ -598,8 +615,8 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 		{
 			std::string querystring = fmt::format("/client/auth_with_self?id={}&playerToken={}", uidStr, tokenStr);
 			httplib::Client cli = SetupHttpClient();
-
-			if (auto res = cli.Post(querystring))
+			auto res = cli.Post(querystring);
+			if (res && res->status == 200)
 			{
 				try
 				{
@@ -629,8 +646,7 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 			}
 			else
 			{
-				auto err = res.error();
-				spdlog::error("Failed authenticating with own server: error {}", err);
+				HandleHttpException(std::move(res));
 				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
@@ -688,19 +704,12 @@ void MasterServerManager::AuthenticateWithServer(
 				try
 				{
 					nlohmann::json connectionInfoJson = nlohmann::json::parse(res->body);
-					if (connectionInfoJson.at("success") == true)
-					{
-						m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(std::string(connectionInfoJson.at("ip")).c_str());
-						m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson.at("port");
-						m_pendingConnectionInfo.authToken = connectionInfoJson.at("authToken");
-						m_bHasPendingConnectionInfo = true;
-						m_bSuccessfullyAuthenticatedWithGameServer = true;
-					}
-					else
-					{
-						m_sAuthFailureReason = connectionInfoJson.at("error").at("enum");
-						m_sAuthFailureMessage = connectionInfoJson.at("error").at("msg");
-					}
+
+					m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(std::string(connectionInfoJson.at("ip")).c_str());
+					m_pendingConnectionInfo.port = (unsigned short)connectionInfoJson.at("port");
+					m_pendingConnectionInfo.authToken = connectionInfoJson.at("authToken");
+					m_bHasPendingConnectionInfo = true;
+					m_bSuccessfullyAuthenticatedWithGameServer = true;
 				}
 				catch (nlohmann::json::parse_error& e)
 				{
@@ -713,10 +722,11 @@ void MasterServerManager::AuthenticateWithServer(
 			}
 			else
 			{
-				spdlog::error(
-					"Failed authenticating with server: {}",
-					res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
-														   : std::to_string((int)res.error()));
+				HandleHttpException(std::move(res));
+				// spdlog::error(
+				//"Failed authenticating with server: {}",
+				// res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
+				//   : std::to_string((int)res.error()));
 				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
@@ -750,7 +760,8 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 			httplib::Client cli = SetupHttpClient();
 			std::string querystring = fmt::format("/accounts/write_persistence?id={}&serverId={}", strPlayerId, m_sOwnServerId);
 			std::string encoded = base64_encode(strPdata.data(), pdataSize);
-			if (auto res = cli.Post(querystring, encoded, "text/plain"))
+			auto res = cli.Post(querystring, encoded, "text/plain");
+			if (res && res->status == 200)
 			{
 				spdlog::error("[Pdata] Status: {}", res->status);
 				spdlog::error("[Pdata] Body: {}", res->body);
@@ -758,8 +769,7 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 			}
 			else
 			{
-				auto err = res.error();
-				spdlog::error("[Pdata] Write persistence failed: {}", err);
+				HandleHttpException(std::move(res));
 				m_bSuccessfullyConnected = false;
 			}
 
@@ -773,7 +783,6 @@ void ConCommand_ns_fetchservers(const CCommand& args)
 {
 	g_pMasterServerManager->RequestServerList();
 }
-
 MasterServerManager::MasterServerManager() : m_pendingConnectionInfo {}, m_sOwnServerId {""}, m_sOwnClientAuthToken {""} {}
 
 ON_DLL_LOAD_RELIESON("engine.dll", MasterServer, (ConCommand, ServerPresence), (CModule module))
@@ -996,21 +1005,10 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				try
 				{
 					nlohmann::json serverAddedJson = nlohmann::json::parse(res->body);
-					if (serverAddedJson["success"])
-					{
-						spdlog::info("Successfully registered the local server to the master server.");
-						return ReturnCleanup(
-							MasterServerReportPresenceResult::Success, serverAddedJson.at("id"), serverAddedJson.at("serverAuthToken"));
-					}
-					else
-					{
-						if (!strcmp(std::string(serverAddedJson.at("error").at("enum")).c_str(), "DUPLICATE_SERVER"))
-						{
-							spdlog::error("Cooling down while the master server cleans the dead server entry, if any.");
-							return ReturnCleanup(MasterServerReportPresenceResult::FailedDuplicateServer);
-						}
-						return ReturnCleanup(MasterServerReportPresenceResult::Failed);
-					}
+
+					spdlog::info("Successfully registered the local server to the master server.");
+					return ReturnCleanup(
+						MasterServerReportPresenceResult::Success, serverAddedJson.at("id"), serverAddedJson.at("serverAuthToken"));
 				}
 				catch (nlohmann::json::parse_error& e)
 				{
@@ -1025,10 +1023,27 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 			}
 			else
 			{
-				spdlog::error(
-					"Failed adding self to server list: error {}",
-					res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
-														   : std::to_string((int)res.error()));
+				try
+				{
+					nlohmann::json serverAddedJson = nlohmann::json::parse(res->body);
+					if (!strcmp(std::string(serverAddedJson.at("error").at("enum")).c_str(), "DUPLICATE_SERVER"))
+					{
+						spdlog::error("Cooling down while the master server cleans the dead server entry, if any.");
+						return ReturnCleanup(MasterServerReportPresenceResult::FailedDuplicateServer);
+					}
+					spdlog::error("Failed registering server:  \"{}\"", serverAddedJson.at("error").at("msg"));
+					return ReturnCleanup(MasterServerReportPresenceResult::Failed);
+				}
+				catch (nlohmann::json::parse_error& e)
+				{
+					spdlog::error("Failed registering server: encountered parse error \"{}\"", e.what());
+					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
+				}
+				catch (nlohmann::json::out_of_range& e)
+				{
+					spdlog::error("Failed registering server: encountered data error \"{}\"", e.what());
+					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
+				}
 				return ReturnCleanup(MasterServerReportPresenceResult::FailedNoConnect);
 			}
 		});
