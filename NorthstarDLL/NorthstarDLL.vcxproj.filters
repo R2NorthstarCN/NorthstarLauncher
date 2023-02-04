@@ -1197,6 +1197,9 @@
     <ClInclude Include="scripts\scriptgamestate.h">
       <Filter>Header Files\scripts</Filter>
     </ClInclude>
+		<ClInclude Include="util\wininfo.h">
+    	<Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="util\utils.h">
       <Filter>Header Files\util</Filter>
     </ClInclude>
@@ -1357,6 +1360,9 @@
     <ClCompile Include="scripts\client\clientchathooks.cpp">
       <Filter>Source Files\scripts\client</Filter>
     </ClCompile>
+    <ClCompile Include="scripts\client\cursorposition.cpp">
+      <Filter>Source Files\scripts\client</Filter>
+    </ClCompile>
     <ClCompile Include="scripts\client\scriptbrowserhooks.cpp">
       <Filter>Source Files\scripts\client</Filter>
     </ClCompile>
@@ -1473,6 +1479,9 @@
     </ClCompile>
     <ClCompile Include="scripts\scriptgamestate.cpp">
       <Filter>Source Files\scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="util\wininfo.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="client\rejectconnectionfixes.cpp">
       <Filter>Source Files</Filter>

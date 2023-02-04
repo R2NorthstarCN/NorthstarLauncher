@@ -460,6 +460,7 @@
     <ClInclude Include="util\sigscanning.h" />
     <ClInclude Include="util\utils.h" />
     <ClInclude Include="util\version.h" />
+		<ClInclude Include="util\wininfo.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\include\spdlog\fmt\bundled\LICENSE.rst" />
@@ -521,6 +522,7 @@
     <ClCompile Include="plugins\plugins.cpp" />
     <ClCompile Include="scripts\clantag.cpp" />
     <ClCompile Include="scripts\client\clientchathooks.cpp" />
+    <ClCompile Include="scripts\client\cursorposition.cpp" />
     <ClCompile Include="scripts\client\scriptbrowserhooks.cpp" />
     <ClCompile Include="scripts\client\scriptmainmenupromos.cpp" />
     <ClCompile Include="scripts\client\scriptmodmenu.cpp" />
@@ -560,6 +562,7 @@
     <ClCompile Include="util\sigscanning.cpp" />
     <ClCompile Include="util\utils.cpp" />
     <ClCompile Include="util\version.cpp" />
+		<ClCompile Include="util\wininfo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="audio_asm.asm" />
