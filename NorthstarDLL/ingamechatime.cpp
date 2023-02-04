@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "ingamechatime.h"
 #include "inputsystem.h"
+#include "dedicated/dedicated.h"
 AUTOHOOK_INIT()
 SourceInterface<vgui::ISurface>* m_vguiSurface;
 SourceInterface<IMatSystemSurface>* m_matSystemSurface;
@@ -164,17 +165,32 @@ AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int6
 }
 ON_DLL_LOAD_CLIENT_RELIESON("vguimatsurface.dll", VGUIHOOKS, ConVar, (CModule module))
 {
+	if (IsDedicatedServer())
+	{
+		spdlog::info("[IME] Disabling vguimatsurface hooks for DEDICATED");
+		return;
+	}
 	AUTOHOOK_DISPATCH();
 	m_vguiSurface = new SourceInterface<vgui::ISurface>("vguimatsurface.dll", "VGUI_Surface031");
 	m_matSystemSurface = new SourceInterface<IMatSystemSurface>("vguimatsurface.dll", "VGUI_Surface031");
 }
 ON_DLL_LOAD_CLIENT("vgui2.dll", IPANELHOOKS, (CModule module))
 {
+	if (IsDedicatedServer())
+	{
+		spdlog::info("[IME] Disabling vguiipanel hooks for DEDICATED");
+		return;
+	}
 	m_iPanel = new SourceInterface<vgui::IPanel>("vgui2.dll", "VGUI_Panel009");
 }
 
 ON_DLL_LOAD_CLIENT("client.dll", GETCHATSTATUS, (CModule module))
 {
+	if (IsDedicatedServer())
+	{
+		spdlog::info("[IME] Disabling ime registration for DEDICATED");
+		return;
+	}
 	localGameSettings = module.Offset(0x11BAA48).As<CGameSettings**>();
 	Cvar_ns_ime_chatbox_fontidx = new ConVar("ns_ime_chatbox_fontidx", "17", FCVAR_NONE, "");
 }

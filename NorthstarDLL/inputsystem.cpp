@@ -1,14 +1,15 @@
 #include "pch.h"
 #include "inputsystem.h"
 #include "logging/sourceconsole.h"
+#include "dedicated/dedicated.h"
 AUTOHOOK_INIT()
 
 bool m_fullscreen = true;
 bool m_alphaMode = true;
 
 typedef unsigned char byte;
-typedef __int64 (*InputStuffType)(__int64 a1, int a2, int a3, int a4, int a5, int a6);
-InputStuffType RandomInputFunction;
+// typedef __int64 (*InputStuffType)(__int64 a1, int a2, int a3, int a4, int a5, int a6);
+//  InputStuffType RandomInputFunction;
 CandidateList m_CandidateList {};
 void onCandidateList(CandidateList* list)
 {
@@ -58,8 +59,12 @@ void handleCandlist(HIMC m_context)
 
 ON_DLL_LOAD("inputsystem.dll", IMESUPPORT, (CModule module))
 {
-
-	RandomInputFunction = module.Offset(0x7EC0).As<InputStuffType>();
+	if (IsDedicatedServer())
+	{
+		spdlog::info("[IME] Disabling inputsystem hooks for DEDICATED");
+		return;
+	}
+	// RandomInputFunction = module.Offset(0x7EC0).As<InputStuffType>();
 	AUTOHOOK_DISPATCH();
 }
 
