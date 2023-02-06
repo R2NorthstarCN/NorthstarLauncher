@@ -30,7 +30,7 @@ ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
 ConVar* Cvar_ns_server_reg_token;
 
-void MasterServerManager::HandleHttpException(httplib::Result&& res, std::string defaultType = "", std::string defaultMsg = "")
+void MasterServerManager::HandleHttpException(httplib::Result& res, std::string defaultType = "", std::string defaultMsg = "")
 {
 	if (!defaultType.empty() && !defaultMsg.empty())
 	{
@@ -401,7 +401,7 @@ bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
 	}
 	else
 	{
-		HandleHttpException(std::move(res));
+		HandleHttpException(res);
 		return false;
 	}
 }
@@ -447,7 +447,7 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 			}
 			else
 			{
-				HandleHttpException(std::move(res), "ERROR_NO_CONNECTION", "我操你妈");
+				HandleHttpException(res, "ERROR_NO_CONNECTION", "无法连接主服务器");
 				m_bSuccessfullyConnected = false;
 			}
 
@@ -530,7 +530,7 @@ void MasterServerManager::RequestServerList()
 			}
 			else
 			{
-				HandleHttpException(std::move(res));
+				HandleHttpException(res);
 				m_bSuccessfullyConnected = false;
 			}
 			m_bRequestingServerList = false;
@@ -588,7 +588,7 @@ void MasterServerManager::RequestMainMenuPromos()
 			}
 			else
 			{
-				HandleHttpException(std::move(res));
+				HandleHttpException(res);
 				m_bSuccessfullyConnected = false;
 			}
 		});
@@ -646,7 +646,7 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 			}
 			else
 			{
-				HandleHttpException(std::move(res));
+				HandleHttpException(res);
 				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
@@ -722,7 +722,7 @@ void MasterServerManager::AuthenticateWithServer(
 			}
 			else
 			{
-				HandleHttpException(std::move(res));
+				HandleHttpException(res);
 				// spdlog::error(
 				//"Failed authenticating with server: {}",
 				// res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
@@ -769,7 +769,7 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 			}
 			else
 			{
-				HandleHttpException(std::move(res));
+				HandleHttpException(res);
 				m_bSuccessfullyConnected = false;
 			}
 

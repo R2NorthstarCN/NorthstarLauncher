@@ -24,12 +24,16 @@ void onCandidateList(CandidateList* list)
 void handleCandlist(HIMC m_context)
 {
 	// m_CandidateList->Reset();
-	std::shared_ptr<std::vector<std::wstring>> newCands = std::make_shared<std::vector<std::wstring>>();
+	std::vector<std::wstring> newCands;
 	DWORD size = ImmGetCandidateListW(m_context, 0, NULL, 0);
 
 	if (size)
 	{
-		LPCANDIDATELIST candlist = (LPCANDIDATELIST)_alloca(size);
+		LPCANDIDATELIST candlist = (LPCANDIDATELIST)_malloca(size);
+		if (candlist == nullptr)
+		{
+			return;
+		}
 		size = ImmGetCandidateListW(m_context, 0, candlist, size);
 
 		DWORD pageSize = candlist->dwPageSize;
@@ -40,7 +44,7 @@ void handleCandlist(HIMC m_context)
 			DWORD pageStart = candlist->dwPageStart;
 			DWORD pageEnd = pageStart + pageSize;
 
-			newCands->resize(pageSize);
+			newCands.resize(pageSize);
 
 			for (size_t i = 0; i < pageSize; i++)
 			{
@@ -48,12 +52,14 @@ void handleCandlist(HIMC m_context)
 				LONG_PTR pStrEnd = (LONG_PTR)candlist + (i + pageStart + 1 < candCount ? candlist->dwOffset[i + pageStart + 1] : size);
 				auto len = pStrEnd - pStrStart;
 
-				newCands->at(i).assign(reinterpret_cast<wchar_t*>(pStrStart), len / sizeof(wchar_t));
+				newCands[i].assign(reinterpret_cast<wchar_t*>(pStrStart), len / sizeof(wchar_t));
 			}
 		}
 	}
 	// m_CandidateList->m_pCandidates.swap(newCands);
-	m_CandidateList.m_pCandidates.store(newCands);
+	m_CandidateList.m_mutex.lock();
+	m_CandidateList.m_pCandidates = newCands;
+	m_CandidateList.m_mutex.unlock();
 	// m_sigCandidateList(m_CandidateList);
 }
 

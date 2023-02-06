@@ -166,6 +166,7 @@ class SquirrelManagerBase
 
 	inline void pushinteger(HSquirrelVM* sqvm, const SQInteger iVal)
 	{
+		// spdlog::info("PUSHINTEGER:{}", iVal);
 		__sq_pushinteger(sqvm, iVal);
 	}
 

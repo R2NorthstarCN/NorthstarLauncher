@@ -55,9 +55,10 @@ void, __fastcall, (CServerGameDLL* self, unsigned int senderPlayerId, const char
 	// check chat ratelimits
 	if (!g_pServerLimits->CheckChatLimits(&R2::g_pClientArray[senderPlayerId - 1]))
 		return;
-
+	spdlog::info("PLAYER INDEX:{}", senderPlayerId);
+	spdlog::info("SENT INDEX:{}", (static_cast<int>(senderPlayerId) - 1));
 	SQRESULT result = g_pSquirrel<ScriptContext::SERVER>->Call(
-		"CServerGameDLL_ProcessMessageStartThread", static_cast<int>(senderPlayerId) - 1, text, isTeam);
+		"CServerGameDLL_ProcessMessageStartThread", static_cast<int>(senderPlayerId - 1), text, isTeam);
 
 	if (result == SQRESULT_ERROR)
 		_CServerGameDLL__OnReceivedSayTextMessage(self, senderPlayerId, text, isTeam);

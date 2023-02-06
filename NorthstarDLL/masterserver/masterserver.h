@@ -108,7 +108,7 @@ class MasterServerManager
 
   public:
 	MasterServerManager();
-	void HandleHttpException(httplib::Result&& res, std::string defaultType, std::string defaultMsg);
+	void HandleHttpException(httplib::Result& res, std::string defaultType, std::string defaultMsg);
 	void ClearServerList();
 	void RequestServerList();
 	void RequestMainMenuPromos();

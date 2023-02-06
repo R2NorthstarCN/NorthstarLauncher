@@ -41,8 +41,8 @@ void RenderIMECandidateList()
 	{
 		return;
 	}
-	auto candidateList = m_CandidateList.m_pCandidates.load();
-	if (candidateList->size() == 0)
+	auto candidateList = m_CandidateList.m_pCandidates;
+	if (candidateList.size() == 0)
 		return;
 	// int startx = 0;
 	/*int y = 850;
@@ -143,14 +143,14 @@ void RenderIMECandidateList()
 
 	int x_ = x;
 	int y_ = y + h;
-	for (int i = 0; i < candidateList->size(); i++)
+	for (int i = 0; i < candidateList.size(); i++)
 	{
 		// as the function DrawTextLen works properly only for ASCII characters, we instead take the length of widestring bytes and divide
 		// by 2 to get amount of characters, then multiply it by standard width of a single "A" character (and also by 1.2 for good measure)
 		// auto visualLength = strlen(reinterpret_cast<const char*>(m_CandidateList->m_pCandidates[i].c_str())) / sizeof(wchar_t);
-		auto visualLength = candidateList->at(i).size();
+		auto visualLength = candidateList[i].size();
 		auto widthPx = singleCharacterWidth * (visualLength * 1.4) + prefixWidth;
-		auto str = (fmt::format("{}. ", i + 1) + wide_to_utf8(candidateList->at(i)));
+		auto str = (fmt::format("{}. ", i + 1) + wide_to_utf8(candidateList[i]));
 		// spdlog::info("visuallength:{}", visualLength);
 		isurface->DrawColoredText(fontIndex, x_, y_, 255, 255, 255, 255, str.c_str());
 		x_ += 2 + widthPx;
