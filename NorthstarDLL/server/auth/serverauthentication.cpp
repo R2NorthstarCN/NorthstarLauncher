@@ -57,7 +57,7 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 				"/authenticate_incoming_player",
 				[this](const httplib::Request& request, httplib::Response& response)
 				{
-					if (!request.has_param("id") || !request.has_param("authToken") || request.body.size() >= R2::PERSISTENCE_MAX_SIZE ||
+					if (!request.has_param("id") || !request.has_param("authToken") || request.body.size() >= 128000 ||
 						!request.has_param("serverAuthToken") ||
 						strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
 					{

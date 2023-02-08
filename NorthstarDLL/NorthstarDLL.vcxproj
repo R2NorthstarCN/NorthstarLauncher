@@ -426,7 +426,8 @@
     <ClInclude Include="hooks\memory.h" />
     <ClInclude Include="hooks\sourceinterface.h" />
     <ClInclude Include="hooks\tier0.h" />
-    <ClInclude Include="ingamechatime.h" />
+    <ClInclude Include="netgraph.h" />
+    <ClInclude Include="vguihooks.h" />
     <ClInclude Include="inputsystem.h" />
     <ClInclude Include="logging\crashhandler.h" />
     <ClInclude Include="logging\logging.h" />
@@ -503,7 +504,7 @@
     <ClCompile Include="engine\hoststate.cpp" />
     <ClCompile Include="engine\r2engine.cpp" />
     <ClCompile Include="engine\runframe.cpp" />
-    <ClCompile Include="ingamechatime.cpp" />
+    <ClCompile Include="vguihooks.cpp" />
     <ClCompile Include="inputsystem.cpp" />
     <ClCompile Include="logging\crashhandler.cpp" />
     <ClCompile Include="logging\logging.cpp" />
@@ -515,6 +516,7 @@
     <ClCompile Include="mods\compiled\modpdef.cpp" />
     <ClCompile Include="mods\compiled\modscriptsrson.cpp" />
     <ClCompile Include="mods\modmanager.cpp" />
+    <ClCompile Include="netgraph.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

@@ -1,6 +1,7 @@
 #include "pch.h"
-#include "ingamechatime.h"
+#include "vguihooks.h"
 #include "inputsystem.h"
+#include "netgraph.h"
 #include "dedicated/dedicated.h"
 AUTOHOOK_INIT()
 SourceInterface<vgui::ISurface>* m_vguiSurface;
@@ -8,6 +9,7 @@ SourceInterface<IMatSystemSurface>* m_matSystemSurface;
 SourceInterface<vgui::IPanel>* m_iPanel;
 bool lastChatboxState;
 ConVar* Cvar_ns_ime_chatbox_fontidx;
+ConVar* Cvar_ns_netgraph;
 std::wstring utf8_to_wide(const std::string_view& str)
 {
 	int size = MultiByteToWideChar(CP_UTF8, MB_COMPOSITE, str.data(), static_cast<int>(str.length()), nullptr, 0);
@@ -44,28 +46,6 @@ void RenderIMECandidateList()
 	auto candidateList = m_CandidateList.m_pCandidates;
 	if (candidateList.size() == 0)
 		return;
-	// int startx = 0;
-	/*int y = 850;
-	for (int i = 0; i < m_CandidateList->m_lPageSize; i++)
-	{
-		(*m_matSystemSurface)
-			->DrawColoredText(
-				8,
-				90,
-				y + i * 17,
-				255,
-				255,
-				255,
-				255,
-				(fmt::format("{}. ", i + 1) + wide_to_utf8(m_CandidateList->m_pCandidates[i])).c_str());
-	}*/
-	// DrawTextOnScreen(
-	// fmt::format("CLASSNAME: {}", (*m_iPanel)->GetClassNameW((*m_iPanel)->GetCurrentKeyFocus((*m_vguiSurface)->GetEmbeddedPanel())))); //
-	// 摈斥莅临 延伸 小米 操蛋 华为
-
-	// spdlog::info("vguimatsurface.dll = {}", (void*)GetModuleHandleA("vguimatsurface"));
-	// spdlog::info("m_vguiSurface = {}", (void*)((uintptr_t)(&*(*m_vguiSurface)) - (uintptr_t)GetModuleHandleA("vguimatsurface")));
-	// spdlog::info("*m_vguiSurface = {}", (void*)(*(uintptr_t*)(&*(*m_vguiSurface)) - (uintptr_t)GetModuleHandleA("vguimatsurface")));
 
 	auto* ipanel = &**m_iPanel; // (xD)wild pointers
 	auto* isurface = &**m_matSystemSurface; // m_vguiSurface; // (xD)less typing later ftw xd true
@@ -79,18 +59,7 @@ void RenderIMECandidateList()
 	if (!main_panel)
 		return;
 
-	/* auto keyFocus = (*m_iPanel)->GetCurrentKeyFocus(main_panel);
-	spdlog::info("keyFocus = {}", (void*)keyFocus);
-	if (keyFocus)
-	{
-		spdlog::info("那么： {}, classname： {}", (*m_iPanel)->GetName(keyFocus), (*m_iPanel)->GetClassNameW(keyFocus));
-		int x, y;
-		(*m_iPanel)->GetPos(keyFocus, x, y);
-		spdlog::info("x:{}, y{}", x, y);
-	}*/
-
 	int count = isurface->GetPopupCount();
-	// spdlog::info("popup count: {}", count);
 
 	vgui::VPANEL panel = nullptr;
 	int x, y, w, h;
@@ -110,13 +79,6 @@ void RenderIMECandidateList()
 
 		auto* name = ipanel->GetName(panel); // IngameTextChat
 		auto* classname = ipanel->GetClassName(panel); // CBaseHudChat
-		/*spdlog::info(
-			"那么： {}, classname： {} | vis:{} pop:{} kbd:{}",
-			name,
-			classname,
-			ipanel->IsVisible(panel),
-			ipanel->IsPopup(panel),
-			ipanel->IsKeyBoardInputEnabled(panel));*/
 
 		if (strcmp(classname, "CBaseHudChat") == 0) // looks like a single = over the network lol xD
 		{
@@ -156,18 +118,27 @@ void RenderIMECandidateList()
 		x_ += 2 + widthPx;
 	}
 }
+void RenderNetGraph()
+{
+	if (Cvar_ns_netgraph->GetInt() == 0)
+		return;
+
+	(*m_matSystemSurface)->DrawColoredText(5, 960, 500, 255, 255, 255, 255, netgui_str.c_str());
+}
 
 AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int64 a1, int a2))
 {
 	auto result = CEngineVGUI__Paint(a1, a2);
+	// add custom vgui draw calls here
 	RenderIMECandidateList();
+	RenderNetGraph();
 	return result;
 }
 ON_DLL_LOAD_CLIENT_RELIESON("vguimatsurface.dll", VGUIHOOKS, ConVar, (CModule module))
 {
 	if (IsDedicatedServer())
 	{
-		spdlog::info("[IME] Disabling vguimatsurface hooks for DEDICATED");
+		// spdlog::info("[IME] Disabling vguimatsurface hooks for DEDICATED");
 		return;
 	}
 	AUTOHOOK_DISPATCH();
@@ -178,7 +149,7 @@ ON_DLL_LOAD_CLIENT("vgui2.dll", IPANELHOOKS, (CModule module))
 {
 	if (IsDedicatedServer())
 	{
-		spdlog::info("[IME] Disabling vguiipanel hooks for DEDICATED");
+		// spdlog::info("[IME] Disabling vguiipanel hooks for DEDICATED");
 		return;
 	}
 	m_iPanel = new SourceInterface<vgui::IPanel>("vgui2.dll", "VGUI_Panel009");
@@ -188,9 +159,10 @@ ON_DLL_LOAD_CLIENT("client.dll", GETCHATSTATUS, (CModule module))
 {
 	if (IsDedicatedServer())
 	{
-		spdlog::info("[IME] Disabling ime registration for DEDICATED");
+		// spdlog::info("[IME] Disabling ime registration for DEDICATED");
 		return;
 	}
 	localGameSettings = module.Offset(0x11BAA48).As<CGameSettings**>();
 	Cvar_ns_ime_chatbox_fontidx = new ConVar("ns_ime_chatbox_fontidx", "17", FCVAR_NONE, "");
+	Cvar_ns_netgraph = new ConVar("net_graph", "0", FCVAR_NONE, "");
 }

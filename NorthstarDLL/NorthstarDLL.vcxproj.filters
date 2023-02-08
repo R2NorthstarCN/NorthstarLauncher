@@ -1197,8 +1197,8 @@
     <ClInclude Include="scripts\scriptgamestate.h">
       <Filter>Header Files\scripts</Filter>
     </ClInclude>
-		<ClInclude Include="util\wininfo.h">
-    	<Filter>Header Files</Filter>
+    <ClInclude Include="util\wininfo.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="util\utils.h">
       <Filter>Header Files\util</Filter>
@@ -1209,7 +1209,10 @@
     <ClInclude Include="inputsystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ingamechatime.h">
+    <ClInclude Include="vguihooks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="netgraph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -1492,7 +1495,10 @@
     <ClCompile Include="inputsystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ingamechatime.cpp">
+    <ClCompile Include="vguihooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="netgraph.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
