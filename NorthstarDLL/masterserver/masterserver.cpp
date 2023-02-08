@@ -1106,23 +1106,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 			std::string updatedAuthToken;
 			if (res && res->status == 200)
 			{
-				try
-				{
-					nlohmann::json serverAddedJson = nlohmann::json::parse(res->body);
-					updatedId = serverAddedJson.at("id");
-					updatedAuthToken = serverAddedJson.at("serverAuthToken");
-					return ReturnCleanup(MasterServerReportPresenceResult::Success, updatedId, updatedAuthToken);
-				}
-				catch (nlohmann::json::parse_error& e)
-				{
-					spdlog::error("Failed reading masterserver heartbeat response: encountered parse error \"{}\"", e.what());
-					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
-				}
-				catch (nlohmann::json::out_of_range& e)
-				{
-					spdlog::error("Failed reading masterserver heartbeat response: encountered data error \"{}\"", e.what());
-					return ReturnCleanup(MasterServerReportPresenceResult::FailedNoRetry);
-				}
+				return ReturnCleanup(MasterServerReportPresenceResult::Success);
 			}
 			else
 			{
