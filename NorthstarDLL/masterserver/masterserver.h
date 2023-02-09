@@ -8,7 +8,6 @@
 #include <cstring>
 #include <future>
 #include "scriptmatchmakingevents.h"
-#include "httplib.h"
 extern ConVar* Cvar_ns_masterserver_hostname;
 extern ConVar* Cvar_ns_curl_log_enable;
 
@@ -94,7 +93,6 @@ class MasterServerManager
 	bool m_bNewgameAfterSelfAuth = false;
 	bool m_bScriptAuthenticatingWithGameServer = false;
 	bool m_bSuccessfullyAuthenticatedWithGameServer = false;
-
 	std::string m_sAuthFailureReason {};
 	std::string m_sAuthFailureMessage {};
 
@@ -108,7 +106,6 @@ class MasterServerManager
 
   public:
 	MasterServerManager();
-	void HandleHttpException(httplib::Result& res, std::string defaultType, std::string defaultMsg);
 	void ClearServerList();
 	void RequestServerList();
 	void RequestMainMenuPromos();
