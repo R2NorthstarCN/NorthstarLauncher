@@ -43,10 +43,11 @@ void RenderIMECandidateList()
 	{
 		return;
 	}
+	// spdlog::info("[IME] READ  m_CandidateList.m_pCandidates");
 	auto candidateList = m_CandidateList.m_pCandidates;
 	if (candidateList.size() == 0)
 		return;
-
+	// spdlog::info("[IME] READ VGUI INTERFACE POINTERS");
 	auto* ipanel = &**m_iPanel; // (xD)wild pointers
 	auto* isurface = &**m_matSystemSurface; // m_vguiSurface; // (xD)less typing later ftw xd true
 	auto main_panel = (*m_vguiSurface)->GetEmbeddedPanel();
@@ -58,7 +59,7 @@ void RenderIMECandidateList()
 
 	if (!main_panel)
 		return;
-
+	// spdlog::info("[IME] READ  main_panel");
 	int count = isurface->GetPopupCount();
 
 	vgui::VPANEL panel = nullptr;
@@ -76,7 +77,7 @@ void RenderIMECandidateList()
 			continue;
 		if (!ipanel->IsKeyBoardInputEnabled(panel))
 			continue;
-
+		// spdlog::info("[IME] IPANEL IS VALID");
 		auto* name = ipanel->GetName(panel); // IngameTextChat
 		auto* classname = ipanel->GetClassName(panel); // CBaseHudChat
 
@@ -114,7 +115,10 @@ void RenderIMECandidateList()
 		auto widthPx = singleCharacterWidth * (visualLength * 1.4) + prefixWidth;
 		auto str = (fmt::format("{}. ", i + 1) + wide_to_utf8(candidateList[i]));
 		// spdlog::info("visuallength:{}", visualLength);
+		// spdlog::info("[IME] CAND:{}", str.c_str());
+		// spdlog::info("[IME] isurface:{}", (void*)isurface);
 		isurface->DrawColoredText(fontIndex, x_, y_, 255, 255, 255, 255, str.c_str());
+		// spdlog::info("[IME]DRAWCALLED");
 		x_ += 2 + widthPx;
 	}
 }
@@ -130,7 +134,9 @@ AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int6
 {
 	auto result = CEngineVGUI__Paint(a1, a2);
 	// add custom vgui draw calls here
-	RenderIMECandidateList();
+	if (m_CandidateList.ImeEnabled)
+		RenderIMECandidateList();
+
 	RenderNetGraph();
 	return result;
 }

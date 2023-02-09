@@ -2,6 +2,7 @@
 #include "inputsystem.h"
 #include "logging/sourceconsole.h"
 #include "dedicated/dedicated.h"
+#include "core/tier0.h"
 AUTOHOOK_INIT()
 
 bool m_fullscreen = true;
@@ -65,13 +66,15 @@ void handleCandlist(HIMC m_context)
 
 ON_DLL_LOAD("inputsystem.dll", IMESUPPORT, (CModule module))
 {
-	if (IsDedicatedServer())
+	if (IsDedicatedServer() || !Tier0::CommandLine()->CheckParm("-experimentalimesupport"))
 	{
-		spdlog::info("[IME] Disabling inputsystem hooks for DEDICATED");
+		spdlog::info("[IME] Disabling inputsystem hooks");
+		m_CandidateList.ImeEnabled = false;
 		return;
 	}
 	// RandomInputFunction = module.Offset(0x7EC0).As<InputStuffType>();
 	AUTOHOOK_DISPATCH();
+	m_CandidateList.ImeEnabled = true;
 }
 
 // clang-format off
@@ -101,6 +104,7 @@ LRESULT,__fastcall, (__int64 a1, HWND hwnd, UINT msg, WPARAM wparam, unsigned __
 		case IMN_OPENCANDIDATE:
 			spdlog::info("[IME] IMN_OPENCANDIDATE");
 			m_CandidateList.Reset();
+			spdlog::info("[IME] m_CandidateList.Reset()");
 			break;
 		case IMN_CLOSECANDIDATE:
 			spdlog::info("[IME] IMN_CLOSECANDIDATE");
@@ -110,6 +114,7 @@ LRESULT,__fastcall, (__int64 a1, HWND hwnd, UINT msg, WPARAM wparam, unsigned __
 			break;
 		}
 		ImmReleaseContext(hwnd, m_context);
+		// spdlog::info("[IME] ImmReleaseContext()");
 	}
 	else if (msg == WM_IME_ENDCOMPOSITION)
 	{
@@ -126,7 +131,9 @@ LRESULT,__fastcall, (__int64 a1, HWND hwnd, UINT msg, WPARAM wparam, unsigned __
 		else
 		{
 			spdlog::error("[IME] oh no, no cuntext in WM_IME_SETCONTEXT");
+			// ImmReleaseContext(hwnd, m_context);
 		}
 	}
+	// spdlog::info("[IME] WndProc");
 	return WndProc(a1, hwnd, msg, wparam, lparam);
 }

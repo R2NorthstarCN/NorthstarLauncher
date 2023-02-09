@@ -5,10 +5,12 @@ struct CandidateList
 	// std::shared_ptr<std::vector<std::wstring>> m_pCandidates = std::make_shared<std::vector<std::wstring>>();
 	std::mutex m_mutex;
 	std::vector<std::wstring> m_pCandidates;
-
+	bool ImeEnabled = false;
 	void Reset()
 	{
+		m_mutex.lock();
 		m_pCandidates = std::vector<std::wstring>();
+		m_mutex.unlock();
 	}
 
 	/*std::shared_ptr<std::vector<std::wstring>> Get()

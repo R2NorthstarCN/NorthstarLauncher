@@ -623,8 +623,8 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 			std::string querystring =
 				fmt::format("/client/auth_with_self?id={}&playerToken={}", encode_query_param(uidStr), encode_query_param(tokenStr));
 			httplib::Client cli = SetupHttpClient();
-
-			if (auto res = cli.Post(querystring))
+			auto res = cli.Post(querystring);
+			if (res && res->status == 200)
 			{
 				try
 				{
@@ -642,6 +642,8 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 					g_pServerAuthentication->m_RemoteAuthenticationData.insert(std::make_pair(authInfoJson.at("authToken"), newAuthData));
 
 					m_bSuccessfullyAuthenticatedWithGameServer = true;
+					m_bAuthenticatingWithGameServer = false;
+					m_bScriptAuthenticatingWithGameServer = false;
 				}
 				catch (nlohmann::json::parse_error& e)
 				{
@@ -655,11 +657,10 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 			else
 			{
 				auto err = res.error();
+				spdlog::error("Failed authenticating with local server: encountered connection error {}", err);
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
-
 				m_bAuthenticatingWithGameServer = false;
-				m_bScriptAuthenticatingWithGameServer = false;
 
 				if (m_bNewgameAfterSelfAuth)
 				{
