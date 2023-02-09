@@ -8,6 +8,7 @@
 #include <cstring>
 #include <future>
 #include "scriptmatchmakingevents.h"
+#include <unordered_set>
 extern ConVar* Cvar_ns_masterserver_hostname;
 extern ConVar* Cvar_ns_curl_log_enable;
 
@@ -71,6 +72,9 @@ class MasterServerManager
 	bool m_bAuthenticatingWithGameServer = false;
 
   public:
+	std::unordered_set<std::string> m_sPlayerPersistenceStates;
+	std::mutex m_PlayerPersistenceMutex;
+
 	char m_sOwnServerId[33];
 	char m_sOwnServerAuthToken[33];
 	std::string m_sOwnClientAuthToken;

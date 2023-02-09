@@ -126,6 +126,8 @@ AUTOHOOK(CCLIENT__StartMatchmaking, client.dll + 0x213D00, SQRESULT, __fastcall,
 AUTOHOOK(CCLIENT__CancelMatchmaking, client.dll + 0x211640, SQRESULT, __fastcall, (HSquirrelVM* clientsqvm))
 // clang-format on
 {
+	CCLIENT__CancelMatchmaking;
+	return SQRESULT_NOTNULL;
 	spdlog::info("[Matchmaker] Cancelled Matchmaking request");
 	g_pMatchmakerManager->CancelMatchmake();
 
@@ -139,8 +141,8 @@ AUTOHOOK(CCLIENT__AreWeMatchmaking, client.dll + 0x211970, SQRESULT, __fastcall,
 	bool are_we_matchmaking = false;
 	if (g_pMatchmakerManager->LocalState == 2)
 		are_we_matchmaking = true;
-
-	g_pSquirrel<ScriptContext::CLIENT>->pushbool(clientsqvm, are_we_matchmaking);
+	// patch false
+	g_pSquirrel<ScriptContext::CLIENT>->pushbool(clientsqvm, false);
 	return SQRESULT_NOTNULL;
 }
 // clang-format off
@@ -175,5 +177,5 @@ AUTOHOOK(CCLIENT__GetMyMatchmakingStatus, client.dll + 0x3B1B70, SQRESULT, __fas
 
 ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptMatchmakingEvents, ClientSquirrel, (CModule module))
 {
-	AUTOHOOK_DISPATCH();
+	// AUTOHOOK_DISPATCH();
 }

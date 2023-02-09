@@ -626,6 +626,7 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 			auto res = cli.Post(querystring);
 			if (res && res->status == 200)
 			{
+				m_bSuccessfullyConnected = true;
 				try
 				{
 					// spdlog::info("{}", res->status);
@@ -648,26 +649,35 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 				catch (nlohmann::json::parse_error& e)
 				{
 					spdlog::error("Failed authenticating with local server: encountered parse error \"{}\"", e.what());
+					m_bSuccessfullyAuthenticatedWithGameServer = false;
+					m_bScriptAuthenticatingWithGameServer = false;
+					m_bAuthenticatingWithGameServer = false;
 				}
 				catch (nlohmann::json::out_of_range& e)
 				{
 					spdlog::error("Failed authenticating with local server: encountered data error \"{}\"", e.what());
+					m_bSuccessfullyAuthenticatedWithGameServer = false;
+					m_bScriptAuthenticatingWithGameServer = false;
+					m_bAuthenticatingWithGameServer = false;
 				}
 			}
 			else
 			{
 				auto err = res.error();
 				spdlog::error("Failed authenticating with local server: encountered connection error {}", err);
+				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
-				m_bAuthenticatingWithGameServer = false;
+			}
 
-				if (m_bNewgameAfterSelfAuth)
-				{
-					// pretty sure this is threadsafe?
-					R2::Cbuf_AddText(R2::Cbuf_GetCurrentPlayer(), "ns_end_reauth_and_leave_to_lobby", R2::cmd_source_t::kCommandSrcCode);
-					m_bNewgameAfterSelfAuth = false;
-				}
+			m_bAuthenticatingWithGameServer = false;
+			m_bScriptAuthenticatingWithGameServer = false;
+
+			if (m_bNewgameAfterSelfAuth)
+			{
+				// pretty sure this is threadsafe?
+				R2::Cbuf_AddText(R2::Cbuf_GetCurrentPlayer(), "ns_end_reauth_and_leave_to_lobby", R2::cmd_source_t::kCommandSrcCode);
+				m_bNewgameAfterSelfAuth = false;
 			}
 		});
 
@@ -696,7 +706,7 @@ void MasterServerManager::AuthenticateWithServer(
 		[this, uidStr, tokenStr, serverIdStr, passwordStr]()
 		{
 			// esnure that any persistence saving is done, so we know masterserver has newest
-			while (m_bSavingPersistentData)
+			while (m_sPlayerPersistenceStates.contains(uidStr))
 				Sleep(100);
 
 			spdlog::info("Attempting authentication with server of id \"{}\"", serverIdStr);
@@ -723,11 +733,16 @@ void MasterServerManager::AuthenticateWithServer(
 						m_pendingConnectionInfo.authToken = connectionInfoJson.at("authToken");
 						m_bHasPendingConnectionInfo = true;
 						m_bSuccessfullyAuthenticatedWithGameServer = true;
+						m_bScriptAuthenticatingWithGameServer = false;
+						m_bAuthenticatingWithGameServer = false;
 					}
 					else
 					{
 						m_sAuthFailureReason = connectionInfoJson.at("error").at("enum");
 						m_sAuthFailureMessage = connectionInfoJson.at("error").at("msg");
+						m_bSuccessfullyAuthenticatedWithGameServer = false;
+						m_bScriptAuthenticatingWithGameServer = false;
+						m_bAuthenticatingWithGameServer = false;
 					}
 				}
 				catch (nlohmann::json::parse_error& e)
@@ -748,9 +763,8 @@ void MasterServerManager::AuthenticateWithServer(
 				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
+				m_bAuthenticatingWithGameServer = false;
 			}
-			m_bAuthenticatingWithGameServer = false;
-			m_bScriptAuthenticatingWithGameServer = false;
 		});
 
 	requestThread.detach();
@@ -758,16 +772,24 @@ void MasterServerManager::AuthenticateWithServer(
 
 void MasterServerManager::WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize)
 {
+	std::string strPlayerId(playerId);
 	// still call this if we don't have a server id, since lobbies that aren't port forwarded need to be able to call it
-	m_bSavingPersistentData = true;
+	if (m_sPlayerPersistenceStates.contains(strPlayerId))
+	{
+		spdlog::warn("player {} attempted to write pdata while previous request still exists!");
+		// player is already requesting for leave, ignore the reqeust.
+		return;
+	}
 	if (!pdataSize)
 	{
 		spdlog::warn("attempted to write pdata of size 0!");
-		m_bSavingPersistentData = false;
 		return;
 	}
 
-	std::string strPlayerId(playerId);
+	m_PlayerPersistenceMutex.lock();
+	m_sPlayerPersistenceStates.insert(strPlayerId);
+	m_PlayerPersistenceMutex.unlock();
+
 	std::vector<BYTE> strPdata(pdataSize);
 	memcpy(strPdata.data(), pdata, pdataSize);
 
@@ -779,21 +801,23 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 			std::string querystring = fmt::format(
 				"/accounts/write_persistence?id={}&serverId={}", encode_query_param(strPlayerId), encode_query_param(m_sOwnServerId));
 			std::string encoded = base64_encode(strPdata.data(), pdataSize);
-			if (auto res = cli.Post(querystring, encoded, "text/plain"))
+			auto res = cli.Post(querystring, encoded, "text/plain");
+			if (res && res->status == 200)
 			{
-				spdlog::error("[Pdata] Status: {}", res->status);
-				spdlog::error("[Pdata] Body: {}", res->body);
+				spdlog::info("[Pdata] Successfully wrote pdata for user: {}", strPlayerId);
 				m_bSuccessfullyConnected = true;
 			}
 			else
 			{
 				auto err = res.error();
-				spdlog::error("[Pdata] Write persistence failed: {}", err);
+				spdlog::error("[Pdata] Write persistence failed for user: {}, error: {}", strPlayerId, err);
 
 				m_bSuccessfullyConnected = false;
 			}
 
-			m_bSavingPersistentData = false;
+			m_PlayerPersistenceMutex.lock();
+			m_sPlayerPersistenceStates.erase(strPlayerId);
+			m_PlayerPersistenceMutex.unlock();
 		});
 
 	requestThread.detach();

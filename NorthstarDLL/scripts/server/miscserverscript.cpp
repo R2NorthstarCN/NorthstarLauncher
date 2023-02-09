@@ -31,9 +31,15 @@ ADD_SQFUNC("void", NSEarlyWritePlayerPersistenceForLeave, "entity player", "", S
 	return SQRESULT_NULL;
 }
 
-ADD_SQFUNC("bool", NSIsWritingPlayerPersistence, "", "", ScriptContext::SERVER)
+ADD_SQFUNC("bool", NSIsWritingPlayerPersistence, "string uid", "", ScriptContext::SERVER)
 {
-	g_pSquirrel<context>->pushbool(sqvm, g_pMasterServerManager->m_bSavingPersistentData);
+	const std::string playerUid = g_pSquirrel<context>->getstring(sqvm, 1);
+	// if target player uid is found in m_sPlayerPersistenceStates then that means they are still writing persistence
+	spdlog::info(
+		"player {} requesting to write persistence, current state:{}",
+		playerUid,
+		g_pMasterServerManager->m_sPlayerPersistenceStates.contains(playerUid));
+	g_pSquirrel<context>->pushbool(sqvm, g_pMasterServerManager->m_sPlayerPersistenceStates.contains(playerUid));
 	return SQRESULT_NOTNULL;
 }
 
