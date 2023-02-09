@@ -2174,7 +2174,7 @@ namespace httplib
 					escaped << std::nouppercase;
 				}
 			}
-
+			std::cout << escaped.str() << std::endl;
 			return escaped.str();
 		}
 

@@ -29,7 +29,28 @@ ClientAnticheatSystem g_ClientAnticheatSystem;
 ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
 ConVar* Cvar_ns_server_reg_token;
+inline std::string encode_query_param(const std::string& value)
+{
+	std::ostringstream escaped;
+	escaped.fill('0');
+	escaped << std::hex;
 
+	for (auto c : value)
+	{
+		if (std::isalnum(static_cast<uint8_t>(c)) || c == '-' || c == '.' || c == '_' || c == '~')
+		{
+			escaped << c;
+		}
+		else
+		{
+			escaped << std::uppercase;
+			escaped << '%' << std::setw(2) << static_cast<int>(static_cast<unsigned char>(c));
+			escaped << std::nouppercase;
+		}
+	}
+
+	return escaped.str();
+}
 void SetCommonHttpClientOptions(CURL* curl)
 {
 	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
@@ -347,9 +368,11 @@ bool MasterServerManager::SetLocalPlayerClanTag(std::string clantag)
 {
 
 	httplib::Client cli = SetupHttpClient();
-	std::string querystring =
-		fmt::format("/client/clantag?clantag={}&id={}&token={}", clantag, R2::g_pLocalPlayerUserID, m_sOwnClientAuthToken);
-
+	std::string querystring = fmt::format(
+		"/client/clantag?clantag={}&id={}&token={}",
+		encode_query_param(clantag),
+		encode_query_param(R2::g_pLocalPlayerUserID),
+		encode_query_param(m_sOwnClientAuthToken));
 	auto res = cli.Post(querystring);
 	if (res && res->status == 200)
 	{
@@ -394,7 +417,8 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 			spdlog::info("Trying to authenticate with northstar masterserver for user {}", uidStr);
 
 			httplib::Client cli = SetupHttpClient();
-			std::string endpoint = fmt::format("/client/origin_auth?id={}&token={}", uidStr, tokenStr);
+			std::string endpoint =
+				fmt::format("/client/origin_auth?id={}&token={}", encode_query_param(uidStr), encode_query_param(tokenStr));
 
 			if (auto res = cli.Get(endpoint))
 			{
@@ -596,7 +620,8 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 	std::thread requestThread(
 		[this, uidStr, tokenStr]()
 		{
-			std::string querystring = fmt::format("/client/auth_with_self?id={}&playerToken={}", uidStr, tokenStr);
+			std::string querystring =
+				fmt::format("/client/auth_with_self?id={}&playerToken={}", encode_query_param(uidStr), encode_query_param(tokenStr));
 			httplib::Client cli = SetupHttpClient();
 
 			if (auto res = cli.Post(querystring))
@@ -677,7 +702,11 @@ void MasterServerManager::AuthenticateWithServer(
 
 			httplib::Client cli = SetupHttpClient();
 			std::string querystring = fmt::format(
-				"/client/auth_with_server?id={}&playerToken={}&server={}&password={}", uidStr, tokenStr, serverIdStr, passwordStr);
+				"/client/auth_with_server?id={}&playerToken={}&server={}&password={}",
+				encode_query_param(uidStr),
+				encode_query_param(tokenStr),
+				encode_query_param(serverIdStr),
+				encode_query_param(passwordStr));
 			auto res = cli.Post(querystring);
 
 			if (res && res->status == 200)
@@ -746,7 +775,8 @@ void MasterServerManager::WritePlayerPersistentData(const char* playerId, const 
 		{
 			spdlog::info("[Pdata] Writing persistence for user: {}", strPlayerId);
 			httplib::Client cli = SetupHttpClient();
-			std::string querystring = fmt::format("/accounts/write_persistence?id={}&serverId={}", strPlayerId, m_sOwnServerId);
+			std::string querystring = fmt::format(
+				"/accounts/write_persistence?id={}&serverId={}", encode_query_param(strPlayerId), encode_query_param(m_sOwnServerId));
 			std::string encoded = base64_encode(strPdata.data(), pdataSize);
 			if (auto res = cli.Post(querystring, encoded, "text/plain"))
 			{
@@ -848,8 +878,8 @@ void MasterServerPresenceReporter::DestroyPresence(const ServerPresence* pServer
 			httplib::Client cli = SetupHttpClient();
 			std::string querystring = fmt::format(
 				"/server/remove_server?id={}?serverAuthToken={}",
-				g_pMasterServerManager->m_sOwnServerId,
-				g_pMasterServerManager->m_sOwnServerAuthToken);
+				encode_query_param(g_pMasterServerManager->m_sOwnServerId),
+				encode_query_param(g_pMasterServerManager->m_sOwnServerAuthToken));
 			cli.Delete(querystring);
 		});
 
@@ -970,13 +1000,13 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				"{}",
 				threadedPresence.m_iPort,
 				threadedPresence.m_iAuthPort,
-				threadedPresence.m_sServerName,
-				threadedPresence.m_sServerDesc,
-				threadedPresence.m_MapName,
-				threadedPresence.m_PlaylistName,
+				encode_query_param(threadedPresence.m_sServerName),
+				encode_query_param(threadedPresence.m_sServerDesc),
+				encode_query_param(threadedPresence.m_MapName),
+				encode_query_param(threadedPresence.m_PlaylistName),
 				threadedPresence.m_iMaxPlayers,
-				threadedPresence.m_Password,
-				serverAccount);
+				encode_query_param(threadedPresence.m_Password),
+				encode_query_param(serverAccount));
 
 			// Lambda to quickly cleanup resources and return a value.
 			auto ReturnCleanup = [](MasterServerReportPresenceResult result, std::string id = "", std::string serverAuthToken = "")
@@ -1076,15 +1106,15 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 				serverId.c_str(),
 				threadedPresence.m_iPort,
 				threadedPresence.m_iAuthPort,
-				threadedPresence.m_sServerName,
-				threadedPresence.m_sServerDesc,
-				threadedPresence.m_MapName,
-				threadedPresence.m_PlaylistName,
+				encode_query_param(threadedPresence.m_sServerName),
+				encode_query_param(threadedPresence.m_sServerDesc),
+				encode_query_param(threadedPresence.m_MapName),
+				encode_query_param(threadedPresence.m_PlaylistName),
 				threadedPresence.m_iPlayerCount,
 				threadedPresence.m_iMaxPlayers,
-				threadedPresence.m_Password,
-				std::to_string(g_pSQGameState->eGameState),
-				g_pMasterServerManager->m_sOwnServerAuthToken);
+				encode_query_param(threadedPresence.m_Password),
+				encode_query_param(std::to_string(g_pSQGameState->eGameState)),
+				encode_query_param(g_pMasterServerManager->m_sOwnServerAuthToken));
 			auto res = cli.Post(querystring, modinfo, "application/json");
 			std::string updatedId;
 			std::string updatedAuthToken;
