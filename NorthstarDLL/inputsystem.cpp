@@ -64,19 +64,6 @@ void handleCandlist(HIMC m_context)
 	// m_sigCandidateList(m_CandidateList);
 }
 
-ON_DLL_LOAD("inputsystem.dll", IMESUPPORT, (CModule module))
-{
-	if (IsDedicatedServer() || !Tier0::CommandLine()->CheckParm("-experimentalimesupport"))
-	{
-		spdlog::info("[IME] Disabling inputsystem hooks");
-		m_CandidateList.ImeEnabled = false;
-		return;
-	}
-	// RandomInputFunction = module.Offset(0x7EC0).As<InputStuffType>();
-	AUTOHOOK_DISPATCH();
-	m_CandidateList.ImeEnabled = true;
-}
-
 // clang-format off
 AUTOHOOK(WndProc, inputsystem.dll + 0x8B80,
 LRESULT,__fastcall, (__int64 a1, HWND hwnd, UINT msg, WPARAM wparam, unsigned __int64 lparam))
@@ -136,4 +123,17 @@ LRESULT,__fastcall, (__int64 a1, HWND hwnd, UINT msg, WPARAM wparam, unsigned __
 	}
 	// spdlog::info("[IME] WndProc");
 	return WndProc(a1, hwnd, msg, wparam, lparam);
+}
+
+ON_DLL_LOAD("inputsystem.dll", IMESUPPORT, (CModule module))
+{
+	if (IsDedicatedServer() || !Tier0::CommandLine()->CheckParm("-experimentalimesupport"))
+	{
+		spdlog::info("[IME] Disabling inputsystem hooks");
+		m_CandidateList.ImeEnabled = false;
+		return;
+	}
+	// RandomInputFunction = module.Offset(0x7EC0).As<InputStuffType>();
+	AUTOHOOK_DISPATCH();
+	m_CandidateList.ImeEnabled = true;
 }
