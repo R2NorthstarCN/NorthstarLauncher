@@ -346,6 +346,7 @@ void RuntimeExceptionHandler()
 	{
 		spdlog::error(
 			"std::current_exception() returned nullptr while being handled by RuntimeExceptionHandler. This should never happen!");
+		NS::log::FlushLoggers();
 		std::abort();
 	}
 }
