@@ -260,6 +260,7 @@ void CreateMiniDump(EXCEPTION_POINTERS* exceptionInfo)
 	}
 	else
 		spdlog::error("Failed to write minidump file {}!", stream.str());
+	NS::log::FlushLoggers();
 }
 
 long GenerateExceptionLog(EXCEPTION_POINTERS* exceptionInfo)
