@@ -143,24 +143,24 @@ AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int6
 
 ON_DLL_LOAD_CLIENT_RELIESON("vguimatsurface.dll", VGUIHOOKS, ConVar, (CModule module))
 {
-	AUTOHOOK_DISPATCH_MODULE("vguimatsurface.dll");
+	AUTOHOOK_DISPATCH_MODULE(vguimatsurface.dll);
 	m_vguiSurface = new SourceInterface<vgui::ISurface>("vguimatsurface.dll", "VGUI_Surface031");
 	m_matSystemSurface = new SourceInterface<IMatSystemSurface>("vguimatsurface.dll", "VGUI_Surface031");
 }
 ON_DLL_LOAD_CLIENT("vgui2.dll", IPANELHOOKS, (CModule module))
 {
-	AUTOHOOK_DISPATCH_MODULE("vgui2.dll");
+	AUTOHOOK_DISPATCH_MODULE(vgui2.dll);
 	m_iPanel = new SourceInterface<vgui::IPanel>("vgui2.dll", "VGUI_Panel009");
 }
 
 ON_DLL_LOAD_CLIENT("engine.dll", CENGINEVGUI_PAINT, (CModule module))
 {
-	AUTOHOOK_DISPATCH_MODULE("engine.dll");
+	AUTOHOOK_DISPATCH_MODULE(engine.dll);
 }
 
 ON_DLL_LOAD_CLIENT("client.dll", GETCHATSTATUS, (CModule module))
 {
-	AUTOHOOK_DISPATCH_MODULE("client.dll");
+	AUTOHOOK_DISPATCH_MODULE(client.dll);
 	localGameSettings = module.Offset(0x11BAA48).As<CGameSettings**>();
 	Cvar_ns_ime_chatbox_fontidx = new ConVar("ns_ime_chatbox_fontidx", "17", FCVAR_NONE, "");
 	Cvar_ns_netgraph = new ConVar("net_graph", "0", FCVAR_NONE, "");
