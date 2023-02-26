@@ -1,7 +1,7 @@
 // Microsoft Visual C++ generated resource script.
 //
 #include "resource1.h"
-
+#include "../NorthstarDLL/ns_version.h"
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -61,8 +61,8 @@ IDI_ICON1               ICON                    "ns_icon.ico"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,12,6,0
- PRODUCTVERSION 1,12,6,0
+ FILEVERSION NORTHSTAR_VERSION
+ PRODUCTVERSION NORTHSTAR_VERSION
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -79,12 +79,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Northstar Developers"
             VALUE "FileDescription", "Northstar Launcher"
-            VALUE "FileVersion", "v1.12.6"
+            VALUE "FileVersion", NORTHSTAR_FILE_VERSION
             VALUE "InternalName", "NorthstarLauncher.exe"
             VALUE "LegalCopyright", "Copyright (C) 2021"
             VALUE "OriginalFilename", "NorthstarLauncher.exe"
             VALUE "ProductName", "Northstar Launcher"
-            VALUE "ProductVersion", "v1.12.6"
+            VALUE "ProductVersion", NORTHSTAR_FILE_VERSION
         END
     END
     BLOCK "VarFileInfo"
