@@ -420,7 +420,6 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 			httplib::Client cli = SetupHttpClient();
 			const std::string endpoint =
 				fmt::format("/client/origin_auth?id={}&token={}", encode_query_param(uid_str), encode_query_param(token_str));
-
 			if (auto res = cli.Get(endpoint))
 			{
 				m_bSuccessfullyConnected = true;

@@ -1507,6 +1507,9 @@
     <ClCompile Include="dedicated\dedicatedlogtoclient.cpp">
       <Filter>Source Files\dedicated</Filter>
     </ClCompile>
+    <ClCompile Include="wsahooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="audio_asm.asm">
