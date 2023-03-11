@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "vguihooks.h"
 #include "inputsystem.h"
-#include "netgraph.h"
+#include "shared/netgraph.h"
 #include "dedicated/dedicated.h"
 AUTOHOOK_INIT()
 SourceInterface<vgui::ISurface>* m_vguiSurface;

@@ -181,12 +181,6 @@
     <Filter Include="Header Files\config">
       <UniqueIdentifier>{0b8b4a41-6131-4388-85d2-f5754a304610}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\ingameime">
-      <UniqueIdentifier>{708af130-6f6b-4d12-a9d4-6b7b53d7179a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\ingameime">
-      <UniqueIdentifier>{9c824558-7a6c-4c4c-af63-d197789e5555}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\httplib.h">
@@ -1203,20 +1197,23 @@
     <ClInclude Include="util\utils.h">
       <Filter>Header Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="scriptmatchmakingevents.h">
-      <Filter>Header Files\scripts</Filter>
-    </ClInclude>
-    <ClInclude Include="inputsystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vguihooks.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="netgraph.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="dedicated\dedicatedlogtoclient.h">
       <Filter>Header Files\dedicated</Filter>
+    </ClInclude>
+    <ClInclude Include="scripts\scriptmatchmakingevents.h">
+      <Filter>Header Files\scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="client\inputsystem.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="client\vguihooks.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="shared\netgraph.h">
+      <Filter>Header Files\shared</Filter>
+    </ClInclude>
+    <ClInclude Include="shared\kcp.h">
+      <Filter>Header Files\shared</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1489,26 +1486,26 @@
     <ClCompile Include="util\wininfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="client\rejectconnectionfixes.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="util\utils.cpp">
       <Filter>Source Files\util</Filter>
-    </ClCompile>
-    <ClCompile Include="inputsystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vguihooks.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="netgraph.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="dedicated\dedicatedlogtoclient.cpp">
       <Filter>Source Files\dedicated</Filter>
     </ClCompile>
-    <ClCompile Include="wsahooks.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="client\rejectconnectionfixes.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="client\inputsystem.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="client\vguihooks.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="shared\netgraph.cpp">
+      <Filter>Source Files\shared</Filter>
+    </ClCompile>
+    <ClCompile Include="shared\kcp.cpp">
+      <Filter>Source Files\shared</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

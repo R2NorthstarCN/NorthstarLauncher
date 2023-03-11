@@ -7,7 +7,7 @@
 #include <shared_mutex>
 #include <cstring>
 #include <future>
-#include "scriptmatchmakingevents.h"
+#include "scripts/scriptmatchmakingevents.h"
 #include <unordered_set>
 extern ConVar* Cvar_ns_masterserver_hostname;
 extern ConVar* Cvar_ns_curl_log_enable;

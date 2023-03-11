@@ -19,7 +19,7 @@
 #include <regex>
 #include "util/base64.h"
 #include "scripts/scriptgamestate.h"
-#include "scriptmatchmakingevents.h"
+#include "scripts/scriptmatchmakingevents.h"
 #include "nlohmann/json.hpp"
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
