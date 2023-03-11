@@ -209,20 +209,20 @@ void ConCommand_kcp_listen(const CCommand& args)
 }
 
 
+ConVar* Cvar_kcp_timer_interval;
+
 ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 {
 	ikcp_allocator(_malloc_base, _free_base);
-
-	if (g_kcp_manager == nullptr)
-	{
-		g_kcp_manager = new kcp_manager();
-		spdlog::info("[KCP] KCP manager created");
-	}
-
 	spdlog::info("[KCP] WSA Hooks Initialized: {}", enable_wsa_hooks());
-
 	RegisterConCommand("kcp_connect", ConCommand_kcp_connect, "connect to kcp server", FCVAR_CLIENTDLL);
 	RegisterConCommand("kcp_listen", ConCommand_kcp_listen, "listen new kcp conn", FCVAR_CLIENTDLL);
+	Cvar_kcp_timer_interval = new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
+	if (g_kcp_manager == nullptr)
+	{
+		g_kcp_manager = new kcp_manager(Cvar_kcp_timer_interval->GetInt());
+		spdlog::info("[KCP] KCP manager created");
+	}
 }
 
 std::string ntop(const sockaddr* addr)
@@ -335,11 +335,11 @@ kcp_connection *kcp_setup(kcp_manager* kcp_manager, const sockaddr_in6& remote_a
 	return connection;
 }
 
-kcp_manager::kcp_manager()
+kcp_manager::kcp_manager(IUINT32 timer_interval)
 {
 	itimer_mgr_init(&timer_mgr, timer_interval);
 	select_thread = std::jthread(
-		[this](std::stop_token stop_token)
+		[this,timer_interval](std::stop_token stop_token)
 		{
 			fd_set sockets;
 			timeval timeout {0, timer_interval * 1000};

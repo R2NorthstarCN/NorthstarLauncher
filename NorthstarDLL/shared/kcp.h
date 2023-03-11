@@ -10,8 +10,6 @@
 #include "ikcp.h"
 #include "itimer.h"
 
-const IUINT32 timer_interval = 10;
-
 // Hash and Equal Function Definitions
 namespace std
 {
@@ -102,7 +100,7 @@ struct kcp_manager
 	SOCKET local_socket = 0;
 	unsigned int local_socket_max_msg_size = 0;
 
-	kcp_manager();
+	kcp_manager(IUINT32 timer_interval);
 	~kcp_manager();
 
 	bool is_initialized();
