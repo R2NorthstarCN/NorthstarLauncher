@@ -411,22 +411,37 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 
 					buf.resize(recvfrom_result);
 
+					if (recvfrom_result < 24)
+					{
+						unaltered_data.push(std::make_pair(from, buf));
+						continue;
+					}
+
 					std::shared_lock lock1(this->established_connections_mutex);
 					if (established_connections.contains(from))
 					{
 						const auto& connection = established_connections[from];
 						std::scoped_lock lock2(*connection->mutex, this->timer_mgr_mutex);
 						auto input_result = ikcp_input(connection->kcpcb, buf.data(), buf.size());
-						if (input_result < 0)
+						switch (input_result)
 						{
-							spdlog::error("[KCP] Input failed: {}", input_result);
+						case -1:
+							spdlog::warn("[KCP] Input conv not matches, perhaps the remote is inconsistent");
+							break;
+						case -2:
+						case -3:
+							spdlog::error("[KCP] Invalid packet, perhaps the remote is not in KCP");
+							break;
+						default:
+							itimer_evt_stop(&this->timer_mgr, connection->update_timer);
+							itimer_evt_start(&this->timer_mgr, connection->update_timer, 0, 1);
 						}
 					}
 					else
 					{
 						lock1.unlock();
 						std::unique_lock lock2(this->pending_connections_mutex);
-						if (buf.size() >= 24 && pending_connections.contains(from.sin6_addr))
+						if (pending_connections.contains(from.sin6_addr))
 						{
 							auto recv_conv = ikcp_getconv(buf.data());
 							if (pending_connections[from.sin6_addr].contains(recv_conv))
