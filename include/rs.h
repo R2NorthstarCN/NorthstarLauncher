@@ -91,11 +91,6 @@ int reed_solomon_encode2(reed_solomon* rs, unsigned char** shards, int nr_shards
  * */
 int reed_solomon_reconstruct(reed_solomon* rs, unsigned char** shards, unsigned char* marks, int nr_shards, int block_size);
 
-void reed_solomon_allocator(void* (*new_malloc)(size_t), void (*new_free)(void*), void* (*new_calloc)(size_t, size_t))
-{
-	reed_solomon_malloc = new_malloc;
-	reed_solomon_free = new_free;
-	reed_solomon_calloc = new_calloc;
-}
+void reed_solomon_allocator(void* (*new_malloc)(size_t), void (*new_free)(void*), void* (*new_calloc)(size_t, size_t));
 #endif
 

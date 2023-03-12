@@ -992,3 +992,9 @@ int reed_solomon_reconstruct(reed_solomon* rs,
     return err;
 }
 
+void reed_solomon_allocator(void* (*new_malloc)(size_t), void (*new_free)(void*), void* (*new_calloc)(size_t, size_t))
+{
+	reed_solomon_malloc = new_malloc;
+	reed_solomon_free = new_free;
+	reed_solomon_calloc = new_calloc;
+}
