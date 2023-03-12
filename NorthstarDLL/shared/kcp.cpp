@@ -385,7 +385,10 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 					if (recvfrom_result == SOCKET_ERROR)
 					{
 						auto last_error = WSAGetLastError();
-						spdlog::error("[KCP] UDP recvfrom failed: {}", last_error);
+						if (last_error != WSAEWOULDBLOCK)
+						{
+							spdlog::error("[KCP] UDP recvfrom failed: {}", last_error);
+						}
 						continue;
 					}
 
