@@ -364,6 +364,7 @@ void kcp_update_timer_cb(void* data, void* user)
 		connection->kcpcb->out_segs = 1; // prevent divided by 0 error
 		connection->kcpcb->lost_segs = 0;
 		connection->kcpcb->retrans_segs = 0;
+		connection->last_stats_cleanup = current;
 	}
 
 	ikcp_update(connection->kcpcb, current);
@@ -390,7 +391,9 @@ kcp_connection* kcp_setup(kcp_manager* kcp_manager, const sockaddr_in6& remote_a
 	connection->update_timer = update_timer;
 	itimer_evt_init(update_timer, kcp_update_timer_cb, connection, kcp_manager);
 
-	connection->last_input = iclock();
+	auto current = iclock();
+	connection->last_input = current;
+	connection->last_stats_cleanup = current;
 
 	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
 	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);
