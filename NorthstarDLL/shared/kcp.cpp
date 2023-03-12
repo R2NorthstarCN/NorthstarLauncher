@@ -228,6 +228,7 @@ void ConCommand_kcp_listen(const CCommand& args)
 
 ConVar* Cvar_kcp_timer_interval;
 ConVar* Cvar_kcp_timeout;
+ConVar* Cvar_kcp_stats_cleanup_interval;
 
 ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 {
@@ -242,6 +243,8 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	Cvar_kcp_timer_interval =
 		new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
 	Cvar_kcp_timeout = new ConVar("kcp_timeout", "5000", FCVAR_NONE, "miliseconds to clean up the kcp connection.");
+	Cvar_kcp_stats_cleanup_interval =
+		new ConVar("kcp_stats_cleanup_interval", "100", FCVAR_NONE, "miliseconds to clean up the kcp seg stats.");
 
 	if (g_kcp_manager == nullptr)
 	{
@@ -356,9 +359,14 @@ void kcp_update_timer_cb(void* data, void* user)
 
 		return;
 	}
+	else if (itimediff(current, connection->last_stats_cleanup) > Cvar_kcp_stats_cleanup_interval->GetInt())
+	{
+		connection->kcpcb->out_segs = 1; // prevent divided by 0 error
+		connection->kcpcb->lost_segs = 0;
+		connection->kcpcb->retrans_segs = 0;
+	}
 
 	ikcp_update(connection->kcpcb, current);
-
 	current = iclock();
 	auto next = ikcp_check(connection->kcpcb, current) - current;
 

@@ -82,6 +82,7 @@ struct kcp_connection
 	ikcpcb* kcpcb;
 	itimer_evt* update_timer;
 	IUINT32 last_input;
+	IUINT32 last_stats_cleanup;
 };
 
 struct kcp_stats
