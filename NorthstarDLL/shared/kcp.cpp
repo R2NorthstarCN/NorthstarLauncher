@@ -440,7 +440,7 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 					else
 					{
 						lock1.unlock();
-						std::unique_lock lock2(this->pending_connections_mutex);
+						std::unique_lock lock3(this->pending_connections_mutex);
 						if (pending_connections.contains(from.sin6_addr))
 						{
 							auto recv_conv = ikcp_getconv(buf.data());
@@ -448,14 +448,14 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 							{
 								pending_connections[from.sin6_addr].erase(recv_conv);
 								auto connection = kcp_setup(this, from, recv_conv);
-								std::unique_lock lock3(this->established_connections_mutex);
+								std::unique_lock lock4(this->established_connections_mutex);
 								this->established_connections[from] = connection;
 								spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&from), recv_conv);
 							}
 						}
 						else
 						{
-							lock2.unlock();
+							lock3.unlock();
 							unaltered_data.push(std::make_pair(from, buf));
 						}
 					}
