@@ -12,6 +12,7 @@
 #include "rs.h"
 
 // Hash and Equal Function Definitions
+
 namespace std
 {
 	template <> struct equal_to<in6_addr>
@@ -81,6 +82,7 @@ struct kcp_connection
 	std::mutex* mutex;
 	ikcpcb* kcpcb;
 	itimer_evt* update_timer;
+	IUINT32 last_input;
 };
 
 struct kcp_manager

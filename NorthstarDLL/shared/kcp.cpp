@@ -163,7 +163,7 @@ void ConCommand_kcp_connect(const CCommand& args)
 	remote_addr.sin6_addr = parsed;
 	remote_addr.sin6_port = htons(port);
 	remote_addr.sin6_scope_struct = scopeid_unspecified;
-	
+
 	{
 		std::unique_lock lock3(g_kcp_manager->established_connections_mutex);
 		if (g_kcp_manager->established_connections.contains(remote_addr))
@@ -177,12 +177,10 @@ void ConCommand_kcp_connect(const CCommand& args)
 			spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&remote_addr), conv);
 		}
 	}
-	
+
 	R2::Cbuf_AddText(
 		R2::Cbuf_GetCurrentPlayer(),
-		fmt::format(
-			"connect {}", ntop((const sockaddr*)&remote_addr))
-			.c_str(),
+		fmt::format("connect {}", ntop((const sockaddr*)&remote_addr)).c_str(),
 		R2::cmd_source_t::kCommandSrcCode);
 }
 
@@ -225,8 +223,8 @@ void ConCommand_kcp_listen(const CCommand& args)
 	spdlog::info("[KCP] Pending local <--> {}%{}", splited[0], conv);
 }
 
-
 ConVar* Cvar_kcp_timer_interval;
+ConVar* Cvar_kcp_timeout;
 
 ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 {
@@ -238,7 +236,9 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	RegisterConCommand("kcp_connect", ConCommand_kcp_connect, "connect to kcp server", FCVAR_CLIENTDLL);
 	RegisterConCommand("kcp_listen", ConCommand_kcp_listen, "listen new kcp conn", FCVAR_CLIENTDLL);
 
-	Cvar_kcp_timer_interval = new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
+	Cvar_kcp_timer_interval =
+		new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
+	Cvar_kcp_timeout = new ConVar("kcp_timeout", "5000", FCVAR_NONE, "miliseconds to clean up the kcp connection.");
 
 	if (g_kcp_manager == nullptr)
 	{
@@ -309,6 +309,11 @@ static inline IUINT32 iclock()
 	return (IUINT32)(iclock64() & 0xfffffffful);
 }
 
+static inline IINT32 itimediff(IUINT32 later, IUINT32 earlier)
+{
+	return ((IINT32)(later - earlier));
+}
+
 bool g_kcp_initialized()
 {
 	return g_kcp_manager != nullptr && g_kcp_manager->is_initialized();
@@ -322,13 +327,35 @@ int udp_output(const char* buf, int len, ikcpcb* kcp, void* user)
 
 void kcp_update_timer_cb(void* data, void* user)
 {
-	auto connection = (kcp_connection*) data;
+	auto connection = (kcp_connection*)data;
 	auto manager = (kcp_manager*)user;
 
 	std::unique_lock lock1(*connection->mutex);
-	auto clock1 = iclock();
-	ikcp_update(connection->kcpcb, clock1);
-	int current = iclock();
+	auto current = iclock();
+	if (itimediff(current, connection->last_input) > Cvar_kcp_timeout->GetInt())
+	{
+		spdlog::info(
+			"[KCP] {}%{} timed out",
+			ntop((const sockaddr*)(&((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr)),
+			connection->kcpcb->conv);
+		{
+			std::unique_lock lock2(manager->established_connections_mutex);
+			manager->established_connections.erase(((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr);
+		}
+		itimer_evt_stop(&manager->timer_mgr, connection->update_timer);
+		delete connection->kcpcb->user;
+		ikcp_release(connection->kcpcb);
+		itimer_evt_destroy(connection->update_timer);
+		delete connection->update_timer;
+		delete connection->mutex;
+		delete connection;
+
+		return;
+	}
+
+	ikcp_update(connection->kcpcb, current);
+
+	current = iclock();
 	auto next = ikcp_check(connection->kcpcb, current) - current;
 
 	// doesn't need lock here cause it could be only run under select thread which locks timer_mgr_mutex
@@ -336,20 +363,22 @@ void kcp_update_timer_cb(void* data, void* user)
 	itimer_evt_start(&manager->timer_mgr, connection->update_timer, next, 1);
 }
 
-kcp_connection *kcp_setup(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)
+kcp_connection* kcp_setup(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)
 {
 	udp_output_userdata* userdata = new udp_output_userdata {kcp_manager->local_socket, remote_addr};
 	ikcpcb* kcpcb = ikcp_create(conv, userdata);
 	ikcp_setoutput(kcpcb, udp_output);
 	ikcp_nodelay(kcpcb, 1, kcp_manager->timer_interval, 2, 1);
 
-	kcp_connection *connection = new kcp_connection;
+	kcp_connection* connection = new kcp_connection;
 	connection->kcpcb = kcpcb;
 	connection->mutex = new std::mutex;
 
 	itimer_evt* update_timer = new itimer_evt;
 	connection->update_timer = update_timer;
 	itimer_evt_init(update_timer, kcp_update_timer_cb, connection, kcp_manager);
+
+	connection->last_input = iclock();
 
 	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
 	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);
@@ -362,7 +391,7 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 	this->timer_interval = timer_interval;
 	itimer_mgr_init(&timer_mgr, timer_interval);
 	select_thread = std::jthread(
-		[this,timer_interval](std::stop_token stop_token)
+		[this, timer_interval](std::stop_token stop_token)
 		{
 			fd_set sockets;
 			timeval timeout {0, timer_interval * 1000};
@@ -433,6 +462,7 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 							spdlog::error("[KCP] Invalid packet, perhaps the remote is not in KCP");
 							break;
 						default:
+							connection->last_input = iclock();
 							itimer_evt_stop(&this->timer_mgr, connection->update_timer);
 							itimer_evt_start(&this->timer_mgr, connection->update_timer, 0, 1);
 						}
@@ -501,7 +531,7 @@ int kcp_manager::intercept_bind(SOCKET socket, const sockaddr* name, int namelen
 		return KCP_NOT_ALTERED;
 	}
 
-	auto client_port = (USHORT) R2::g_pCVar->FindVar("clientport")->GetInt();
+	auto client_port = (USHORT)R2::g_pCVar->FindVar("clientport")->GetInt();
 	auto server_port = (USHORT)R2::g_pCVar->FindVar("hostport")->GetInt();
 
 	auto local_port = IsDedicatedServer() ? server_port : client_port;
