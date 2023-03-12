@@ -338,6 +338,7 @@ void kcp_update_timer_cb(void* data, void* user)
 			"[KCP] {}%{} timed out",
 			ntop((const sockaddr*)(&((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr)),
 			connection->kcpcb->conv);
+		ikcp_flush(connection->kcpcb);
 		{
 			std::unique_lock lock2(manager->established_connections_mutex);
 			manager->established_connections.erase(((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr);
