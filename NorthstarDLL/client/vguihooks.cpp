@@ -123,7 +123,8 @@ void RenderIMECandidateList()
 	}
 }
 
-const char* KCP_NETGRAPH_LABELS[] = {"ADDR", "RTT", "SRTT", "RTO", "MINRTO", "LOST%%", "RETRANS%%"};
+const char* KCP_NETGRAPH_LABELS[] = {"ADDR", "RTT", "SRTT", "RTO", "MINRTO", "LOST%", "RETRANS%"};
+#define KCP_NETGRAPH_PRINT(x, y, fmt, ...) (*m_matSystemSurface)->DrawColoredText(5, x, y, 255, 255, 255, 255, fmt, __VA_ARGS__)
 
 void RenderNetGraph()
 {
@@ -131,98 +132,61 @@ void RenderNetGraph()
 		return;
 	if (!g_kcp_initialized())
 		return;
-	// fmt::format("[PING]")
-	auto kcp_stat = g_kcp_manager->get_stats();
+
+	auto kcp_stats = g_kcp_manager->get_stats();
 	int x_offset = 0;
-	int x_step = 50;
+	int x_step = 48;
 	int y_offset = 0;
 	int y_step = 10;
-	const int addr_offset = 100;
+	const int addr_offset = 95;
 
-	for (int label_index = 0; label_index < 7; label_index++)
+	for (int i = 0; i < 7; i++)
 	{
-		// draw lables
-		if (label_index == 0) // sockaddr need wider space
-			(*m_matSystemSurface)
-				->DrawColoredText(
-					5, (x_offset + label_index * x_step) + addr_offset, y_offset, 255, 255, 255, 255, KCP_NETGRAPH_LABELS[label_index]);
+		auto x_current = x_offset + i * x_step;
+		auto y_current = y_offset;
+		if (i != 0)
+		{
+			x_current += addr_offset;
+		}
 
-		(*m_matSystemSurface)
-			->DrawColoredText(5, x_offset + label_index * x_step, y_offset, 255, 255, 255, 255, KCP_NETGRAPH_LABELS[label_index]);
+		KCP_NETGRAPH_PRINT(x_current, y_current, "%s", KCP_NETGRAPH_LABELS[i]);
 	}
 
 	y_offset += y_step; // one line lower than labels
 
-	for (int i = 0; i < kcp_stat.size(); i++)
+	for (int i = 0; i < kcp_stats.size(); i++)
 	{
-		int render_index = 0;
-		// draw ADDR
-		(*m_matSystemSurface)
-			->DrawColoredText(
-				5,
-				(x_offset + render_index * x_step) + addr_offset,
-				y_offset + y_step * i,
-				255,
-				255,
-				255,
-				255,
-				ntop((const sockaddr*)&kcp_stat[i].first).c_str());
+		auto y_current = y_offset + i * y_step;
 
-		render_index++;
-
-		// draw RTT
-		(*m_matSystemSurface)
-			->DrawColoredText(5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.rtt);
-
-		render_index++;
-
-		// draw SRTT
-		(*m_matSystemSurface)
-			->DrawColoredText(
-				5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.srtt);
-
-		render_index++;
-
-		// draw RTO
-		(*m_matSystemSurface)
-			->DrawColoredText(5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.rto);
-
-		render_index++;
-
-		// draw MINRTO
-		(*m_matSystemSurface)
-			->DrawColoredText(
-				5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.minrto);
-
-		render_index++;
-
-		// draw LOST%
-		(*m_matSystemSurface)
-			->DrawColoredText(
-				5,
-				x_offset + render_index * x_step,
-				y_offset + y_step * i,
-				255,
-				255,
-				255,
-				255,
-				"%.1d",
-				100.0 * kcp_stat[i].second.lost_segs / kcp_stat[i].second.out_segs);
-
-		render_index++;
-
-		// draw RETRANS%
-		(*m_matSystemSurface)
-			->DrawColoredText(
-				5,
-				x_offset + render_index * x_step,
-				y_offset + y_step * i,
-				255,
-				255,
-				255,
-				255,
-				"%.1d",
-				100.0 * kcp_stat[i].second.retrans_segs / kcp_stat[i].second.out_segs);
+		for (int j = 0; j < 7; j++)
+		{
+			auto x_current = x_offset + j * x_step + addr_offset;
+			auto& kcp_stat = kcp_stats[i].second;
+			switch (j)
+			{
+			case 0:
+				KCP_NETGRAPH_PRINT(x_current - addr_offset, y_current, "%s", ntop((const sockaddr*)&kcp_stats[i].first).c_str());
+				break;
+			case 1:
+				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.rtt);
+				break;
+			case 2:
+				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.srtt);
+				break;
+			case 3:
+				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.rto);
+				break;
+			case 4:
+				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.minrto);
+				break;
+			case 5:
+				KCP_NETGRAPH_PRINT(x_current, y_current, "%.2f", 100.0 * kcp_stat.lost_segs / kcp_stat.out_segs);
+				break;
+			case 6:
+				KCP_NETGRAPH_PRINT(x_current, y_current, "%.2f", 100.0 * kcp_stat.retrans_segs / kcp_stat.out_segs);
+				break;
+			}
+		}
 	}
 }
 
