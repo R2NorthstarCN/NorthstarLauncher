@@ -4,6 +4,9 @@
 #include "dedicated/dedicated.h"
 #include "core/convar/concommand.h"
 #include "engine/r2engine.h"
+#include "rs.h"
+
+kcp_manager* g_kcp_manager = nullptr;
 
 AUTOHOOK_INIT()
 

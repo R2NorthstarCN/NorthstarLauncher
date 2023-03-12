@@ -9,7 +9,6 @@
 #include "core/memalloc.h"
 #include "ikcp.h"
 #include "itimer.h"
-#include "rs.h"
 
 // Hash and Equal Function Definitions
 
@@ -124,7 +123,7 @@ struct kcp_manager
 	std::vector<std::pair<sockaddr_in6, kcp_stats>> get_stats();
 };
 
-kcp_manager* g_kcp_manager = nullptr;
+extern kcp_manager* g_kcp_manager;
 
 bool g_kcp_initialized();
 

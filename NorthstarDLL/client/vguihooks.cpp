@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "vguihooks.h"
 #include "inputsystem.h"
-#include "shared/netgraph.h"
+#include "shared/kcp.h"
 #include "dedicated/dedicated.h"
 AUTOHOOK_INIT()
 SourceInterface<vgui::ISurface>* m_vguiSurface;
@@ -122,12 +122,108 @@ void RenderIMECandidateList()
 		x_ += 2 + widthPx;
 	}
 }
+
+const char* KCP_NETGRAPH_LABELS[] = {"ADDR", "RTT", "SRTT", "RTO", "MINRTO", "LOST%%", "RETRANS%%"};
+
 void RenderNetGraph()
 {
 	if (Cvar_ns_netgraph->GetInt() == 0)
 		return;
-	fmt::format("[PING]")
-	(*m_matSystemSurface)->DrawColoredText(5, 960, 500, 255, 255, 255, 255, netgui_str.c_str());
+	if (!g_kcp_initialized())
+		return;
+	// fmt::format("[PING]")
+	auto kcp_stat = g_kcp_manager->get_stats();
+	int x_offset = 0;
+	int x_step = 50;
+	int y_offset = 0;
+	int y_step = 10;
+	const int addr_offset = 100;
+
+	for (int label_index = 0; label_index < 7; label_index++)
+	{
+		// draw lables
+		if (label_index == 0) // sockaddr need wider space
+			(*m_matSystemSurface)
+				->DrawColoredText(
+					5, (x_offset + label_index * x_step) + addr_offset, y_offset, 255, 255, 255, 255, KCP_NETGRAPH_LABELS[label_index]);
+
+		(*m_matSystemSurface)
+			->DrawColoredText(5, x_offset + label_index * x_step, y_offset, 255, 255, 255, 255, KCP_NETGRAPH_LABELS[label_index]);
+	}
+
+	y_offset += y_step; // one line lower than labels
+
+	for (int i = 0; i < kcp_stat.size(); i++)
+	{
+		int render_index = 0;
+		// draw ADDR
+		(*m_matSystemSurface)
+			->DrawColoredText(
+				5,
+				(x_offset + render_index * x_step) + addr_offset,
+				y_offset + y_step * i,
+				255,
+				255,
+				255,
+				255,
+				ntop((const sockaddr*)&kcp_stat[i].first).c_str());
+
+		render_index++;
+
+		// draw RTT
+		(*m_matSystemSurface)
+			->DrawColoredText(5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.rtt);
+
+		render_index++;
+
+		// draw SRTT
+		(*m_matSystemSurface)
+			->DrawColoredText(
+				5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.srtt);
+
+		render_index++;
+
+		// draw RTO
+		(*m_matSystemSurface)
+			->DrawColoredText(5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.rto);
+
+		render_index++;
+
+		// draw MINRTO
+		(*m_matSystemSurface)
+			->DrawColoredText(
+				5, x_offset + render_index * x_step, y_offset + y_step * i, 255, 255, 255, 255, "%d", kcp_stat[i].second.minrto);
+
+		render_index++;
+
+		// draw LOST%
+		(*m_matSystemSurface)
+			->DrawColoredText(
+				5,
+				x_offset + render_index * x_step,
+				y_offset + y_step * i,
+				255,
+				255,
+				255,
+				255,
+				"%.1d",
+				100.0 * kcp_stat[i].second.lost_segs / kcp_stat[i].second.out_segs);
+
+		render_index++;
+
+		// draw RETRANS%
+		(*m_matSystemSurface)
+			->DrawColoredText(
+				5,
+				x_offset + render_index * x_step,
+				y_offset + y_step * i,
+				255,
+				255,
+				255,
+				255,
+				"%.1d",
+				100.0 * kcp_stat[i].second.retrans_segs / kcp_stat[i].second.out_segs);
+	}
 }
 
 AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int64 a1, int a2))
