@@ -219,7 +219,7 @@ void ConCommand_kcp_listen(const CCommand& args)
 		return;
 	}
 
-	std::unique_lock lock3(g_kcp_manager->pending_connections_mutex);
+	std::unique_lock lock(g_kcp_manager->pending_connections_mutex);
 	g_kcp_manager->pending_connections[parsed].insert(conv);
 
 	spdlog::info("[KCP] Pending local <--> {}%{}", splited[0], conv);
