@@ -244,7 +244,7 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 		new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
 	Cvar_kcp_timeout = new ConVar("kcp_timeout", "5000", FCVAR_NONE, "miliseconds to clean up the kcp connection.");
 	Cvar_kcp_stats_rotate_interval =
-		new ConVar("kcp_stats_rotate_interval", "1000", FCVAR_NONE, "miliseconds to clean up the kcp seg stats.");
+		new ConVar("kcp_stats_rotate_interval", "3000", FCVAR_NONE, "miliseconds to clean up the kcp seg stats.");
 
 	if (g_kcp_manager == nullptr)
 	{
