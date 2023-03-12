@@ -684,7 +684,6 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 		stats.rtt = connection->kcpcb->rx_rttval;
 		stats.srtt = connection->kcpcb->rx_srtt;
 		stats.rto = connection->kcpcb->rx_rto;
-		stats.minrto = connection->kcpcb->rx_minrto;
 		stats.out_segs = connection->kcpcb->out_segs;
 		stats.lost_segs = connection->kcpcb->lost_segs;
 		stats.retrans_segs = connection->kcpcb->retrans_segs;

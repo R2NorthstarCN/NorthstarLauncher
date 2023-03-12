@@ -87,7 +87,7 @@ struct kcp_connection
 
 struct kcp_stats
 {
-	IINT32 rtt, srtt, rto, minrto;
+	IINT32 rtt, srtt, rto;
 
 	IUINT64 out_segs, lost_segs, retrans_segs;
 };

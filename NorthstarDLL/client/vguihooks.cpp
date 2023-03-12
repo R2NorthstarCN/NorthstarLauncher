@@ -7,6 +7,8 @@ AUTOHOOK_INIT()
 SourceInterface<vgui::ISurface>* m_vguiSurface;
 SourceInterface<IMatSystemSurface>* m_matSystemSurface;
 SourceInterface<vgui::IPanel>* m_iPanel;
+typedef __int64 __fastcall GetScreenWidth_Type(__int64);
+GetScreenWidth_Type* GetScreenWidth = NULL;
 bool lastChatboxState;
 ConVar* Cvar_ns_ime_chatbox_fontidx;
 ConVar* Cvar_ns_netgraph;
@@ -123,32 +125,24 @@ void RenderIMECandidateList()
 	}
 }
 
-const char* KCP_NETGRAPH_LABELS[] = {"ADDR", "RTT", "SRTT", "RTO", "MINRTO", "LOST%", "RETRANS%"};
+const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOST%", "RETRANS%"};
 #define KCP_NETGRAPH_PRINT(x, y, fmt, ...) (*m_matSystemSurface)->DrawColoredText(5, x, y, 255, 255, 255, 255, fmt, __VA_ARGS__)
 
-void RenderNetGraph()
+void RenderNetGraph(__int64 a1)
 {
-	if (Cvar_ns_netgraph->GetInt() == 0)
-		return;
 	if (!g_kcp_initialized())
 		return;
 
 	auto kcp_stats = g_kcp_manager->get_stats();
-	int x_offset = 0;
 	int x_step = 48;
+	int x_offset = GetScreenWidth(a1) - 10 - 4 * x_step;
 	int y_offset = 0;
 	int y_step = 10;
-	const int addr_offset = 95;
 
-	for (int i = 0; i < 7; i++)
+	for (int i = 0; i < 4; i++)
 	{
 		auto x_current = x_offset + i * x_step;
 		auto y_current = y_offset;
-		if (i != 0)
-		{
-			x_current += addr_offset;
-		}
-
 		KCP_NETGRAPH_PRINT(x_current, y_current, "%s", KCP_NETGRAPH_LABELS[i]);
 	}
 
@@ -158,31 +152,22 @@ void RenderNetGraph()
 	{
 		auto y_current = y_offset + i * y_step;
 
-		for (int j = 0; j < 7; j++)
+		for (int j = 0; j < 4; j++)
 		{
-			auto x_current = x_offset + j * x_step + addr_offset;
+			auto x_current = x_offset + j * x_step;
 			auto& kcp_stat = kcp_stats[i].second;
 			switch (j)
 			{
 			case 0:
-				KCP_NETGRAPH_PRINT(x_current - addr_offset, y_current, "%s", ntop((const sockaddr*)&kcp_stats[i].first).c_str());
-				break;
-			case 1:
-				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.rtt);
-				break;
-			case 2:
 				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.srtt);
 				break;
-			case 3:
+			case 1:
 				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.rto);
 				break;
-			case 4:
-				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.minrto);
-				break;
-			case 5:
+			case 2:
 				KCP_NETGRAPH_PRINT(x_current, y_current, "%.2f", 100.0 * kcp_stat.lost_segs / kcp_stat.out_segs);
 				break;
-			case 6:
+			case 3:
 				KCP_NETGRAPH_PRINT(x_current, y_current, "%.2f", 100.0 * kcp_stat.retrans_segs / kcp_stat.out_segs);
 				break;
 			}
@@ -194,7 +179,7 @@ AUTOHOOK(CClientVGUI__ShowFPS, client.dll + 0x34D980, __int64, __fastcall, (__in
 {
 	auto result = CClientVGUI__ShowFPS(a1);
 	// add custom performance metric display here
-	RenderNetGraph();
+	RenderNetGraph(a1);
 	return result;
 }
 
@@ -230,7 +215,8 @@ ON_DLL_LOAD_CLIENT("engine.dll", CENGINEVGUI_PAINT, (CModule module))
 ON_DLL_LOAD_CLIENT("client.dll", GETCHATSTATUS, (CModule module))
 {
 	AUTOHOOK_DISPATCH_MODULE(client.dll);
+	GetScreenWidth = module.Offset(0x75D930).As<GetScreenWidth_Type*>();
 	localGameSettings = module.Offset(0x11BAA48).As<CGameSettings**>();
 	Cvar_ns_ime_chatbox_fontidx = new ConVar("ns_ime_chatbox_fontidx", "17", FCVAR_NONE, "");
-	Cvar_ns_netgraph = new ConVar("net_graph", "0", FCVAR_NONE, "");
+	//Cvar_ns_netgraph = new ConVar("net_graph", "0", FCVAR_NONE, "");
 }
