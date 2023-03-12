@@ -190,6 +190,15 @@ void RenderNetGraph()
 	}
 }
 
+AUTOHOOK(CClientVGUI__ShowFPS, client.dll + 0x34D980, __int64, __fastcall, (__int64 a1))
+{
+	auto result = CClientVGUI__ShowFPS(a1);
+	// add custom performance metric display here
+	RenderNetGraph();
+	return result;
+}
+
+
 AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int64 a1, int a2))
 {
 	auto result = CEngineVGUI__Paint(a1, a2);
@@ -197,7 +206,7 @@ AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int6
 	if (m_CandidateList.ImeEnabled)
 		RenderIMECandidateList();
 
-	RenderNetGraph();
+	//RenderNetGraph();
 	return result;
 }
 
