@@ -8,6 +8,7 @@
 AUTOHOOK_INIT()
 
 // Hooked Original Function Definitions
+
 int(WSAAPI* org_bind)(_In_ SOCKET s, _In_reads_bytes_(namelen) const struct sockaddr FAR* name, _In_ int namelen) = nullptr;
 int(WSAAPI* org_sendto)(
 	_In_ SOCKET s,
@@ -25,6 +26,7 @@ int(WSAAPI* org_recvfrom)(
 	_Inout_opt_ int FAR* fromlen) = nullptr;
 
 // Hooked Function Definitions
+
 int WSAAPI de_bind(_In_ SOCKET s, _In_reads_bytes_(namelen) const struct sockaddr FAR* name, _In_ int namelen)
 {
 	auto result = org_bind(s, name, namelen);
@@ -128,10 +130,14 @@ void ConCommand_kcp_connect(const CCommand& args)
 		return;
 	}
 	auto splited = split(args.ArgS(), " ");
-	if (splited.size() < 3)
+	if (splited.size() < 2)
 	{
 		spdlog::warn("not enough args");
 		return;
+	}
+	else if (splited.size() == 2)
+	{
+		splited.push_back("1");
 	}
 	in6_addr parsed {};
 	if (inet_pton(AF_INET6, splited[0].c_str(), &parsed) != 1)
@@ -157,13 +163,20 @@ void ConCommand_kcp_connect(const CCommand& args)
 	remote_addr.sin6_addr = parsed;
 	remote_addr.sin6_port = htons(port);
 	remote_addr.sin6_scope_struct = scopeid_unspecified;
-
-	auto connection = kcp_setup(g_kcp_manager, remote_addr, conv);
+	
 	{
 		std::unique_lock lock3(g_kcp_manager->established_connections_mutex);
-		g_kcp_manager->established_connections[remote_addr] = connection;
+		if (g_kcp_manager->established_connections.contains(remote_addr))
+		{
+			spdlog::warn("[KCP] Control block is already created");
+		}
+		else
+		{
+			auto connection = kcp_setup(g_kcp_manager, remote_addr, conv);
+			g_kcp_manager->established_connections[remote_addr] = connection;
+			spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&remote_addr), conv);
+		}
 	}
-	spdlog::info("[KCP] intercepting local --> {}%{}", ntop((const sockaddr*)&remote_addr), conv);
 	
 	R2::Cbuf_AddText(
 		R2::Cbuf_GetCurrentPlayer(),
@@ -182,10 +195,14 @@ void ConCommand_kcp_listen(const CCommand& args)
 	}
 
 	auto splited = split(args.ArgS(), " ");
-	if (splited.size() < 2)
+	if (splited.size() < 1)
 	{
 		spdlog::warn("not enough args");
 		return;
+	}
+	else if (splited.size() == 1)
+	{
+		splited.push_back("1");
 	}
 
 	in6_addr parsed {};
@@ -205,7 +222,7 @@ void ConCommand_kcp_listen(const CCommand& args)
 	std::unique_lock lock3(g_kcp_manager->pending_connections_mutex);
 	g_kcp_manager->pending_connections[parsed].insert(conv);
 
-	spdlog::info("[KCP] pending local <--> {}%{}", splited[0], conv);
+	spdlog::info("[KCP] Pending local <--> {}%{}", splited[0], conv);
 }
 
 
