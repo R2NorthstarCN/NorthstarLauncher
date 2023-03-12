@@ -21,12 +21,18 @@
     <ClInclude Include="itimer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="rs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ikcp.c">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="itimer.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="rs.c">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

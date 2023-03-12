@@ -129,6 +129,8 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -141,10 +143,12 @@
   <ItemGroup>
     <ClInclude Include="ikcp.h" />
     <ClInclude Include="itimer.h" />
+    <ClInclude Include="rs.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ikcp.c" />
     <ClCompile Include="itimer.c" />
+    <ClCompile Include="rs.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

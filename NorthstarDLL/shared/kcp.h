@@ -9,6 +9,7 @@
 #include "core/memalloc.h"
 #include "ikcp.h"
 #include "itimer.h"
+#include "rs.h"
 
 // Hash and Equal Function Definitions
 namespace std
@@ -99,6 +100,8 @@ struct kcp_manager
 
 	SOCKET local_socket = 0;
 	unsigned int local_socket_max_msg_size = 0;
+
+	IUINT32 timer_interval;
 
 	kcp_manager(IUINT32 timer_interval);
 	~kcp_manager();
