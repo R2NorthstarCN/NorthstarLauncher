@@ -82,12 +82,14 @@ struct kcp_connection
 	ikcpcb* kcpcb;
 	itimer_evt* update_timer;
 	IUINT32 last_input;
-	IUINT32 last_stats_cleanup;
+
+	IUINT32 last_stats_rotate;
+	IUINT64 last_out_segs, last_lost_segs, last_retrans_segs;
 };
 
 struct kcp_stats
 {
-	IINT32 rtt, srtt, rto;
+	IINT32 srtt, rto;
 
 	IUINT64 out_segs, lost_segs, retrans_segs;
 };

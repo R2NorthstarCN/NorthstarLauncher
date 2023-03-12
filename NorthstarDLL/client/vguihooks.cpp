@@ -125,7 +125,7 @@ void RenderIMECandidateList()
 	}
 }
 
-const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOST%", "RETRANS%"};
+const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOS%", "RTS%"};
 #define KCP_NETGRAPH_PRINT(x, y, fmt, ...) (*m_matSystemSurface)->DrawColoredText(5, x, y, 255, 255, 255, 255, fmt, __VA_ARGS__)
 
 void RenderNetGraph(__int64 a1)
@@ -134,7 +134,7 @@ void RenderNetGraph(__int64 a1)
 		return;
 
 	auto kcp_stats = g_kcp_manager->get_stats();
-	int x_step = 48;
+	int x_step = 45;
 	int x_offset = GetScreenWidth(a1) - 10 - 4 * x_step;
 	int y_offset = 0;
 	int y_step = 10;
@@ -191,7 +191,6 @@ AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int6
 	if (m_CandidateList.ImeEnabled)
 		RenderIMECandidateList();
 
-	//RenderNetGraph();
 	return result;
 }
 

@@ -228,7 +228,7 @@ void ConCommand_kcp_listen(const CCommand& args)
 
 ConVar* Cvar_kcp_timer_interval;
 ConVar* Cvar_kcp_timeout;
-ConVar* Cvar_kcp_stats_cleanup_interval;
+ConVar* Cvar_kcp_stats_rotate_interval;
 
 ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 {
@@ -243,8 +243,8 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	Cvar_kcp_timer_interval =
 		new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
 	Cvar_kcp_timeout = new ConVar("kcp_timeout", "5000", FCVAR_NONE, "miliseconds to clean up the kcp connection.");
-	Cvar_kcp_stats_cleanup_interval =
-		new ConVar("kcp_stats_cleanup_interval", "100", FCVAR_NONE, "miliseconds to clean up the kcp seg stats.");
+	Cvar_kcp_stats_rotate_interval =
+		new ConVar("kcp_stats_rotate_interval", "1000", FCVAR_NONE, "miliseconds to clean up the kcp seg stats.");
 
 	if (g_kcp_manager == nullptr)
 	{
@@ -359,12 +359,16 @@ void kcp_update_timer_cb(void* data, void* user)
 
 		return;
 	}
-	else if (itimediff(current, connection->last_stats_cleanup) > Cvar_kcp_stats_cleanup_interval->GetInt())
+	else if (itimediff(current, connection->last_stats_rotate) > Cvar_kcp_stats_rotate_interval->GetInt())
 	{
-		connection->kcpcb->out_segs = 1; // prevent divided by 0 error
+		connection->last_out_segs = connection->kcpcb->out_segs;
+		connection->last_lost_segs = connection->kcpcb->lost_segs;
+		connection->last_retrans_segs = connection->kcpcb->retrans_segs;
+		connection->kcpcb->out_segs = 0;
 		connection->kcpcb->lost_segs = 0;
 		connection->kcpcb->retrans_segs = 0;
-		connection->last_stats_cleanup = current;
+		connection->last_stats_rotate = current;
+		
 	}
 
 	ikcp_update(connection->kcpcb, current);
@@ -393,7 +397,7 @@ kcp_connection* kcp_setup(kcp_manager* kcp_manager, const sockaddr_in6& remote_a
 
 	auto current = iclock();
 	connection->last_input = current;
-	connection->last_stats_cleanup = current;
+	connection->last_stats_rotate = current;
 
 	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
 	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);
@@ -681,12 +685,11 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 	{
 		kcp_stats stats {};
 		auto& connection = entry.second;
-		stats.rtt = connection->kcpcb->rx_rttval;
 		stats.srtt = connection->kcpcb->rx_srtt;
 		stats.rto = connection->kcpcb->rx_rto;
-		stats.out_segs = connection->kcpcb->out_segs;
-		stats.lost_segs = connection->kcpcb->lost_segs;
-		stats.retrans_segs = connection->kcpcb->retrans_segs;
+		stats.out_segs = connection->kcpcb->out_segs + connection->last_out_segs;
+		stats.lost_segs = connection->kcpcb->lost_segs + connection->last_lost_segs;
+		stats.retrans_segs = connection->kcpcb->retrans_segs + connection->last_retrans_segs;
 		result.push_back(std::make_pair(entry.first, stats));
 	}
 	return result;
