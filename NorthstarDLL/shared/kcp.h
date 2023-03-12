@@ -85,6 +85,13 @@ struct kcp_connection
 	IUINT32 last_input;
 };
 
+struct kcp_stats
+{
+	IINT32 rtt, srtt, rto, minrto;
+
+	IUINT64 out_segs, lost_segs, retrans_segs;
+};
+
 struct kcp_manager
 {
 	std::shared_mutex established_connections_mutex;
@@ -113,6 +120,8 @@ struct kcp_manager
 	int intercept_bind(SOCKET s, const sockaddr* name, int namelen);
 	int intercept_sendto(SOCKET socket, const char* buf, int len, const sockaddr* to, int tolen);
 	int intercept_recvfrom(SOCKET socket, char* buf, int len, sockaddr* from, int* fromlen);
+
+	std::vector<std::pair<sockaddr_in6, kcp_stats>> get_stats();
 };
 
 kcp_manager* g_kcp_manager = nullptr;

@@ -658,3 +658,23 @@ int kcp_manager::intercept_recvfrom(SOCKET socket, char* buf, int len, sockaddr*
 	}
 	return KCP_NOT_ALTERED;
 }
+
+std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
+{
+	std::vector<std::pair<sockaddr_in6, kcp_stats>> result;
+	std::shared_lock lock(this->established_connections_mutex);
+	for (const auto& entry : this->established_connections)
+	{
+		kcp_stats stats {};
+		auto& connection = entry.second;
+		stats.rtt = connection->kcpcb->rx_rttval;
+		stats.srtt = connection->kcpcb->rx_srtt;
+		stats.rto = connection->kcpcb->rx_rto;
+		stats.minrto = connection->kcpcb->rx_minrto;
+		stats.out_segs = connection->kcpcb->out_segs;
+		stats.lost_segs = connection->kcpcb->lost_segs;
+		stats.retrans_segs = connection->kcpcb->retrans_segs;
+		result.push_back(std::make_pair(entry.first, stats));
+	}
+	return result;
+}
