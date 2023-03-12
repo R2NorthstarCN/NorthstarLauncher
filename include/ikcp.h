@@ -314,6 +314,10 @@ struct IKCPCB
 	int logmask;
 	int (*output)(const char *buf, int len, struct IKCPCB *kcp, void *user);
 	void (*writelog)(const char *log, struct IKCPCB *kcp, void *user);
+
+	IUINT64 out_segs;
+	IUINT64 lost_segs;
+	IUINT64 retrans_segs;
 };
 
 
