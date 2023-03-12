@@ -1209,9 +1209,6 @@
     <ClInclude Include="client\vguihooks.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
-    <ClInclude Include="shared\netgraph.h">
-      <Filter>Header Files\shared</Filter>
-    </ClInclude>
     <ClInclude Include="shared\kcp.h">
       <Filter>Header Files\shared</Filter>
     </ClInclude>
@@ -1500,9 +1497,6 @@
     </ClCompile>
     <ClCompile Include="client\vguihooks.cpp">
       <Filter>Source Files\client</Filter>
-    </ClCompile>
-    <ClCompile Include="shared\netgraph.cpp">
-      <Filter>Source Files\shared</Filter>
     </ClCompile>
     <ClCompile Include="shared\kcp.cpp">
       <Filter>Source Files\shared</Filter>

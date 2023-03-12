@@ -454,7 +454,6 @@
     <ClInclude Include="shared\keyvalues.h" />
     <ClInclude Include="shared\maxplayers.h" />
     <ClInclude Include="shared\misccommands.h" />
-    <ClInclude Include="shared\netgraph.h" />
     <ClInclude Include="shared\playlist.h" />
     <ClInclude Include="squirrel\squirrel.h" />
     <ClInclude Include="squirrel\squirrelautobind.h" />
@@ -559,7 +558,6 @@
     <ClCompile Include="shared\keyvalues.cpp" />
     <ClCompile Include="shared\maxplayers.cpp" />
     <ClCompile Include="shared\misccommands.cpp" />
-    <ClCompile Include="shared\netgraph.cpp" />
     <ClCompile Include="shared\playlist.cpp" />
     <ClCompile Include="squirrel\squirrel.cpp" />
     <ClCompile Include="squirrel\squirrelautobind.cpp" />

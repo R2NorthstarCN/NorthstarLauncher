@@ -126,7 +126,7 @@ void RenderNetGraph()
 {
 	if (Cvar_ns_netgraph->GetInt() == 0)
 		return;
-
+	fmt::format("[PING]")
 	(*m_matSystemSurface)->DrawColoredText(5, 960, 500, 255, 255, 255, 255, netgui_str.c_str());
 }
 
