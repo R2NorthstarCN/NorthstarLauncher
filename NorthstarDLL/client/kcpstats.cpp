@@ -17,27 +17,64 @@ void draw_kcp_stats()
 
 	auto kcp_stats = g_kcp_manager->get_stats();
 
-	ImGui::Begin("KCP Stats");
-	if (ImGui::BeginTable("kcp_stats", 4))
+	ImGuiWindowFlags window_flags = 0;
+	window_flags |= ImGuiWindowFlags_NoBackground;
+	window_flags |= ImGuiWindowFlags_NoTitleBar;
+
+	ImGui::Begin("KCP Stats", NULL, window_flags);
+	if (kcp_stats.size() == 1)
 	{
-		for (int col = 0; col < 4; col++)
-		{
-			ImGui::TableSetupColumn(KCP_NETGRAPH_LABELS[col]);
-		}
-		ImGui::TableHeadersRow();
-		for (const auto& entry : kcp_stats)
+		if (ImGui::BeginTable("kcp_stats", 8))
 		{
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
-			ImGui::Text("%d", entry.second.srtt);
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[0]);
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
 			ImGui::TableNextColumn();
-			ImGui::Text("%d", entry.second.rto);
+			ImGui::Text("%d", kcp_stats[0].second.srtt);
 			ImGui::TableNextColumn();
-			ImGui::Text("%.2f", 100.0 * entry.second.lost_segs / (entry.second.out_segs == 0 ? 1 : entry.second.out_segs));
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[1]);
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
 			ImGui::TableNextColumn();
-			ImGui::Text("%.2f", 100.0 * entry.second.retrans_segs / (entry.second.out_segs == 0 ? 1 : entry.second.out_segs));
+			ImGui::Text("%d", kcp_stats[0].second.rto);
+			ImGui::TableNextColumn();
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
+			ImGui::TableNextColumn();
+			ImGui::Text(
+				"%.2f", 100.0 * kcp_stats[0].second.lost_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
+			ImGui::TableNextColumn();
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
+			ImGui::TableNextColumn();
+			ImGui::Text(
+				"%.2f", 100.0 * kcp_stats[0].second.retrans_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
+			ImGui::EndTable();
 		}
-		ImGui::EndTable();
+	}
+	else if (kcp_stats.size() > 1)
+	{
+		if (ImGui::BeginTable("kcp_stats", 4))
+		{
+			for (int col = 0; col < 4; col++)
+			{
+				ImGui::TableSetupColumn(KCP_NETGRAPH_LABELS[col]);
+			}
+			ImGui::TableHeadersRow();
+			for (const auto& entry : kcp_stats)
+			{
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::Text("%d", entry.second.srtt);
+				ImGui::TableNextColumn();
+				ImGui::Text("%d", entry.second.rto);
+				ImGui::TableNextColumn();
+				ImGui::Text("%.2f", 100.0 * entry.second.lost_segs / (entry.second.out_segs == 0 ? 1 : entry.second.out_segs));
+				ImGui::TableNextColumn();
+				ImGui::Text("%.2f", 100.0 * entry.second.retrans_segs / (entry.second.out_segs == 0 ? 1 : entry.second.out_segs));
+			}
+			ImGui::EndTable();
+		}
 	}
 	ImGui::End();
 }
