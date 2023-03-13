@@ -790,3 +790,8 @@ char* fec_packet::data()
 	}
 	return this->buf + 6;
 }
+
+fec_decoder::fec_decoder()
+{
+
+}
