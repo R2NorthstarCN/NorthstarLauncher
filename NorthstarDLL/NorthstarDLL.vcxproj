@@ -53,6 +53,7 @@
     <LinkIncremental>false</LinkIncremental>
     <TargetName>Northstar</TargetName>
     <LibraryPath>$(SolutionDir)include;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)kcp;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnabled>false</VcpkgEnabled>

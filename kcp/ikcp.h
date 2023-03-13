@@ -410,6 +410,12 @@ void ikcp_allocator(void* (*new_malloc)(size_t), void (*new_free)(void*));
 // read conv
 IUINT32 ikcp_getconv(const void *ptr);
 
+static inline char* ikcp_encode8u(char* p, unsigned char c);
+static inline const char* ikcp_decode8u(const char* p, unsigned char* c);
+static inline char* ikcp_encode16u(char* p, unsigned short w);
+static inline const char* ikcp_decode16u(const char* p, unsigned short* w);
+static inline char* ikcp_encode32u(char* p, IUINT32 l);
+static inline const char* ikcp_decode32u(const char* p, IUINT32* l);
 
 #ifdef __cplusplus
 }

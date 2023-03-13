@@ -253,6 +253,20 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	}
 }
 
+IUINT32 fec_seqid(fec_packet pak)
+{
+	return IUINT32();
+}
+
+IUINT32 fec_flag(fec_packet pak) {
+
+}
+
+char* fec_data(fec_packet pak)
+{
+	return nullptr;
+}
+
 std::string ntop(const sockaddr* addr)
 {
 	switch (addr->sa_family)

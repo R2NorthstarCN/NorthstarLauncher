@@ -62,6 +62,14 @@ namespace std
 	};
 } // namespace std
 
+// FEC
+
+typedef char* fec_packet;
+
+IUINT32 fec_seqid(fec_packet pak);
+IUINT32 fec_flag(fec_packet pak);
+char *fec_data(fec_packet pak);
+
 // Function Definitions
 
 std::string ntop(const sockaddr* addr);
