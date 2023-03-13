@@ -91,6 +91,24 @@ void draw_kcp_stats()
 			sliding_window[0] = kcp_stats[0].second;
 			last_rotate = iclock();
 		}
+
+		std::vector<double> xs;
+		std::vector<double> y_srtts;
+		std::vector<double> y_rtss;
+		IINT32 y_srtt_max = 0;
+		IUINT32 out_segs = 0, lost_segs = 0, retrans_segs = 0;
+
+		for (int i = 0; i < sliding_window.size(); ++i)
+		{
+			xs.push_back(i);
+			y_srtts.push_back(sliding_window[i].srtt);
+			y_rtss.push_back(100.0 * sliding_window[i].retrans_segs / (sliding_window[i].out_segs == 0 ? 1 : sliding_window[i].out_segs));
+			y_srtt_max = std::max(sliding_window[i].srtt, y_srtt_max);
+			out_segs += sliding_window[i].out_segs;
+			lost_segs += sliding_window[i].lost_segs;
+			retrans_segs += sliding_window[i].retrans_segs;
+		}
+
 		if (ImGui::BeginTable("kcp_stats", 8))
 		{
 			ImGui::TableNextRow();
@@ -110,41 +128,56 @@ void draw_kcp_stats()
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
 			KCP_SET_HEADER_BG;
 			ImGui::TableNextColumn();
-			ImGui::Text(
-				"%.2f", 100.0 * kcp_stats[0].second.lost_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
+			ImGui::Text("%.2f", 100.0 * lost_segs / (out_segs == 0 ? 1 : out_segs));
 			KCP_SET_VALUE_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
 			KCP_SET_HEADER_BG;
 			ImGui::TableNextColumn();
-			ImGui::Text(
-				"%.2f ", 100.0 * kcp_stats[0].second.retrans_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
+			ImGui::Text("%.2f ", 100.0 * retrans_segs / (out_segs == 0 ? 1 : out_segs));
 			KCP_SET_VALUE_BG;
 			ImGui::EndTable();
 		}
-		std::vector<IINT32> xs;
-		std::vector<IINT32> y_srtts;
-		IINT32 y_srtt_max = 0;
 
-		for (int i = 0; i < sliding_window.size(); ++i)
+		IINT32 y_limit = 0;
+		if (y_srtt_max > 200)
 		{
-			xs.push_back(i);
-			y_srtts.push_back(sliding_window[i].srtt);
-			y_srtt_max = std::max(sliding_window[i].srtt, y_srtt_max);
+			y_limit = 400;
+		}
+		else if (y_srtt_max > 100)
+		{
+			y_limit = 200;
+		}
+		else if (y_srtt_max > 50)
+		{
+			y_limit = 100;
+		}
+		else
+		{
+			y_limit = 50;
 		}
 
 		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));
 		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 102));
-
-		if (ImPlot::BeginPlot("SRTT", ImVec2(250, 125), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
+		ImPlot::SetNextAxisLimits(ImAxis_Y1, 0, y_limit, ImPlotCond_Always);
+		if (ImPlot::BeginPlot("##SRTT", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
-			ImPlot::SetupAxis(ImAxis_Y1, NULL);
-			ImPlot::SetupAxisLimits(ImAxis_Y1, 0, y_srtt_max > 200 ? 400 : y_srtt_max > 100 ? 200 : y_srtt_max > 50 ? 100 : 50);
+			ImPlot::SetupAxis(ImAxis_Y1, "SRRT");
 			ImPlot::PlotLine("SRTT", xs.data(), y_srtts.data(), xs.size());
 			ImPlot::EndPlot();
 		}
-		
+		ImGui::SameLine();
+		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));
+		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 102));
+		ImPlot::SetNextAxisLimits(ImAxis_Y1, 0, 100, ImPlotCond_Always);
+		if (ImPlot::BeginPlot("##RTS%", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
+		{
+			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
+			ImPlot::SetupAxis(ImAxis_Y1, "RTS%");
+			ImPlot::PlotLine("RTS%", xs.data(), y_rtss.data(), xs.size());
+			ImPlot::EndPlot();
+		}
 	}
 	else if (kcp_stats.size() > 1)
 	{

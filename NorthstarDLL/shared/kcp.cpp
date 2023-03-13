@@ -628,6 +628,7 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 	std::shared_lock lock(this->established_connections_mutex);
 	for (const auto& entry : this->established_connections)
 	{
+		std::unique_lock lock2(*entry.second->mutex);
 		kcp_stats stats {};
 		auto& connection = entry.second;
 		stats.srtt = connection->kcpcb->rx_srtt;
@@ -635,6 +636,9 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 		stats.out_segs = connection->kcpcb->out_segs;
 		stats.lost_segs = connection->kcpcb->lost_segs;
 		stats.retrans_segs = connection->kcpcb->retrans_segs;
+		connection->kcpcb->out_segs = 0;
+		connection->kcpcb->lost_segs = 0;
+		connection->kcpcb->retrans_segs = 0;
 		result.push_back(std::make_pair(entry.first, stats));
 	}
 	return result;
