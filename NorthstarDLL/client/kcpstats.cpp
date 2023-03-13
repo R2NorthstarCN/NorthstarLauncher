@@ -18,9 +18,14 @@ void draw_kcp_stats()
 	auto kcp_stats = g_kcp_manager->get_stats();
 
 	ImGuiWindowFlags window_flags = 0;
-	window_flags |= ImGuiWindowFlags_NoBackground;
-	window_flags |= ImGuiWindowFlags_NoTitleBar;
+	window_flags |= ImGuiWindowFlags_NoDecoration;
+	window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+	window_flags |= ImGuiWindowFlags_NoResize;
+	window_flags |= ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoInputs;
 
+	ImGui::SetNextWindowFocus();
+	ImGui::SetNextWindowBgAlpha(0.2f);
 	ImGui::Begin("KCP Stats", NULL, window_flags);
 	if (kcp_stats.size() == 1)
 	{
@@ -29,23 +34,23 @@ void draw_kcp_stats()
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[0]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
 			ImGui::TableNextColumn();
 			ImGui::Text("%d", kcp_stats[0].second.srtt);
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[1]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
 			ImGui::TableNextColumn();
 			ImGui::Text("%d", kcp_stats[0].second.rto);
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
 			ImGui::TableNextColumn();
 			ImGui::Text(
 				"%.2f", 100.0 * kcp_stats[0].second.lost_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 255));
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
 			ImGui::TableNextColumn();
 			ImGui::Text(
 				"%.2f", 100.0 * kcp_stats[0].second.retrans_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
@@ -76,6 +81,11 @@ void draw_kcp_stats()
 			ImGui::EndTable();
 		}
 	}
+	auto current_size = ImGui::GetWindowSize();
+	auto main_viewport = ImGui::GetMainViewport();
+	auto viewport_pos = main_viewport->WorkPos;
+	auto viewport_size = main_viewport->WorkSize;
+	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y));
 	ImGui::End();
 }
 
