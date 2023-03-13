@@ -4,7 +4,6 @@
 #include "dedicated/dedicated.h"
 #include "core/convar/concommand.h"
 #include "engine/r2engine.h"
-#include "rs.h"
 
 kcp_manager* g_kcp_manager = nullptr;
 
@@ -763,19 +762,31 @@ static inline const char* ikcp_decode32u(const char* p, IUINT32* l)
 
 IUINT32 fec_packet::seqid()
 {
+	if (buf == nullptr)
+	{
+		return 0;
+	}
 	IUINT32 result = 0;
-	ikcp_decode32u(this->buf, &result);
+	ikcp_decode32u(buf, &result);
 	return result;
 }
 
 IUINT16 fec_packet::flag()
 {
+	if (buf == nullptr)
+	{
+		return 0;
+	}
 	IUINT16 result = 0;
-	ikcp_decode16u(this->buf + 4, &result);
+	ikcp_decode16u(buf + 4, &result);
 	return result;
 }
 
 char* fec_packet::data()
 {
+	if (buf == nullptr)
+	{
+		return nullptr;
+	}
 	return this->buf + 6;
 }

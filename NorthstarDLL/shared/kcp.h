@@ -9,6 +9,7 @@
 #include "core/memalloc.h"
 #include "ikcp.h"
 #include "itimer.h"
+#include "rs.h"
 
 // Hash and Equal Function Definitions
 
@@ -66,7 +67,7 @@ namespace std
 
 struct fec_packet
 {
-	char* buf;
+	char* buf = nullptr;
 
 	IUINT32 seqid();
 	IUINT16 flag();
@@ -74,7 +75,10 @@ struct fec_packet
 
 	~fec_packet()
 	{
-
+		if (buf != nullptr)
+		{
+			delete[] buf;
+		}
 	}
 };
 
@@ -84,12 +88,17 @@ struct fec_element
 	IUINT32 ts;
 };
 
+const IUINT32 FEC_RX_MULTI = 3;
+
 struct fec_decoder
 {
 	IUINT32 rxlimit;
-	IUINT32 data_shards, parity_shards, shard_size;
+	std::vector<fec_element> rx;
 
-	
+	reed_solomon* codec;
+
+	fec_decoder();
+	~fec_decoder();
 };
 
 // Function Definitions
