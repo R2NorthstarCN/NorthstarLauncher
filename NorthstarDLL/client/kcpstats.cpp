@@ -54,6 +54,13 @@ const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "RTO", "LOS%", "RTS%"};
 #define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150))
 #define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(68, 67, 67, 102))
 
+#define KCP_PURPLE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(127, 0, 255, 255))
+#define KCP_RED_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 0, 0, 255))
+#define KCP_ORANGE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 128, 0, 255))
+#define KCP_YELLOW_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 0, 255))
+#define KCP_LIME_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(128, 255, 0, 255))
+#define KCP_GREEN_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(0, 255, 0, 255))
+
 std::vector<kcp_stats> kcp_stats_sliding_window(50);
 std::vector<double> rts_sliding_window(50);
 IUINT32 last_rotate = iclock();
@@ -90,6 +97,7 @@ void draw_kcp_stats()
 		std::vector<double> y_srtts;
 		std::vector<double> y_rtss;
 		IINT32 y_srtt_max = 0;
+		double y_rts_max = 0;
 		IUINT32 out_segs = kcp_stats[0].second.out_segs, lost_segs = kcp_stats[0].second.lost_segs,
 				retrans_segs = kcp_stats[0].second.retrans_segs;
 
@@ -99,6 +107,7 @@ void draw_kcp_stats()
 			y_srtts.push_back(kcp_stats_sliding_window[i].srtt);
 			y_srtt_max = std::max(kcp_stats_sliding_window[i].srtt, y_srtt_max);
 			y_rtss.push_back(rts_sliding_window[i]);
+			y_rts_max = std::max(rts_sliding_window[i], y_rts_max);
 			out_segs += kcp_stats_sliding_window[i].out_segs;
 			lost_segs += kcp_stats_sliding_window[i].lost_segs;
 			retrans_segs += kcp_stats_sliding_window[i].retrans_segs;
@@ -162,23 +171,39 @@ void draw_kcp_stats()
 		}
 
 		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));
-		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 102));
-		ImPlot::SetNextAxisLimits(ImAxis_Y1, 0, y_limit, ImPlotCond_Always);
+		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 160));
 		if (ImPlot::BeginPlot("##SRTT", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
 			ImPlot::SetupAxis(ImAxis_Y1, NULL);
+			ImPlot::SetupAxisLimits(
+				ImAxis_Y1,
+				0,
+				y_srtt_max > 200 ? (KCP_RED_LINE, 400)
+				: y_srtt_max > 100 ? (KCP_ORANGE_LINE, 200)
+				: y_srtt_max > 50  ? (KCP_LIME_LINE, 100)
+								   : (KCP_GREEN_LINE, 50),
+				ImPlotCond_Always);
 			ImPlot::PlotLine("SRTT", xs.data(), y_srtts.data(), xs.size());
 			ImPlot::EndPlot();
 		}
 		ImGui::SameLine();
 		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));
-		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 102));
-		ImPlot::SetNextAxisLimits(ImAxis_Y1, 0, 100, ImPlotCond_Always);
+		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 160));
 		if (ImPlot::BeginPlot("##RTS%", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
 			ImPlot::SetupAxis(ImAxis_Y1, NULL);
+			ImPlot::SetupAxisLimits(
+				ImAxis_Y1,
+				0,
+				y_rts_max > 50.0   ? (KCP_PURPLE_LINE, 100.0)
+				: y_rts_max > 25.0 ? (KCP_RED_LINE, 50.0)
+				: y_rts_max > 13.0 ? (KCP_ORANGE_LINE, 25.0)
+				: y_rts_max > 6.0  ? (KCP_YELLOW_LINE, 13.0)
+				: y_rts_max > 3.0  ? (KCP_LIME_LINE, 6.0)
+								   : (KCP_GREEN_LINE, 3.0),
+				ImPlotCond_Always);
 			ImPlot::PlotLine("RTS%", xs.data(), y_rtss.data(), xs.size());
 			ImPlot::EndPlot();
 		}
