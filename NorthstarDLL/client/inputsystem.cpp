@@ -135,5 +135,5 @@ ON_DLL_LOAD("inputsystem.dll", IMESUPPORT, (CModule module))
 	}
 	// RandomInputFunction = module.Offset(0x7EC0).As<InputStuffType>();
 	AUTOHOOK_DISPATCH_MODULE(inputsystem.dll)
-	m_CandidateList.ImeEnabled = true;
+	m_CandidateList.ImeEnabled = false;
 }
