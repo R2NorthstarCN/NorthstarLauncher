@@ -11,4 +11,10 @@ typedef HRESULT(__stdcall* Present)(IDXGISwapChain* pSwapChain, UINT SyncInterva
 typedef LRESULT(CALLBACK* WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 typedef uintptr_t PTR;
 
-void kiero_setup();
+typedef void imgui_draw();
+
+std::vector<imgui_draw*> draw_functions;
+
+void imgui_setup();
+
+void imgui_add_draw(imgui_draw* func);

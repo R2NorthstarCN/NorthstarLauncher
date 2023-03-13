@@ -2,6 +2,8 @@
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+extern std::vector<imgui_draw*> draw_functions;
+
 Present oPresent;
 HWND window = NULL;
 WNDPROC oWndProc;
@@ -55,8 +57,10 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT 
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	bool show = true;
-	ImGui::ShowDemoWindow(&show);
+	for (const auto& func : draw_functions)
+	{
+		func();
+	}
 
 	ImGui::EndFrame();
 	ImGui::Render();
@@ -66,8 +70,7 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT 
 	return oPresent(pSwapChain, SyncInterval, Flags);
 }
 
-
-void kiero_setup()
+void imgui_setup()
 {
 	std::jthread setup_thread(
 		[]()
@@ -87,4 +90,9 @@ void kiero_setup()
 			}
 		});
 	setup_thread.detach();
+}
+
+void imgui_add_draw(imgui_draw* func)
+{
+	draw_functions.push_back(func);
 }

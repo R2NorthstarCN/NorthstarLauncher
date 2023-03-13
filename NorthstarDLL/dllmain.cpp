@@ -170,7 +170,7 @@ bool InitialiseNorthstar()
 	// run callbacks for any libraries that are already loaded by now
 	CallAllPendingDLLLoadCallbacks();
 
-	kiero_setup();
+	imgui_setup();
 
 	return true;
 }
