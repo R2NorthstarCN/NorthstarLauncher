@@ -125,10 +125,10 @@ void RenderIMECandidateList()
 	}
 }
 
-const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOS%", "RTS%"};
-#define KCP_NETGRAPH_PRINT(x, y, fmt, ...) (*m_matSystemSurface)->DrawColoredText(5, x, y, 255, 255, 255, 255, fmt, __VA_ARGS__)
+//const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOS%", "RTS%"};
+//#define KCP_NETGRAPH_PRINT(x, y, fmt, ...) (*m_matSystemSurface)->DrawColoredText(5, x, y, 255, 255, 255, 255, fmt, __VA_ARGS__)
 
-void RenderNetGraph(__int64 a1)
+/* void RenderNetGraph(__int64 a1)
 {
 	if (!g_kcp_initialized())
 		return;
@@ -175,7 +175,7 @@ void RenderNetGraph(__int64 a1)
 			}
 		}
 	}
-}
+}*/
 
 AUTOHOOK(CClientVGUI__ShowFPS, client.dll + 0x34D980, __int64, __fastcall, (__int64 a1))
 {

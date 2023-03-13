@@ -1,8 +1,9 @@
 #include "imgui.h"
+#include "core/memalloc.h"
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-extern std::vector<imgui_draw*> draw_functions;
+std::vector<imgui_draw*> draw_functions;
 
 Present oPresent;
 HWND window = NULL;
@@ -72,6 +73,7 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT 
 
 void imgui_setup()
 {
+	// ImGui::GetAllocatorFunctions(imgui_malloc, (ImGuiMemFreeFunc*)imgui_free, nullptr);
 	std::jthread setup_thread(
 		[]()
 		{

@@ -354,6 +354,9 @@
     <ClInclude Include="client\imgui.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
+    <ClInclude Include="client\kcpstats.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">
@@ -639,6 +642,9 @@
       <Filter>Source Files\shared</Filter>
     </ClCompile>
     <ClCompile Include="client\imgui.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="client\kcpstats.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
   </ItemGroup>

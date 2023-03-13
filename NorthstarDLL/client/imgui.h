@@ -13,7 +13,7 @@ typedef uintptr_t PTR;
 
 typedef void imgui_draw();
 
-std::vector<imgui_draw*> draw_functions;
+extern std::vector<imgui_draw*> draw_functions;
 
 void imgui_setup();
 
