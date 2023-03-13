@@ -54,6 +54,15 @@
     <ClCompile Include="kiero.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="implot.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="implot_demo.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="implot_items.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imconfig.h">
@@ -90,6 +99,12 @@
       <Filter>头文件\backends</Filter>
     </ClInclude>
     <ClInclude Include="kiero.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="implot.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="implot_internal.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
