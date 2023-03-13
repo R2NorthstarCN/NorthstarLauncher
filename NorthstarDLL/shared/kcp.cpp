@@ -655,6 +655,10 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 
 kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)
 {
+	this->last_lost_segs = 0;
+	this->last_out_segs = 0;
+	this->last_retrans_segs = 0;
+
 	udp_output_userdata* userdata = new udp_output_userdata {kcp_manager->local_socket, remote_addr};
 	ikcpcb* kcpcb = ikcp_create(conv, userdata);
 	ikcp_setoutput(kcpcb, udp_output);
