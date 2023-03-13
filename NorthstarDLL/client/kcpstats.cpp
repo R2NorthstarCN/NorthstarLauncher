@@ -49,13 +49,13 @@ static inline IINT32 itimediff(IUINT32 later, IUINT32 earlier)
 	return ((IINT32)(later - earlier));
 }
 
-const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOS%", "RTS%"};
+const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "RTO", "LOS%", "RTS%"};
 
 #define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150))
 #define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(68, 67, 67, 102))
 
 std::vector<kcp_stats> sliding_window(50);
-IUINT32 last_rotate;
+IUINT32 last_rotate = iclock();
 
 void draw_kcp_stats()
 {
@@ -76,12 +76,20 @@ void draw_kcp_stats()
 
 	ImGui::SetNextWindowFocus();
 	ImGui::Begin("KCP Stats", NULL, window_flags);
+
+	auto current_size = ImGui::GetWindowSize();
+	auto main_viewport = ImGui::GetMainViewport();
+	auto viewport_pos = main_viewport->WorkPos;
+	auto viewport_size = main_viewport->WorkSize;
+	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y));
+
 	if (kcp_stats.size() == 1)
 	{
 		if (itimediff(iclock(), last_rotate) > Cvar_kcp_stats_interval->GetInt())
 		{
 			std::rotate(sliding_window.rbegin(), sliding_window.rbegin() + 1, sliding_window.rend());
 			sliding_window[0] = kcp_stats[0].second;
+			last_rotate = iclock();
 		}
 		if (ImGui::BeginTable("kcp_stats", 8))
 		{
@@ -110,7 +118,7 @@ void draw_kcp_stats()
 			KCP_SET_HEADER_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text(
-				"%.2f", 100.0 * kcp_stats[0].second.retrans_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
+				"%.2f ", 100.0 * kcp_stats[0].second.retrans_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
 			KCP_SET_VALUE_BG;
 			ImGui::EndTable();
 		}
@@ -123,7 +131,7 @@ void draw_kcp_stats()
 			y_srtts.push_back(sliding_window[i].srtt);
 		}
 
-		if (ImPlot::BeginPlot("##SRTT"))
+		if (ImPlot::BeginPlot("##SRTT", ImVec2(250, 125), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1);
 			ImPlot::SetupAxis(ImAxis_Y1, "SRTT", ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_Opposite);
@@ -156,11 +164,6 @@ void draw_kcp_stats()
 			ImGui::EndTable();
 		}
 	}
-	auto current_size = ImGui::GetWindowSize();
-	auto main_viewport = ImGui::GetMainViewport();
-	auto viewport_pos = main_viewport->WorkPos;
-	auto viewport_size = main_viewport->WorkSize;
-	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y));
 	ImGui::End();
 }
 
