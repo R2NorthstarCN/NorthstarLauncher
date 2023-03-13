@@ -54,7 +54,8 @@ const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "RTO", "LOS%", "RTS%"};
 #define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150))
 #define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(68, 67, 67, 102))
 
-std::vector<kcp_stats> sliding_window(50);
+std::vector<kcp_stats> kcp_stats_sliding_window(50);
+std::vector<double> rts_sliding_window(50);
 IUINT32 last_rotate = iclock();
 
 void draw_kcp_stats()
@@ -85,28 +86,31 @@ void draw_kcp_stats()
 
 	if (kcp_stats.size() == 1)
 	{
-		if (itimediff(iclock(), last_rotate) > Cvar_kcp_stats_interval->GetInt())
-		{
-			std::rotate(sliding_window.rbegin(), sliding_window.rbegin() + 1, sliding_window.rend());
-			sliding_window[0] = kcp_stats[0].second;
-			last_rotate = iclock();
-		}
-
 		std::vector<double> xs;
 		std::vector<double> y_srtts;
 		std::vector<double> y_rtss;
 		IINT32 y_srtt_max = 0;
-		IUINT32 out_segs = 0, lost_segs = 0, retrans_segs = 0;
+		IUINT32 out_segs = kcp_stats[0].second.out_segs, lost_segs = kcp_stats[0].second.lost_segs,
+				retrans_segs = kcp_stats[0].second.retrans_segs;
 
-		for (int i = 0; i < sliding_window.size(); ++i)
+		for (int i = 0; i < 50; ++i)
 		{
 			xs.push_back(i);
-			y_srtts.push_back(sliding_window[i].srtt);
-			y_rtss.push_back(100.0 * sliding_window[i].retrans_segs / (sliding_window[i].out_segs == 0 ? 1 : sliding_window[i].out_segs));
-			y_srtt_max = std::max(sliding_window[i].srtt, y_srtt_max);
-			out_segs += sliding_window[i].out_segs;
-			lost_segs += sliding_window[i].lost_segs;
-			retrans_segs += sliding_window[i].retrans_segs;
+			y_srtts.push_back(kcp_stats_sliding_window[i].srtt);
+			y_srtt_max = std::max(kcp_stats_sliding_window[i].srtt, y_srtt_max);
+			y_rtss.push_back(rts_sliding_window[i]);
+			out_segs += kcp_stats_sliding_window[i].out_segs;
+			lost_segs += kcp_stats_sliding_window[i].lost_segs;
+			retrans_segs += kcp_stats_sliding_window[i].retrans_segs;
+		}
+
+		if (itimediff(iclock(), last_rotate) > Cvar_kcp_stats_interval->GetInt())
+		{
+			std::rotate(kcp_stats_sliding_window.rbegin(), kcp_stats_sliding_window.rbegin() + 1, kcp_stats_sliding_window.rend());
+			std::rotate(rts_sliding_window.rbegin(), rts_sliding_window.rbegin() + 1, rts_sliding_window.rend());
+			kcp_stats_sliding_window[0] = kcp_stats[0].second;
+			rts_sliding_window[0] = 100.0 * retrans_segs / (out_segs == 0 ? 1 : out_segs);
+			last_rotate = iclock();
 		}
 
 		if (ImGui::BeginTable("kcp_stats", 8))
@@ -163,7 +167,7 @@ void draw_kcp_stats()
 		if (ImPlot::BeginPlot("##SRTT", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
-			ImPlot::SetupAxis(ImAxis_Y1, "SRRT");
+			ImPlot::SetupAxis(ImAxis_Y1, NULL);
 			ImPlot::PlotLine("SRTT", xs.data(), y_srtts.data(), xs.size());
 			ImPlot::EndPlot();
 		}
@@ -174,7 +178,7 @@ void draw_kcp_stats()
 		if (ImPlot::BeginPlot("##RTS%", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
-			ImPlot::SetupAxis(ImAxis_Y1, "RTS%");
+			ImPlot::SetupAxis(ImAxis_Y1, NULL);
 			ImPlot::PlotLine("RTS%", xs.data(), y_rtss.data(), xs.size());
 			ImPlot::EndPlot();
 		}
