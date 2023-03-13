@@ -1,5 +1,6 @@
 #include "imgui.h"
 #include "core/memalloc.h"
+#include "dedicated/dedicated.h"
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -73,6 +74,10 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT 
 
 void imgui_setup()
 {
+	if (IsDedicatedServer())
+	{
+		return;
+	}
 	// ImGui::GetAllocatorFunctions(imgui_malloc, (ImGuiMemFreeFunc*)imgui_free, nullptr);
 	std::jthread setup_thread(
 		[]()
