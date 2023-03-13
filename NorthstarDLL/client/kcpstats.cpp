@@ -6,7 +6,56 @@
 
 AUTOHOOK_INIT()
 
+static inline void itimeofday(long* sec, long* usec)
+{
+	static long mode = 0, addsec = 0;
+	BOOL retval;
+	static IINT64 freq = 1;
+	IINT64 qpc;
+	if (mode == 0)
+	{
+		retval = QueryPerformanceFrequency((LARGE_INTEGER*)&freq);
+		freq = (freq == 0) ? 1 : freq;
+		retval = QueryPerformanceCounter((LARGE_INTEGER*)&qpc);
+		addsec = (long)time(NULL);
+		addsec = addsec - (long)((qpc / freq) & 0x7fffffff);
+		mode = 1;
+	}
+	retval = QueryPerformanceCounter((LARGE_INTEGER*)&qpc);
+	retval = retval * 2;
+	if (sec)
+		*sec = (long)(qpc / freq) + addsec;
+	if (usec)
+		*usec = (long)((qpc % freq) * 1000000 / freq);
+}
+
+/* get clock in millisecond 64 */
+static inline IINT64 iclock64(void)
+{
+	long s, u;
+	IINT64 value;
+	itimeofday(&s, &u);
+	value = ((IINT64)s) * 1000 + (u / 1000);
+	return value;
+}
+
+static inline IUINT32 iclock()
+{
+	return (IUINT32)(iclock64() & 0xfffffffful);
+}
+
+static inline IINT32 itimediff(IUINT32 later, IUINT32 earlier)
+{
+	return ((IINT32)(later - earlier));
+}
+
 const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOS%", "RTS%"};
+
+#define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150))
+#define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(68, 67, 67, 102))
+
+std::vector<kcp_stats> sliding_window(50);
+IUINT32 last_rotate;
 
 void draw_kcp_stats()
 {
@@ -22,40 +71,66 @@ void draw_kcp_stats()
 	window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
 	window_flags |= ImGuiWindowFlags_NoResize;
 	window_flags |= ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBackground;
 	window_flags |= ImGuiWindowFlags_NoInputs;
 
 	ImGui::SetNextWindowFocus();
-	ImGui::SetNextWindowBgAlpha(0.4f);
 	ImGui::Begin("KCP Stats", NULL, window_flags);
 	if (kcp_stats.size() == 1)
 	{
+		if (itimediff(iclock(), last_rotate) > Cvar_kcp_stats_interval->GetInt())
+		{
+			std::rotate(sliding_window.rbegin(), sliding_window.rbegin() + 1, sliding_window.rend());
+			sliding_window[0] = kcp_stats[0].second;
+		}
 		if (ImGui::BeginTable("kcp_stats", 8))
 		{
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[0]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
+			KCP_SET_HEADER_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text("%d", kcp_stats[0].second.srtt);
+			KCP_SET_VALUE_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[1]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
+			KCP_SET_HEADER_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text("%d", kcp_stats[0].second.rto);
+			KCP_SET_VALUE_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
+			KCP_SET_HEADER_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text(
 				"%.2f", 100.0 * kcp_stats[0].second.lost_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
+			KCP_SET_VALUE_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
-			ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150));
+			KCP_SET_HEADER_BG;
 			ImGui::TableNextColumn();
 			ImGui::Text(
 				"%.2f", 100.0 * kcp_stats[0].second.retrans_segs / (kcp_stats[0].second.out_segs == 0 ? 1 : kcp_stats[0].second.out_segs));
+			KCP_SET_VALUE_BG;
 			ImGui::EndTable();
 		}
+		std::vector<IUINT32> xs;
+		std::vector<IUINT32> y_srtts;
+
+		for (int i = 0; i < sliding_window.size(); ++i)
+		{
+			xs.push_back(i);
+			y_srtts.push_back(sliding_window[i].srtt);
+		}
+
+		if (ImPlot::BeginPlot("##SRTT"))
+		{
+			ImPlot::SetupAxis(ImAxis_X1);
+			ImPlot::SetupAxis(ImAxis_Y1, "SRTT", ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_Opposite);
+			ImPlot::PlotLine("SRTT", xs.data(), y_srtts.data(), xs.size());
+			ImPlot::EndPlot();
+		}
+		
 	}
 	else if (kcp_stats.size() > 1)
 	{
@@ -92,5 +167,6 @@ void draw_kcp_stats()
 ON_DLL_LOAD("client.dll", KCPSTATS, (CModule module))
 {
 	Cvar_kcp_stats = new ConVar("kcp_stats", "0", FCVAR_NONE, "kcp stats window");
+	Cvar_kcp_stats_interval = new ConVar("kcp_stats_interval", "100", FCVAR_NONE, "kcp stats interval");
 	imgui_add_draw(draw_kcp_stats);
 }

@@ -124,9 +124,6 @@ struct kcp_connection
 	itimer_evt* update_timer;
 	IUINT32 last_input;
 
-	IUINT32 last_stats_rotate;
-	IUINT64 last_out_segs, last_lost_segs, last_retrans_segs;
-
 	kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv);
 
 	~kcp_connection();

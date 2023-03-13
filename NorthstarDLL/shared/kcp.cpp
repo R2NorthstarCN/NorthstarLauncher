@@ -228,7 +228,6 @@ void ConCommand_kcp_listen(const CCommand& args)
 
 ConVar* Cvar_kcp_timer_interval;
 ConVar* Cvar_kcp_timeout;
-ConVar* Cvar_kcp_stats_rotate_interval;
 
 ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 {
@@ -243,8 +242,6 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	Cvar_kcp_timer_interval =
 		new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
 	Cvar_kcp_timeout = new ConVar("kcp_timeout", "5000", FCVAR_NONE, "miliseconds to clean up the kcp connection.");
-	Cvar_kcp_stats_rotate_interval =
-		new ConVar("kcp_stats_rotate_interval", "2000", FCVAR_NONE, "miliseconds to clean up the kcp seg stats.");
 
 	if (g_kcp_manager == nullptr)
 	{
@@ -349,16 +346,6 @@ void kcp_update_timer_cb(void* data, void* user)
 		delete connection;
 
 		return;
-	}
-	else if (itimediff(current, connection->last_stats_rotate) > Cvar_kcp_stats_rotate_interval->GetInt())
-	{
-		connection->last_out_segs = connection->kcpcb->out_segs;
-		connection->last_lost_segs = connection->kcpcb->lost_segs;
-		connection->last_retrans_segs = connection->kcpcb->retrans_segs;
-		connection->kcpcb->out_segs = 0;
-		connection->kcpcb->lost_segs = 0;
-		connection->kcpcb->retrans_segs = 0;
-		connection->last_stats_rotate = current;
 	}
 
 	ikcp_update(connection->kcpcb, current);
@@ -645,9 +632,9 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 		auto& connection = entry.second;
 		stats.srtt = connection->kcpcb->rx_srtt;
 		stats.rto = connection->kcpcb->rx_rto;
-		stats.out_segs = connection->kcpcb->out_segs + connection->last_out_segs;
-		stats.lost_segs = connection->kcpcb->lost_segs + connection->last_lost_segs;
-		stats.retrans_segs = connection->kcpcb->retrans_segs + connection->last_retrans_segs;
+		stats.out_segs = connection->kcpcb->out_segs;
+		stats.lost_segs = connection->kcpcb->lost_segs;
+		stats.retrans_segs = connection->kcpcb->retrans_segs;
 		result.push_back(std::make_pair(entry.first, stats));
 	}
 	return result;
@@ -655,10 +642,6 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 
 kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)
 {
-	this->last_lost_segs = 0;
-	this->last_out_segs = 0;
-	this->last_retrans_segs = 0;
-
 	udp_output_userdata* userdata = new udp_output_userdata {kcp_manager->local_socket, remote_addr};
 	ikcpcb* kcpcb = ikcp_create(conv, userdata);
 	ikcp_setoutput(kcpcb, udp_output);
@@ -673,7 +656,6 @@ kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& rem
 
 	auto current = iclock();
 	this->last_input = current;
-	this->last_stats_rotate = current;
 
 	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
 	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);
