@@ -1,64 +1,71 @@
 #include "imgui.h"
-#include <d3d11.h>
 
-static WNDPROC oWndProc = NULL;
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-typedef long(__stdcall* Present)(IDXGISwapChain*, UINT, UINT);
-static Present oPresent = NULL;
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-LRESULT CALLBACK hkWindowProc(_In_ HWND hwnd, _In_ UINT uMsg, _In_ WPARAM wParam, _In_ LPARAM lParam)
+Present oPresent;
+HWND window = NULL;
+WNDPROC oWndProc;
+ID3D11Device* pDevice = NULL;
+ID3D11DeviceContext* pContext = NULL;
+ID3D11RenderTargetView* mainRenderTargetView;
+
+LRESULT __stdcall WndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam) > 0)
-		return 1L;
-	return ::CallWindowProcA(oWndProc, hwnd, uMsg, wParam, lParam);
+
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam))
+		return true;
+
+	return CallWindowProc(oWndProc, hWnd, uMsg, wParam, lParam);
 }
 
-long __stdcall hkPresent11(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
+void InitImGui()
+{
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags = ImGuiConfigFlags_NoMouseCursorChange;
+	ImGui_ImplWin32_Init(window);
+	ImGui_ImplDX11_Init(pDevice, pContext);
+}
+
+HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
 {
 	static bool init = false;
-
 	if (!init)
 	{
-		DXGI_SWAP_CHAIN_DESC desc;
-		pSwapChain->GetDesc(&desc);
+		if (SUCCEEDED(pSwapChain->GetDevice(__uuidof(ID3D11Device), (void**)&pDevice)))
+		{
+			pDevice->GetImmediateContext(&pContext);
+			DXGI_SWAP_CHAIN_DESC sd;
+			pSwapChain->GetDesc(&sd);
+			window = sd.OutputWindow;
+			ID3D11Texture2D* pBackBuffer;
+			pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+			pDevice->CreateRenderTargetView(pBackBuffer, NULL, &mainRenderTargetView);
+			pBackBuffer->Release();
+			oWndProc = (WNDPROC)SetWindowLongPtr(window, GWLP_WNDPROC, (LONG_PTR)WndProc);
+			InitImGui();
+			init = true;
+		}
 
-		ID3D11Device* device;
-		pSwapChain->GetDevice(__uuidof(ID3D11Device), (void**)&device);
-
-		ID3D11DeviceContext* context;
-		device->GetImmediateContext(&context);
-
-		oWndProc = (WNDPROC)::SetWindowLongPtr((HWND)desc.OutputWindow, GWLP_WNDPROC, (LONG)hkWindowProc);
-
-		ImGui::CreateContext();
-		ImGui_ImplWin32_Init(desc.OutputWindow);
-		ImGui_ImplDX11_Init(device, context);
-
-		init = true;
+		else
+			return oPresent(pSwapChain, SyncInterval, Flags);
 	}
 
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	char buffer[128];
-	memset(buffer, 0, 128);
-	sprintf(buffer, "Kiero Dear ImGui Example (%s)", "D3D11");
-
-	ImGui::Begin(buffer);
-
-	ImGui::Text("Hello");
-	ImGui::Button("World!");
-
-	ImGui::End();
+	bool show = true;
+	ImGui::ShowDemoWindow(&show);
 
 	ImGui::EndFrame();
 	ImGui::Render();
 
+	pContext->OMSetRenderTargets(1, &mainRenderTargetView, NULL);
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
 	return oPresent(pSwapChain, SyncInterval, Flags);
 }
+
 
 void kiero_setup()
 {
@@ -67,21 +74,15 @@ void kiero_setup()
 		{
 			while (true)
 			{
-				if (kiero::init(kiero::RenderType::Auto) == kiero::Status::Success)
+				if (kiero::init(kiero::RenderType::D3D11) != kiero::Status::Success)
 				{
-					switch (kiero::getRenderType())
-					{
-					case kiero::RenderType::D3D11:
-						if (kiero::bind(8, (void**)&oPresent, hkPresent11) != kiero::Status::Success)
-						{
-							spdlog::error("[ImGui] Initialize Failed 2");
-							return;
-						}
-						break;
-					default:
-						spdlog::error("[ImGui] Initialize Failed 1");
-						return;
-					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+					continue;
+				}
+				if (kiero::bind(8, (void**)&oPresent, hkPresent) != kiero::Status::Success)
+				{
+					spdlog::error("[ImGui] bind failed");
+					break;
 				}
 			}
 		});
