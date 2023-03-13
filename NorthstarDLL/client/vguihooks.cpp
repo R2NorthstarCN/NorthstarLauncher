@@ -165,10 +165,12 @@ void RenderNetGraph(__int64 a1)
 				KCP_NETGRAPH_PRINT(x_current, y_current, "%d", kcp_stat.rto);
 				break;
 			case 2:
-				KCP_NETGRAPH_PRINT(x_current, y_current, "%.2f", 100.0 * kcp_stat.lost_segs / kcp_stat.out_segs);
+				KCP_NETGRAPH_PRINT(
+					x_current, y_current, "%.2f", 100.0 * kcp_stat.lost_segs / (kcp_stat.out_segs == 0 ? 1 : kcp_stat.out_segs));
 				break;
 			case 3:
-				KCP_NETGRAPH_PRINT(x_current, y_current, "%.2f", 100.0 * kcp_stat.retrans_segs / kcp_stat.out_segs);
+				KCP_NETGRAPH_PRINT(
+					x_current, y_current, "%.2f", 100.0 * kcp_stat.retrans_segs / (kcp_stat.out_segs == 0 ? 1 : kcp_stat.out_segs));
 				break;
 			}
 		}
@@ -182,7 +184,6 @@ AUTOHOOK(CClientVGUI__ShowFPS, client.dll + 0x34D980, __int64, __fastcall, (__in
 	RenderNetGraph(a1);
 	return result;
 }
-
 
 AUTOHOOK(CEngineVGUI__Paint, engine.dll + 0x248C60, __int64, __fastcall, (__int64 a1, int a2))
 {
@@ -217,5 +218,5 @@ ON_DLL_LOAD_CLIENT("client.dll", GETCHATSTATUS, (CModule module))
 	GetScreenWidth = module.Offset(0x75D930).As<GetScreenWidth_Type*>();
 	localGameSettings = module.Offset(0x11BAA48).As<CGameSettings**>();
 	Cvar_ns_ime_chatbox_fontidx = new ConVar("ns_ime_chatbox_fontidx", "17", FCVAR_NONE, "");
-	//Cvar_ns_netgraph = new ConVar("net_graph", "0", FCVAR_NONE, "");
+	// Cvar_ns_netgraph = new ConVar("net_graph", "0", FCVAR_NONE, "");
 }
