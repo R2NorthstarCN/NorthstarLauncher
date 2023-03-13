@@ -122,19 +122,25 @@ void draw_kcp_stats()
 			KCP_SET_VALUE_BG;
 			ImGui::EndTable();
 		}
-		std::vector<IUINT32> xs;
-		std::vector<IUINT32> y_srtts;
+		std::vector<IINT32> xs;
+		std::vector<IINT32> y_srtts;
+		IINT32 y_srtt_max = 0;
 
 		for (int i = 0; i < sliding_window.size(); ++i)
 		{
 			xs.push_back(i);
 			y_srtts.push_back(sliding_window[i].srtt);
+			y_srtt_max = std::max(sliding_window[i].srtt, y_srtt_max);
 		}
 
-		if (ImPlot::BeginPlot("##SRTT", ImVec2(250, 125), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
+		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));
+		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 102));
+
+		if (ImPlot::BeginPlot("SRTT", ImVec2(250, 125), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
-			ImPlot::SetupAxis(ImAxis_X1);
-			ImPlot::SetupAxis(ImAxis_Y1, "SRTT", ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_Opposite);
+			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
+			ImPlot::SetupAxis(ImAxis_Y1, NULL);
+			ImPlot::SetupAxisLimits(ImAxis_Y1, 0, y_srtt_max > 200 ? 400 : y_srtt_max > 100 ? 200 : y_srtt_max > 50 ? 100 : 50);
 			ImPlot::PlotLine("SRTT", xs.data(), y_srtts.data(), xs.size());
 			ImPlot::EndPlot();
 		}
