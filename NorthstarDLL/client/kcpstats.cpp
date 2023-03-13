@@ -25,7 +25,7 @@ void draw_kcp_stats()
 	window_flags |= ImGuiWindowFlags_NoInputs;
 
 	ImGui::SetNextWindowFocus();
-	ImGui::SetNextWindowBgAlpha(0.2f);
+	ImGui::SetNextWindowBgAlpha(0.4f);
 	ImGui::Begin("KCP Stats", NULL, window_flags);
 	if (kcp_stats.size() == 1)
 	{
