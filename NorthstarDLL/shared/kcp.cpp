@@ -175,7 +175,7 @@ void ConCommand_kcp_connect(const CCommand& args)
 		}
 		else
 		{
-			auto connection = kcp_setup(g_kcp_manager, remote_addr, conv);
+			auto connection = new kcp_connection(g_kcp_manager, remote_addr, conv);
 			g_kcp_manager->established_connections[remote_addr] = connection;
 			spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&remote_addr), conv);
 		}
@@ -251,20 +251,6 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 		g_kcp_manager = new kcp_manager(Cvar_kcp_timer_interval->GetInt());
 		spdlog::info("[KCP] KCP manager created");
 	}
-}
-
-IUINT32 fec_seqid(fec_packet pak)
-{
-	return IUINT32();
-}
-
-IUINT32 fec_flag(fec_packet pak) {
-
-}
-
-char* fec_data(fec_packet pak)
-{
-	return nullptr;
 }
 
 std::string ntop(const sockaddr* addr)
@@ -354,21 +340,12 @@ void kcp_update_timer_cb(void* data, void* user)
 	auto current = iclock();
 	if (itimediff(current, connection->last_input) > Cvar_kcp_timeout->GetInt())
 	{
-		spdlog::info(
-			"[KCP] {}%{} timed out",
-			ntop((const sockaddr*)(&((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr)),
-			connection->kcpcb->conv);
 		ikcp_flush(connection->kcpcb);
 		{
 			std::unique_lock lock2(manager->established_connections_mutex);
 			manager->established_connections.erase(((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr);
 		}
 		itimer_evt_stop(&manager->timer_mgr, connection->update_timer);
-		delete connection->kcpcb->user;
-		ikcp_release(connection->kcpcb);
-		itimer_evt_destroy(connection->update_timer);
-		delete connection->update_timer;
-		delete connection->mutex;
 		delete connection;
 
 		return;
@@ -382,7 +359,6 @@ void kcp_update_timer_cb(void* data, void* user)
 		connection->kcpcb->lost_segs = 0;
 		connection->kcpcb->retrans_segs = 0;
 		connection->last_stats_rotate = current;
-		
 	}
 
 	ikcp_update(connection->kcpcb, current);
@@ -392,31 +368,6 @@ void kcp_update_timer_cb(void* data, void* user)
 	// doesn't need lock here cause it could be only run under select thread which locks timer_mgr_mutex
 	itimer_evt_stop(&manager->timer_mgr, connection->update_timer);
 	itimer_evt_start(&manager->timer_mgr, connection->update_timer, next, 1);
-}
-
-kcp_connection* kcp_setup(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)
-{
-	udp_output_userdata* userdata = new udp_output_userdata {kcp_manager->local_socket, remote_addr};
-	ikcpcb* kcpcb = ikcp_create(conv, userdata);
-	ikcp_setoutput(kcpcb, udp_output);
-	ikcp_nodelay(kcpcb, 1, kcp_manager->timer_interval, 2, 1);
-
-	kcp_connection* connection = new kcp_connection;
-	connection->kcpcb = kcpcb;
-	connection->mutex = new std::mutex;
-
-	itimer_evt* update_timer = new itimer_evt;
-	connection->update_timer = update_timer;
-	itimer_evt_init(update_timer, kcp_update_timer_cb, connection, kcp_manager);
-
-	auto current = iclock();
-	connection->last_input = current;
-	connection->last_stats_rotate = current;
-
-	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
-	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);
-
-	return connection;
 }
 
 kcp_manager::kcp_manager(IUINT32 timer_interval)
@@ -503,18 +454,15 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 					else
 					{
 						lock1.unlock();
+						auto recv_conv = ikcp_getconv(buf.data());
 						std::unique_lock lock3(this->pending_connections_mutex);
-						if (pending_connections.contains(from.sin6_addr))
+						if (pending_connections.contains(from.sin6_addr) && pending_connections[from.sin6_addr].contains(recv_conv))
 						{
-							auto recv_conv = ikcp_getconv(buf.data());
-							if (pending_connections[from.sin6_addr].contains(recv_conv))
-							{
-								pending_connections[from.sin6_addr].erase(recv_conv);
-								auto connection = kcp_setup(this, from, recv_conv);
-								std::unique_lock lock4(this->established_connections_mutex);
-								this->established_connections[from] = connection;
-								spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&from), recv_conv);
-							}
+							pending_connections[from.sin6_addr].erase(recv_conv);
+							auto connection = new kcp_connection(this, from, recv_conv);
+							std::unique_lock lock4(this->established_connections_mutex);
+							this->established_connections[from] = connection;
+							spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&from), recv_conv);
 						}
 						else
 						{
@@ -540,11 +488,7 @@ kcp_manager::~kcp_manager()
 		std::unique_lock lock(established_connections_mutex);
 		for (auto& entry : established_connections)
 		{
-			delete entry.second->kcpcb->user;
-			ikcp_release(entry.second->kcpcb);
-			itimer_evt_destroy(entry.second->update_timer);
-			delete entry.second->update_timer;
-			delete entry.second->mutex;
+			itimer_evt_stop(&this->timer_mgr, entry.second->update_timer);
 			delete entry.second;
 		}
 		established_connections.clear();
@@ -707,4 +651,127 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 		result.push_back(std::make_pair(entry.first, stats));
 	}
 	return result;
+}
+
+kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)
+{
+	udp_output_userdata* userdata = new udp_output_userdata {kcp_manager->local_socket, remote_addr};
+	ikcpcb* kcpcb = ikcp_create(conv, userdata);
+	ikcp_setoutput(kcpcb, udp_output);
+	ikcp_nodelay(kcpcb, 1, kcp_manager->timer_interval, 2, 1);
+
+	this->kcpcb = kcpcb;
+	this->mutex = new std::mutex;
+
+	itimer_evt* update_timer = new itimer_evt;
+	this->update_timer = update_timer;
+	itimer_evt_init(update_timer, kcp_update_timer_cb, this, kcp_manager);
+
+	auto current = iclock();
+	this->last_input = current;
+	this->last_stats_rotate = current;
+
+	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
+	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);
+}
+
+kcp_connection::~kcp_connection()
+{
+	spdlog::info(
+		"[KCP] Disconnect local <--> {}%{}",
+		ntop((const sockaddr*)(&((const udp_output_userdata*)(kcpcb->user))->remote_addr)),
+		kcpcb->conv);
+	delete mutex;
+	delete kcpcb->user;
+	ikcp_release(kcpcb);
+	itimer_evt_destroy(update_timer);
+}
+
+/* encode 8 bits unsigned int */
+static inline char* ikcp_encode8u(char* p, unsigned char c)
+{
+	*(unsigned char*)p++ = c;
+	return p;
+}
+
+/* decode 8 bits unsigned int */
+static inline const char* ikcp_decode8u(const char* p, unsigned char* c)
+{
+	*c = *(unsigned char*)p++;
+	return p;
+}
+
+/* encode 16 bits unsigned int (lsb) */
+static inline char* ikcp_encode16u(char* p, unsigned short w)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*(unsigned char*)(p + 0) = (w & 255);
+	*(unsigned char*)(p + 1) = (w >> 8);
+#else
+	memcpy(p, &w, 2);
+#endif
+	p += 2;
+	return p;
+}
+
+/* decode 16 bits unsigned int (lsb) */
+static inline const char* ikcp_decode16u(const char* p, unsigned short* w)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*w = *(const unsigned char*)(p + 1);
+	*w = *(const unsigned char*)(p + 0) + (*w << 8);
+#else
+	memcpy(w, p, 2);
+#endif
+	p += 2;
+	return p;
+}
+
+/* encode 32 bits unsigned int (lsb) */
+static inline char* ikcp_encode32u(char* p, IUINT32 l)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*(unsigned char*)(p + 0) = (unsigned char)((l >> 0) & 0xff);
+	*(unsigned char*)(p + 1) = (unsigned char)((l >> 8) & 0xff);
+	*(unsigned char*)(p + 2) = (unsigned char)((l >> 16) & 0xff);
+	*(unsigned char*)(p + 3) = (unsigned char)((l >> 24) & 0xff);
+#else
+	memcpy(p, &l, 4);
+#endif
+	p += 4;
+	return p;
+}
+
+/* decode 32 bits unsigned int (lsb) */
+static inline const char* ikcp_decode32u(const char* p, IUINT32* l)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*l = *(const unsigned char*)(p + 3);
+	*l = *(const unsigned char*)(p + 2) + (*l << 8);
+	*l = *(const unsigned char*)(p + 1) + (*l << 8);
+	*l = *(const unsigned char*)(p + 0) + (*l << 8);
+#else
+	memcpy(l, p, 4);
+#endif
+	p += 4;
+	return p;
+}
+
+IUINT32 fec_packet::seqid()
+{
+	IUINT32 result = 0;
+	ikcp_decode32u(this->buf, &result);
+	return result;
+}
+
+IUINT16 fec_packet::flag()
+{
+	IUINT16 result = 0;
+	ikcp_decode16u(this->buf + 4, &result);
+	return result;
+}
+
+char* fec_packet::data()
+{
+	return this->buf + 6;
 }

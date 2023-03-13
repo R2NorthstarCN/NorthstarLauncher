@@ -64,11 +64,33 @@ namespace std
 
 // FEC
 
-typedef char* fec_packet;
+struct fec_packet
+{
+	char* buf;
 
-IUINT32 fec_seqid(fec_packet pak);
-IUINT32 fec_flag(fec_packet pak);
-char *fec_data(fec_packet pak);
+	IUINT32 seqid();
+	IUINT16 flag();
+	char* data();
+
+	~fec_packet()
+	{
+
+	}
+};
+
+struct fec_element
+{
+	fec_packet pkt;
+	IUINT32 ts;
+};
+
+struct fec_decoder
+{
+	IUINT32 rxlimit;
+	IUINT32 data_shards, parity_shards, shard_size;
+
+	
+};
 
 // Function Definitions
 
@@ -84,6 +106,8 @@ struct udp_output_userdata
 	sockaddr_in6 remote_addr;
 };
 
+struct kcp_manager;
+
 struct kcp_connection
 {
 	std::mutex* mutex;
@@ -93,6 +117,10 @@ struct kcp_connection
 
 	IUINT32 last_stats_rotate;
 	IUINT64 last_out_segs, last_lost_segs, last_retrans_segs;
+
+	kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv);
+
+	~kcp_connection();
 };
 
 struct kcp_stats
@@ -137,5 +165,3 @@ struct kcp_manager
 extern kcp_manager* g_kcp_manager;
 
 bool g_kcp_initialized();
-
-kcp_connection* kcp_setup(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv);
