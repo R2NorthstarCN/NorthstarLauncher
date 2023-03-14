@@ -250,6 +250,76 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	}
 }
 
+/* encode 8 bits unsigned int */
+static inline char* ikcp_encode8u(char* p, unsigned char c)
+{
+	*(unsigned char*)p++ = c;
+	return p;
+}
+
+/* decode 8 bits unsigned int */
+static inline const char* ikcp_decode8u(const char* p, unsigned char* c)
+{
+	*c = *(unsigned char*)p++;
+	return p;
+}
+
+/* encode 16 bits unsigned int (lsb) */
+static inline char* ikcp_encode16u(char* p, unsigned short w)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*(unsigned char*)(p + 0) = (w & 255);
+	*(unsigned char*)(p + 1) = (w >> 8);
+#else
+	memcpy(p, &w, 2);
+#endif
+	p += 2;
+	return p;
+}
+
+/* decode 16 bits unsigned int (lsb) */
+static inline const char* ikcp_decode16u(const char* p, unsigned short* w)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*w = *(const unsigned char*)(p + 1);
+	*w = *(const unsigned char*)(p + 0) + (*w << 8);
+#else
+	memcpy(w, p, 2);
+#endif
+	p += 2;
+	return p;
+}
+
+/* encode 32 bits unsigned int (lsb) */
+static inline char* ikcp_encode32u(char* p, IUINT32 l)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*(unsigned char*)(p + 0) = (unsigned char)((l >> 0) & 0xff);
+	*(unsigned char*)(p + 1) = (unsigned char)((l >> 8) & 0xff);
+	*(unsigned char*)(p + 2) = (unsigned char)((l >> 16) & 0xff);
+	*(unsigned char*)(p + 3) = (unsigned char)((l >> 24) & 0xff);
+#else
+	memcpy(p, &l, 4);
+#endif
+	p += 4;
+	return p;
+}
+
+/* decode 32 bits unsigned int (lsb) */
+static inline const char* ikcp_decode32u(const char* p, IUINT32* l)
+{
+#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
+	*l = *(const unsigned char*)(p + 3);
+	*l = *(const unsigned char*)(p + 2) + (*l << 8);
+	*l = *(const unsigned char*)(p + 1) + (*l << 8);
+	*l = *(const unsigned char*)(p + 0) + (*l << 8);
+#else
+	memcpy(l, p, 4);
+#endif
+	p += 4;
+	return p;
+}
+
 std::string ntop(const sockaddr* addr)
 {
 	switch (addr->sa_family)
@@ -325,7 +395,17 @@ bool g_kcp_initialized()
 int udp_output(const char* buf, int len, ikcpcb* kcp, void* user)
 {
 	auto userdata = (udp_output_userdata*)user;
-	return org_sendto(userdata->socket, buf, len, 0, (const sockaddr*)&userdata->remote_addr, sizeof(sockaddr_in6));
+	std::vector<std::vector<char>> encoded = userdata->connection->encoder->encode(buf, len);
+	for (const auto& pkt : encoded)
+	{
+		auto sendto_result =
+			org_sendto(userdata->socket, pkt.data(), pkt.size(), 0, (const sockaddr*)&userdata->remote_addr, sizeof(sockaddr_in6));
+		if (sendto_result < 0)
+		{
+			return sendto_result;
+		}
+	}
+	return 0;
 }
 
 void kcp_update_timer_cb(void* data, void* user)
@@ -355,6 +435,41 @@ void kcp_update_timer_cb(void* data, void* user)
 	// doesn't need lock here cause it could be only run under select thread which locks timer_mgr_mutex
 	itimer_evt_stop(&manager->timer_mgr, connection->update_timer);
 	itimer_evt_start(&manager->timer_mgr, connection->update_timer, next, 1);
+}
+
+void kcp_fec_aware_input(kcp_connection* connection, std::vector<char> &buf)
+{
+	IUINT16 fec_flag = 0;
+	ikcp_decode16u(buf.data() + 4, &fec_flag);
+	if ((fec_flag == FEC_TYPE_DATA || fec_flag == FEC_TYPE_PARITY) && buf.size() > FEC_HEADER_SIZE + 2)
+	{
+		fec_packet pkt { buf };
+		auto recovered = connection->decoder->decode(pkt);
+		if (fec_flag == FEC_TYPE_DATA)
+		{
+			auto input_result = ikcp_input(connection->kcpcb, pkt.data(), pkt.buf.size() - FEC_HEADER_SIZE - 2);
+			if (input_result < 0)
+			{
+				spdlog::error("[KCP] Input error: {}", input_result);
+			}
+		}
+		for (const auto& rpkt : recovered)
+		{
+			auto input_result = ikcp_input(connection->kcpcb, rpkt.data(), rpkt.size());
+			if (input_result < 0)
+			{
+				spdlog::error("[KCP] Input error: {}", input_result);
+			}
+		}
+	}
+	else
+	{
+		auto input_result = ikcp_input(connection->kcpcb, buf.data(), buf.size());
+		if (input_result < 0)
+		{
+			spdlog::error("[KCP] Input error: {}", input_result);
+		}
+	}
 }
 
 kcp_manager::kcp_manager(IUINT32 timer_interval)
@@ -422,21 +537,10 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 					{
 						const auto& connection = established_connections[from];
 						std::scoped_lock lock2(*connection->mutex, this->timer_mgr_mutex);
-						auto input_result = ikcp_input(connection->kcpcb, buf.data(), buf.size());
-						switch (input_result)
-						{
-						case -1:
-							spdlog::warn("[KCP] Input conv not matches, perhaps the remote is inconsistent");
-							break;
-						case -2:
-						case -3:
-							spdlog::error("[KCP] Invalid packet, perhaps the remote is not in KCP");
-							break;
-						default:
-							connection->last_input = iclock();
-							itimer_evt_stop(&this->timer_mgr, connection->update_timer);
-							itimer_evt_start(&this->timer_mgr, connection->update_timer, 0, 1);
-						}
+						kcp_fec_aware_input(connection, buf);
+						connection->last_input = iclock();
+						itimer_evt_stop(&this->timer_mgr, connection->update_timer);
+						itimer_evt_start(&this->timer_mgr, connection->update_timer, 0, 1);
 					}
 					else
 					{
@@ -447,6 +551,7 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 						{
 							pending_connections[from.sin6_addr].erase(recv_conv);
 							auto connection = new kcp_connection(this, from, recv_conv);
+							kcp_fec_aware_input(connection, buf);
 							std::unique_lock lock4(this->established_connections_mutex);
 							this->established_connections[from] = connection;
 							spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&from), recv_conv);
@@ -646,7 +751,7 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 
 kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)
 {
-	udp_output_userdata* userdata = new udp_output_userdata {kcp_manager->local_socket, remote_addr};
+	udp_output_userdata* userdata = new udp_output_userdata {kcp_manager->local_socket, remote_addr, this};
 	ikcpcb* kcpcb = ikcp_create(conv, userdata);
 	ikcp_setoutput(kcpcb, udp_output);
 	ikcp_nodelay(kcpcb, 1, kcp_manager->timer_interval, 2, 1);
@@ -661,6 +766,9 @@ kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& rem
 	auto current = iclock();
 	this->last_input = current;
 
+	encoder = new fec_encoder(1, 1);
+	decoder = new fec_decoder(1, 1);
+
 	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
 	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);
 }
@@ -668,127 +776,276 @@ kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& rem
 kcp_connection::~kcp_connection()
 {
 	spdlog::info(
-		"[KCP] Disconnect local <--> {}%{}",
+		"[KCP] Disconnecting local <--> {}%{}",
 		ntop((const sockaddr*)(&((const udp_output_userdata*)(kcpcb->user))->remote_addr)),
 		kcpcb->conv);
 	delete mutex;
 	delete kcpcb->user;
 	ikcp_release(kcpcb);
 	itimer_evt_destroy(update_timer);
-}
 
-/* encode 8 bits unsigned int */
-static inline char* ikcp_encode8u(char* p, unsigned char c)
-{
-	*(unsigned char*)p++ = c;
-	return p;
-}
-
-/* decode 8 bits unsigned int */
-static inline const char* ikcp_decode8u(const char* p, unsigned char* c)
-{
-	*c = *(unsigned char*)p++;
-	return p;
-}
-
-/* encode 16 bits unsigned int (lsb) */
-static inline char* ikcp_encode16u(char* p, unsigned short w)
-{
-#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
-	*(unsigned char*)(p + 0) = (w & 255);
-	*(unsigned char*)(p + 1) = (w >> 8);
-#else
-	memcpy(p, &w, 2);
-#endif
-	p += 2;
-	return p;
-}
-
-/* decode 16 bits unsigned int (lsb) */
-static inline const char* ikcp_decode16u(const char* p, unsigned short* w)
-{
-#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
-	*w = *(const unsigned char*)(p + 1);
-	*w = *(const unsigned char*)(p + 0) + (*w << 8);
-#else
-	memcpy(w, p, 2);
-#endif
-	p += 2;
-	return p;
-}
-
-/* encode 32 bits unsigned int (lsb) */
-static inline char* ikcp_encode32u(char* p, IUINT32 l)
-{
-#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
-	*(unsigned char*)(p + 0) = (unsigned char)((l >> 0) & 0xff);
-	*(unsigned char*)(p + 1) = (unsigned char)((l >> 8) & 0xff);
-	*(unsigned char*)(p + 2) = (unsigned char)((l >> 16) & 0xff);
-	*(unsigned char*)(p + 3) = (unsigned char)((l >> 24) & 0xff);
-#else
-	memcpy(p, &l, 4);
-#endif
-	p += 4;
-	return p;
-}
-
-/* decode 32 bits unsigned int (lsb) */
-static inline const char* ikcp_decode32u(const char* p, IUINT32* l)
-{
-#if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
-	*l = *(const unsigned char*)(p + 3);
-	*l = *(const unsigned char*)(p + 2) + (*l << 8);
-	*l = *(const unsigned char*)(p + 1) + (*l << 8);
-	*l = *(const unsigned char*)(p + 0) + (*l << 8);
-#else
-	memcpy(l, p, 4);
-#endif
-	p += 4;
-	return p;
+	delete encoder;
+	delete decoder;
 }
 
 IUINT32 fec_packet::seqid()
 {
-	if (buf == nullptr)
+	if (buf.size() < 4)
 	{
 		return 0;
 	}
 	IUINT32 result = 0;
-	ikcp_decode32u(buf, &result);
+	ikcp_decode32u(buf.data(), &result);
 	return result;
 }
 
 IUINT16 fec_packet::flag()
 {
-	if (buf == nullptr)
+	if (buf.size() < 2)
 	{
 		return 0;
 	}
 	IUINT16 result = 0;
-	ikcp_decode16u(buf + 4, &result);
+	ikcp_decode16u(buf.data() + 4, &result);
 	return result;
 }
 
 char* fec_packet::data()
 {
-	if (buf == nullptr)
+	if (buf.size() < FEC_HEADER_SIZE + 2)
 	{
 		return nullptr;
 	}
-	return this->buf + 6;
+	return buf.data() + FEC_HEADER_SIZE + 2;
 }
 
-fec_packet::~fec_packet()
+fec_decoder::fec_decoder(int data_shards, int parity_shards)
 {
-	if (buf != nullptr)
+	rxlimit = FEC_RX_MULTI * (data_shards + parity_shards);
+	codec = reed_solomon_new(data_shards, parity_shards);
+}
+
+fec_decoder::~fec_decoder()
+{
+	reed_solomon_release(codec);
+}
+
+std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
+{
+	std::vector<std::vector<char>> recovered;
+
+	auto insert_iter = rx.rend();
+	for (auto i = rx.rbegin(); i != rx.rend(); ++i)
 	{
-		delete[] buf;
+		if (in.seqid() == i->pkt.seqid())
+		{
+			return recovered;
+		}
+		else if (itimediff(in.seqid(), i->pkt.seqid()) > 0)
+		{
+			insert_iter = i;
+			break;
+		}
 	}
+	auto pkt_iter = rx.insert(insert_iter.base(), {in, iclock()});
+
+	IUINT32 shard_begin = in.seqid() - in.seqid() % codec->shards;
+	IUINT32 shard_end = shard_begin + codec->shards - 1;
+
+	auto search_begin = pkt_iter - in.seqid() % codec->shards;
+	if (search_begin < rx.begin())
+	{
+		search_begin = rx.begin();
+	}
+
+	auto search_end = search_begin + codec->shards - 1;
+	if (search_end > rx.end())
+	{
+		search_end = rx.end();
+	}
+
+	if (search_end - search_begin > codec->shards)
+	{
+		int num_shards = 0, num_data_shards = 0;
+		size_t max_size = 0;
+		auto first = search_begin;
+
+		char** shards = new char*[codec->shards];
+		size_t* shard_sizes = new size_t[codec->shards];
+		bool* flags = new bool[codec->shards];
+
+		memset(shards, 0, sizeof(char*));
+		memset(shard_sizes, 0, sizeof(size_t) * codec->shards);
+		memset(flags, 0, sizeof(bool) * codec->shards);
+
+		for (auto i = search_begin; i != search_end; ++i)
+		{
+			if (itimediff(i->pkt.seqid(), shard_end) > 0)
+			{
+				break;
+			}
+			else if (itimediff(i->pkt.seqid(), shard_begin) >= 0)
+			{
+				shards[i->pkt.seqid() % codec->shards] = i->pkt.data();
+				shard_sizes[i->pkt.seqid() % codec->shards] = i->pkt.buf.size() - 6;
+				flags[i->pkt.seqid() % codec->shards] = true;
+				num_shards++;
+				if (i->pkt.flag() == FEC_TYPE_DATA)
+				{
+					num_data_shards++;
+				}
+				if (num_shards == 1)
+				{
+					first = i;
+				}
+				max_size = std::max(max_size, i->pkt.buf.size() - 6);
+			}
+		}
+
+		if (num_data_shards == codec->data_shards)
+		{
+			rx.erase(first, first + num_shards);
+		}
+		else if (num_shards >= codec->data_shards)
+		{
+			for (int i = 0; i < codec->shards; ++i)
+			{
+				if (shards[i] != nullptr)
+				{
+					char* new_buf = new char[max_size];
+					memcpy_s(new_buf, max_size, shards[i], shard_sizes[i]);
+					memset(new_buf + shard_sizes[i], 0, sizeof(char) * (max_size - shard_sizes[i]));
+					
+				}
+				else
+				{
+					char* new_buf = new char[max_size];
+					memset(new_buf, 0, sizeof(char) * max_size);
+				}
+			}
+
+			auto err = reed_solomon_reconstruct(codec, (unsigned char**)shards, (unsigned char*)flags, codec->shards, max_size);
+			if (err >= 0)
+			{
+				for (int i = 0; i < codec->data_shards; ++i)
+				{
+					if (!flags[i])
+					{
+						IUINT16 rsize = 0;
+						ikcp_decode16u(shards[i], &rsize);
+						if (rsize <= max_size && rsize >= 2)
+						{
+							std::vector<char> rshard(shards[i] + 2, shards[i] + rsize);
+							recovered.push_back(std::move(rshard));
+						}
+					}
+				}
+			}
+			rx.erase(first, first + num_shards);
+
+			for (int i = 0; i < codec->shards; ++i)
+			{
+				delete[] shards[i];
+			}
+		}
+
+		delete[] shards;
+		delete[] shard_sizes;
+		delete[] flags;
+	}
+
+	if (rx.size() > rxlimit)
+	{
+		rx.erase(rx.begin(), rx.begin() + rx.size() - rxlimit);
+	}
+
+	auto current = iclock();
+	auto expire_iter = rx.begin();
+	for (; expire_iter != rx.end(); expire_iter++)
+	{
+		if (itimediff(current, expire_iter->ts) > FEC_EXPIRE)
+		{
+			continue;
+		}
+		break;
+	}
+	rx.erase(rx.begin(), expire_iter);
+
+	return recovered;
 }
 
-fec_decoder::fec_decoder()
+fec_encoder::fec_encoder(int data_shards, int parity_shards)
 {
-	this->rxlimit = FEC_RX_MULTI * 3;
+	codec = reed_solomon_new(data_shards, parity_shards);
+	paws = 0xffffffff / (codec->shards * codec->shards);
+	next = 0;
+	shard_cache = std::vector<std::vector<char>>(codec->shards);
+	shard_count = 0;
+	max_size = 0;
 }
 
-fec_decoder::~fec_decoder() {}
+fec_encoder::~fec_encoder()
+{
+	reed_solomon_release(codec);
+}
+
+std::vector<std::vector<char>> fec_encoder::encode(const char* buf, const size_t len)
+{
+	std::vector<std::vector<char>> result;
+	std::vector<char> new_buf(len + FEC_HEADER_SIZE + 2);
+	ikcp_encode32u(new_buf.data(), next);
+	ikcp_encode16u(new_buf.data() + 4, FEC_TYPE_DATA);
+	next++;
+	ikcp_encode16u(new_buf.data() + FEC_HEADER_SIZE, new_buf.size());
+	memcpy(new_buf.data() + FEC_HEADER_SIZE + 2, buf, len);
+	max_size = std::max((IUINT32)new_buf.size(), max_size);
+
+	result.push_back(new_buf);
+
+	shard_cache[shard_count] = std::move(new_buf);
+	shard_count++;
+
+	if (shard_count == codec->data_shards)
+	{
+		char** cache = new char*[codec->shards];
+			
+		for (int i = 0; i < codec->data_shards; ++i)
+		{
+			shard_cache[i].resize(max_size);
+			cache[i] = shard_cache[i].data() + FEC_HEADER_SIZE;
+		}
+
+		auto block_size = max_size - FEC_HEADER_SIZE;
+
+		for (int i = codec->data_shards; i < codec->shards; ++i)
+		{
+			cache[i] = new char[block_size];
+		}
+
+		auto err = reed_solomon_encode2(codec, (unsigned char**)cache, codec->shards, block_size);
+
+		if (err >= 0)
+		{
+			for (int i = codec->data_shards; i < codec->shards; ++i)
+			{
+				std::vector<char> new_buf(max_size);
+				ikcp_encode32u(new_buf.data(), next);
+				ikcp_encode16u(new_buf.data() + 4, FEC_TYPE_PARITY);
+				memcpy(new_buf.data() + FEC_HEADER_SIZE, cache[i], block_size);
+				next = (next + 1) % paws;
+
+				result.push_back(std::move(new_buf));
+			}
+		}
+
+		for (int i = codec->data_shards; i < codec->shards; ++i)
+		{
+			delete[] cache[i];
+		}
+
+		shard_count = 0;
+		max_size = 0;
+	}
+
+	return result;
+}

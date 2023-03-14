@@ -67,13 +67,11 @@ namespace std
 
 struct fec_packet
 {
-	char* buf = nullptr;
+	std::vector<char> buf;
 
 	IUINT32 seqid();
 	IUINT16 flag();
 	char* data();
-
-	~fec_packet();
 };
 
 struct fec_element
@@ -83,6 +81,11 @@ struct fec_element
 };
 
 const IUINT32 FEC_RX_MULTI = 3;
+const IUINT16 FEC_TYPE_DATA = 0xf1;
+const IUINT16 FEC_TYPE_PARITY = 0xf2;
+const IINT32 FEC_EXPIRE = 60000;
+
+const size_t FEC_HEADER_SIZE = 6;
 
 struct fec_decoder
 {
@@ -91,9 +94,31 @@ struct fec_decoder
 
 	reed_solomon* codec;
 
-	fec_decoder();
+	fec_decoder(int data_shards, int parity_shards);
 	~fec_decoder();
+
+	std::vector<std::vector<char>> decode(fec_packet& in);
 };
+
+struct fec_encoder
+{
+	reed_solomon* codec;
+
+	IUINT32 paws;
+	IUINT32 next;
+
+	IUINT32 shard_count;
+	IUINT32 max_size;
+
+	std::vector<std::vector<char>> shard_cache;
+
+	fec_encoder(int data_shards, int parity_shards);
+	~fec_encoder();
+
+	std::vector<std::vector<char>> encode(const char* buf, const size_t len);
+};
+
+
 
 // Function Definitions
 
@@ -103,10 +128,13 @@ std::string ntop(const sockaddr* addr);
 
 const int KCP_NOT_ALTERED = -114;
 
+struct kcp_connection;
+
 struct udp_output_userdata
 {
 	SOCKET socket;
 	sockaddr_in6 remote_addr;
+	kcp_connection* connection;
 };
 
 struct kcp_manager;
@@ -117,6 +145,9 @@ struct kcp_connection
 	ikcpcb* kcpcb;
 	itimer_evt* update_timer;
 	IUINT32 last_input;
+
+	fec_encoder* encoder;
+	fec_decoder* decoder;
 
 	kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv);
 
