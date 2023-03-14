@@ -858,13 +858,13 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 		search_begin = rx.begin();
 	}
 
-	auto search_end = search_begin + codec->shards - 1;
+	auto search_end = search_begin + codec->shards;
 	if (search_end > rx.end())
 	{
 		search_end = rx.end();
 	}
 
-	if (search_end - search_begin > codec->shards)
+	if (search_end - search_begin >= codec->shards)
 	{
 		int num_shards = 0, num_data_shards = 0;
 		size_t max_size = 0;
