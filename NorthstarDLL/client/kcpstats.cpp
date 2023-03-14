@@ -51,8 +51,8 @@ static inline IINT32 itimediff(IUINT32 later, IUINT32 earlier)
 
 const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "RTO", "LOS%", "RTS%"};
 
-#define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 124, 150))
-#define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(68, 67, 67, 102))
+#define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 120, 140))
+#define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140))
 
 #define KCP_PURPLE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(127, 0, 255, 255))
 #define KCP_RED_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 0, 0, 255))
@@ -159,8 +159,8 @@ void draw_kcp_stats()
 			ImGui::EndTable();
 		}
 
-		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));
-		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 160));
+		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
+		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
 		if (ImPlot::BeginPlot("##SRTT", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
@@ -177,8 +177,8 @@ void draw_kcp_stats()
 			ImPlot::EndPlot();
 		}
 		ImGui::SameLine();
-		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));
-		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(68, 67, 67, 160));
+		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
+		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
 		if (ImPlot::BeginPlot("##RTS%", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 		{
 			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
