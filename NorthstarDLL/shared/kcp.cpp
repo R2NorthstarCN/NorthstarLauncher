@@ -917,7 +917,7 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 					memset(new_buf + shard_sizes[i], 0, sizeof(char) * (max_size - shard_sizes[i]));
 					
 				}
-				else
+				else if (i < codec->data_shards)
 				{
 					char* new_buf = new char[max_size];
 					memset(new_buf, 0, sizeof(char) * max_size);
@@ -929,7 +929,7 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 			{
 				for (int i = 0; i < codec->data_shards; ++i)
 				{
-					if (!flags[i])
+					if (!flags[i] && shards[i] != nullptr)
 					{
 						IUINT16 rsize = 0;
 						ikcp_decode16u(shards[i], &rsize);
@@ -945,7 +945,10 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 
 			for (int i = 0; i < codec->shards; ++i)
 			{
-				delete[] shards[i];
+				if (shards[i] != nullptr)
+				{
+					delete[] shards[i];
+				}
 			}
 		}
 
