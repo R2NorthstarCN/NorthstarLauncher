@@ -65,39 +65,40 @@ namespace std
 
 // FEC
 
-struct fec_packet
-{
-	std::vector<char> buf;
-
-	IUINT32 seqid();
-	IUINT16 flag();
-	char* data();
-};
-
-struct fec_element
-{
-	fec_packet pkt;
-	IUINT32 ts;
-};
-
+const 
 const IUINT32 FEC_RX_MULTI = 3;
 const IUINT16 FEC_TYPE_DATA = 0xf1;
 const IUINT16 FEC_TYPE_PARITY = 0xf2;
 const IINT32 FEC_EXPIRE = 60000;
 
-const size_t FEC_HEADER_SIZE = 6;
+const IUINT32 FEC_HEADER_OFFSET_SEQID = 0;
+const IUINT32 FEC_HEADER_OFFSET_FLAG = FEC_HEADER_OFFSET_SEQID + 4;
+const IUINT32 FEC_HEADER_OFFSET_DATA = FEC_HEADER_OFFSET_SEQID + FEC_HEADER_OFFSET_FLAG + 2;
+
+IUINT32 fec_seqid(const char* buf);
+IUINT16 fec_flag(const char* buf);
+IUINT16 fec_data(const char* buf);
+
+struct fec_element
+{
+	std::vector<char> buf;
+	IUINT32 ts;
+};
 
 struct fec_decoder
 {
 	IUINT32 rxlimit;
 	std::vector<fec_element> rx;
 
+	std::vector<std::vector<char>> decode_cache;
+	std::vector<char> flag_cache;
+
 	reed_solomon* codec;
 
 	fec_decoder(int data_shards, int parity_shards);
 	~fec_decoder();
 
-	std::vector<std::vector<char>> decode(fec_packet& in);
+	std::vector<std::vector<char>> decode(const char* buf, int len);
 };
 
 struct fec_encoder
@@ -115,7 +116,7 @@ struct fec_encoder
 	fec_encoder(int data_shards, int parity_shards);
 	~fec_encoder();
 
-	std::vector<std::vector<char>> encode(const char* buf, const size_t len);
+	std::vector<std::vector<char>> encode(const char* buf, int len);
 };
 
 

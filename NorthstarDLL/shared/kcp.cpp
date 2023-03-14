@@ -439,28 +439,38 @@ void kcp_update_timer_cb(void* data, void* user)
 	itimer_evt_start(&manager->timer_mgr, connection->update_timer, next, 1);
 }
 
-void kcp_fec_aware_input(kcp_connection* connection, std::vector<char> &buf)
+void kcp_fec_aware_input(kcp_connection* connection, std::vector<char>& buf)
 {
-	IUINT16 fec_flag = 0;
-	ikcp_decode16u(buf.data() + 4, &fec_flag);
-	if ((fec_flag == FEC_TYPE_DATA || fec_flag == FEC_TYPE_PARITY) && buf.size() > FEC_HEADER_SIZE + 2)
+	IUINT16 flag = fec_flag(buf.data());
+
+	if ((flag == FEC_TYPE_DATA || flag == FEC_TYPE_PARITY) && buf.size() > FEC_HEADER_OFFSET_DATA + 2)
 	{
-		fec_packet pkt { buf };
-		auto recovered = connection->decoder->decode(pkt);
-		if (fec_flag == FEC_TYPE_DATA)
+		auto recovered = connection->decoder->decode(buf.data(), buf.size());
+		if (flag == FEC_TYPE_DATA)
 		{
-			auto input_result = ikcp_input(connection->kcpcb, pkt.data(), pkt.buf.size() - FEC_HEADER_SIZE - 2);
+			auto input_result =
+				ikcp_input(connection->kcpcb, buf.data() + FEC_HEADER_OFFSET_DATA + 2, buf.size() - FEC_HEADER_OFFSET_DATA - 2);
 			if (input_result < 0)
 			{
-				spdlog::error("[KCP] Input error: {}", input_result);
+				spdlog::error("[KCP] Input error 1: {} {}", input_result, ikcp_getconv(buf.data() + FEC_HEADER_OFFSET_DATA + 2));
 			}
 		}
 		for (const auto& rpkt : recovered)
 		{
-			auto input_result = ikcp_input(connection->kcpcb, rpkt.data(), rpkt.size());
+			if (rpkt.size() < 2)
+			{
+				continue;
+			}
+			IUINT16 sz = 0;
+			ikcp_decode16u(rpkt.data(), &sz);
+			if (sz > rpkt.size() || sz < 2)
+			{
+				continue;
+			}
+			auto input_result = ikcp_input(connection->kcpcb, rpkt.data() + 2, sz - 2);
 			if (input_result < 0)
 			{
-				spdlog::error("[KCP] Input error: {}", input_result);
+				spdlog::error("[KCP] Input error 2: {}", input_result);
 			}
 		}
 	}
@@ -469,7 +479,7 @@ void kcp_fec_aware_input(kcp_connection* connection, std::vector<char> &buf)
 		auto input_result = ikcp_input(connection->kcpcb, buf.data(), buf.size());
 		if (input_result < 0)
 		{
-			spdlog::error("[KCP] Input error: {}", input_result);
+			spdlog::error("[KCP] Input error 3: {}", input_result);
 		}
 	}
 }
@@ -798,41 +808,32 @@ kcp_connection::~kcp_connection()
 	delete decoder;
 }
 
-IUINT32 fec_packet::seqid()
+IUINT32 fec_seqid(const char* buf)
 {
-	if (buf.size() < 4)
-	{
-		return 0;
-	}
 	IUINT32 result = 0;
-	ikcp_decode32u(buf.data(), &result);
+	ikcp_decode32u(buf + FEC_HEADER_OFFSET_SEQID, &result);
 	return result;
 }
 
-IUINT16 fec_packet::flag()
+IUINT16 fec_flag(const char* buf)
 {
-	if (buf.size() < 2)
-	{
-		return 0;
-	}
 	IUINT16 result = 0;
-	ikcp_decode16u(buf.data() + 4, &result);
+	ikcp_decode16u(buf + FEC_HEADER_OFFSET_FLAG, &result);
 	return result;
 }
 
-char* fec_packet::data()
+char* fec_data(char* buf)
 {
-	if (buf.size() < FEC_HEADER_SIZE + 2)
-	{
-		return nullptr;
-	}
-	return buf.data() + FEC_HEADER_SIZE + 2;
+	return buf + FEC_HEADER_OFFSET_DATA;
 }
 
 fec_decoder::fec_decoder(int data_shards, int parity_shards)
 {
 	rxlimit = FEC_RX_MULTI * (data_shards + parity_shards);
 	codec = reed_solomon_new(data_shards, parity_shards);
+
+	decode_cache = std::vector<std::vector<char>>(codec->shards);
+	flag_cache = std::vector<char>(codec->shards);
 }
 
 fec_decoder::~fec_decoder()
@@ -840,67 +841,83 @@ fec_decoder::~fec_decoder()
 	reed_solomon_release(codec);
 }
 
-std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
+std::vector<std::vector<char>> fec_decoder::decode(const char* buf, int len)
 {
 	std::vector<std::vector<char>> recovered;
-
-	auto insert_iter = rx.rend();
-	for (auto i = rx.rbegin(); i != rx.rend(); ++i)
+	if (len < FEC_HEADER_OFFSET_DATA)
 	{
-		if (in.seqid() == i->pkt.seqid())
+		return recovered;
+	}
+
+	int n = rx.size() - 1;
+	int insert_idx = 0;
+	for (int i = n; i >= 0; i--)
+	{
+		if (fec_seqid(buf) == fec_seqid(rx[i].buf.data()))
 		{
 			return recovered;
 		}
-		else if (itimediff(in.seqid(), i->pkt.seqid()) > 0)
+		else if (itimediff(fec_seqid(buf), fec_seqid(rx[i].buf.data())) > 0)
 		{
-			insert_iter = i;
+			insert_idx = i + 1;
 			break;
 		}
 	}
-	auto pkt_iter = rx.insert(insert_iter.base(), {in, iclock()});
 
-	IUINT32 shard_begin = in.seqid() - in.seqid() % codec->shards;
-	IUINT32 shard_end = shard_begin + codec->shards - 1;
+	fec_element elem = {std::vector<char>(buf, buf + len), iclock()};
 
-	auto search_begin = pkt_iter - in.seqid() % codec->shards;
-	if (search_begin < rx.begin())
+	if (insert_idx == n + 1)
 	{
-		search_begin = rx.begin();
+		rx.push_back(elem);
+	}
+	else
+	{
+		rx.push_back({std::vector<char>(), 0});
+		memmove_s(rx.data() + insert_idx + 1, rx.size() - (insert_idx + 1), rx.data() + insert_idx, rx.size() - (insert_idx + 1));
+		rx[insert_idx] = elem;
 	}
 
-	auto search_end = search_begin + codec->shards;
-	if (search_end > rx.end())
+	IUINT32 shard_begin = fec_seqid(buf) - fec_seqid(buf) % (IUINT32)(codec->shards);
+	IUINT32 shard_end = shard_begin + (IUINT32)(codec->shards) - 1;
+
+	int search_begin = insert_idx - (int)(fec_seqid(buf) % (IUINT32)(codec->shards));
+	if (search_begin < 0)
 	{
-		search_end = rx.end();
+		search_begin = 0;
+	}
+	int search_end = search_begin + codec->shards - 1;
+	if (search_end >= rx.size())
+	{
+		search_end = rx.size() - 1;
 	}
 
-	if (search_end - search_begin >= codec->shards)
+	if (search_end - search_begin + 1 >= codec->data_shards)
 	{
-		int num_shards = 0, num_data_shards = 0;
-		size_t max_size = 0;
-		auto first = search_begin;
+		int num_shards = 0, num_data_shards = 0, first = 0, max_size = 0;
 
-		char** shards = new char*[codec->shards];
-		size_t* shard_sizes = new size_t[codec->shards];
-		bool* flags = new bool[codec->shards];
+		auto& shards = decode_cache;
+		auto& shards_flag = flag_cache;
 
-		memset(shards, 0, sizeof(char*) * codec->shards);
-		memset(shard_sizes, 0, sizeof(size_t) * codec->shards);
-		memset(flags, 0, sizeof(bool) * codec->shards);
-
-		for (auto i = search_begin; i != search_end; ++i)
+		for (int i = 0; i < shards.size(); i++)
 		{
-			if (itimediff(i->pkt.seqid(), shard_end) > 0)
+			shards[i] = std::vector<char>();
+			shards_flag[i] = false;
+		}
+
+		for (int i = search_begin; i <= search_end; i++)
+		{
+			auto seqid = fec_seqid(rx[i].buf.data());
+			if (itimediff(seqid, shard_end) > 0)
 			{
 				break;
 			}
-			else if (itimediff(i->pkt.seqid(), shard_begin) >= 0)
+			else if (itimediff(seqid, shard_begin) >= 0)
 			{
-				shards[i->pkt.seqid() % codec->shards] = i->pkt.data();
-				shard_sizes[i->pkt.seqid() % codec->shards] = i->pkt.buf.size() - 6;
-				flags[i->pkt.seqid() % codec->shards] = true;
+				shards[seqid % (IUINT32)(codec->shards)] =
+					std::vector<char>(fec_data(rx[i].buf.data()), fec_data(rx[i].buf.data()) + rx[i].buf.size() - FEC_HEADER_OFFSET_DATA);
+				shards_flag[seqid % (IUINT32)(codec->shards)] = true;
 				num_shards++;
-				if (i->pkt.flag() == FEC_TYPE_DATA)
+				if (fec_flag(rx[i].buf.data()) == FEC_TYPE_DATA)
 				{
 					num_data_shards++;
 				}
@@ -908,80 +925,63 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 				{
 					first = i;
 				}
-				max_size = std::max(max_size, i->pkt.buf.size() - 6);
+				if (shards[seqid % (IUINT32)(codec->shards)].size() > max_size)
+				{
+					max_size = shards[seqid % (IUINT32)(codec->shards)].size();
+				}
 			}
 		}
 
 		if (num_data_shards == codec->data_shards)
 		{
-			rx.erase(first, first + num_shards);
+			rx.erase(rx.begin() + first, rx.begin() + first + num_shards);
 		}
 		else if (num_shards >= codec->data_shards)
 		{
-			for (int i = 0; i < codec->shards; ++i)
+			std::vector<char*> temp(shards.size());
+			for (int i = 0; i < shards.size(); ++i)
 			{
-				if (shards[i] != nullptr)
-				{
-					char* new_buf = new char[max_size];
-					memcpy_s(new_buf, max_size, shards[i], shard_sizes[i]);
-					memset(new_buf + shard_sizes[i], 0, sizeof(char) * (max_size - shard_sizes[i]));
-				}
-				else
-				{
-					char* new_buf = new char[max_size];
-					memset(new_buf, 0, sizeof(char) * max_size);
-				}
+				shards[i].resize(max_size, 0);
+				temp[i] = shards[i].data();
 			}
-
-			auto err = reed_solomon_reconstruct(codec, (unsigned char**)shards, (unsigned char*)flags, codec->shards, max_size);
+			auto err =
+				reed_solomon_reconstruct(codec, (unsigned char**)temp.data(), (unsigned char*)shards_flag.data(), shards.size(), max_size);
 			if (err >= 0)
 			{
-				for (int i = 0; i < codec->data_shards; ++i)
+				for (int k = 0; k < codec->data_shards; k++)
 				{
-					if (!flags[i] && shards[i] != nullptr)
+					if (!shards_flag[k])
 					{
-						IUINT16 rsize = 0;
-						ikcp_decode16u(shards[i], &rsize);
-						if (rsize <= max_size && rsize >= 2)
-						{
-							std::vector<char> rshard(shards[i] + 2, shards[i] + rsize);
-							recovered.push_back(std::move(rshard));
-						}
+						recovered.push_back(shards[k]);
 					}
 				}
 			}
-			rx.erase(first, first + num_shards);
-
-			for (int i = 0; i < codec->shards; ++i)
-			{
-				if (shards[i] != nullptr)
-				{
-					delete[] shards[i];
-				}
-			}
+			rx.erase(rx.begin() + first, rx.begin() + first + num_shards);
 		}
-
-		delete[] shards;
-		delete[] shard_sizes;
-		delete[] flags;
 	}
 
 	if (rx.size() > rxlimit)
 	{
-		rx.erase(rx.begin(), rx.begin() + rx.size() - rxlimit);
+		rx.erase(rx.begin(), rx.begin() + 1);
 	}
 
 	auto current = iclock();
-	auto expire_iter = rx.begin();
-	for (; expire_iter != rx.end(); expire_iter++)
+	int num_expired = 0;
+
+	for (int i = 0; i < rx.size(); ++i)
 	{
-		if (itimediff(current, expire_iter->ts) > FEC_EXPIRE)
+		if (itimediff(current, rx[i].ts) > FEC_EXPIRE)
 		{
+			num_expired++;
 			continue;
 		}
 		break;
 	}
-	rx.erase(rx.begin(), expire_iter);
+
+	if (num_expired > 0)
+	{
+		rx.erase(rx.begin(), rx.begin() + num_expired);
+	}
 
 	return recovered;
 }
@@ -989,11 +989,13 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 fec_encoder::fec_encoder(int data_shards, int parity_shards)
 {
 	codec = reed_solomon_new(data_shards, parity_shards);
-	paws = 0xffffffff / (codec->shards * codec->shards);
+	paws = 0xffffffff / ((IUINT32)codec->shards * (IUINT32)codec->shards);
 	next = 0;
-	shard_cache = std::vector<std::vector<char>>(codec->shards);
+
 	shard_count = 0;
 	max_size = 0;
+
+	shard_cache = std::vector<std::vector<char>>(codec->shards);
 }
 
 fec_encoder::~fec_encoder()
@@ -1001,58 +1003,50 @@ fec_encoder::~fec_encoder()
 	reed_solomon_release(codec);
 }
 
-std::vector<std::vector<char>> fec_encoder::encode(const char* buf, const size_t len)
+std::vector<std::vector<char>> fec_encoder::encode(const char* buf, int len)
 {
 	std::vector<std::vector<char>> result;
-	std::vector<char> new_buf(len + FEC_HEADER_SIZE + 2);
-	ikcp_encode32u(new_buf.data(), next);
-	ikcp_encode16u(new_buf.data() + 4, FEC_TYPE_DATA);
+
+	std::vector<char> new_buf(len + FEC_HEADER_OFFSET_DATA + 2);
+
+	ikcp_encode32u(new_buf.data() + FEC_HEADER_OFFSET_SEQID, next);
+	ikcp_encode16u(new_buf.data() + FEC_HEADER_OFFSET_FLAG, FEC_TYPE_DATA);
 	next++;
-	ikcp_encode16u(new_buf.data() + FEC_HEADER_SIZE, new_buf.size());
-	memcpy(new_buf.data() + FEC_HEADER_SIZE + 2, buf, len);
-	max_size = std::max((IUINT32)new_buf.size(), max_size);
+
+	ikcp_encode16u(new_buf.data() + FEC_HEADER_OFFSET_DATA, len + 2);
+
+	memcpy(new_buf.data() + FEC_HEADER_OFFSET_DATA + 2, buf, len);
+
+	shard_cache[shard_count] = new_buf;
+	shard_count++;
 
 	result.push_back(new_buf);
 
-	shard_cache[shard_count] = std::move(new_buf);
-	shard_count++;
+	if (new_buf.size() > max_size)
+	{
+		max_size = new_buf.size();
+	}
 
 	if (shard_count == codec->data_shards)
 	{
-		char** cache = new char*[codec->shards];
-			
-		for (int i = 0; i < codec->data_shards; ++i)
+		std::vector<char*> temp(shard_cache.size());
+
+		for (int i = 0; i < shard_cache.size(); ++i)
 		{
-			shard_cache[i].resize(max_size);
-			cache[i] = shard_cache[i].data() + FEC_HEADER_SIZE;
+			shard_cache[i].resize(max_size, 0);
+			temp[i] = shard_cache[i].data() + FEC_HEADER_OFFSET_DATA;
 		}
 
-		auto block_size = max_size - FEC_HEADER_SIZE;
-
-		for (int i = codec->data_shards; i < codec->shards; ++i)
-		{
-			cache[i] = new char[block_size];
-		}
-
-		auto err = reed_solomon_encode2(codec, (unsigned char**)cache, codec->shards, block_size);
-
+		auto err = reed_solomon_encode2(codec, (unsigned char**)temp.data(), shard_cache.size(), max_size - FEC_HEADER_OFFSET_DATA);
 		if (err >= 0)
 		{
-			for (int i = codec->data_shards; i < codec->shards; ++i)
+			for (int i = codec->data_shards; i < shard_cache.size(); ++i)
 			{
-				std::vector<char> new_buf(max_size);
-				ikcp_encode32u(new_buf.data(), next);
-				ikcp_encode16u(new_buf.data() + 4, FEC_TYPE_PARITY);
-				memcpy(new_buf.data() + FEC_HEADER_SIZE, cache[i], block_size);
+				ikcp_encode32u(shard_cache[i].data() + FEC_HEADER_OFFSET_SEQID, next);
+				ikcp_encode16u(shard_cache[i].data() + FEC_HEADER_OFFSET_FLAG, FEC_TYPE_PARITY);
 				next = (next + 1) % paws;
-
-				result.push_back(std::move(new_buf));
+				result.push_back(shard_cache[i]);
 			}
-		}
-
-		for (int i = codec->data_shards; i < codec->shards; ++i)
-		{
-			delete[] cache[i];
 		}
 
 		shard_count = 0;
