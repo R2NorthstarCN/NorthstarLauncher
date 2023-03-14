@@ -234,6 +234,8 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	ikcp_allocator(_malloc_base, _free_base);
 	reed_solomon_allocator(_malloc_base, _free_base, _calloc_base);
 
+	fec_init();
+
 	spdlog::info("[KCP] WSA Hooks Initialized: {}", enable_wsa_hooks());
 
 	RegisterConCommand("kcp_connect", ConCommand_kcp_connect, "connect to kcp server", FCVAR_CLIENTDLL);
@@ -699,7 +701,14 @@ int kcp_manager::intercept_recvfrom(SOCKET socket, char* buf, int len, sockaddr*
 			auto peek_size = ikcp_peeksize(entry.second->kcpcb);
 			char* new_buf = new char[peek_size];
 			ikcp_recv(entry.second->kcpcb, new_buf, peek_size);
-			memcpy_s(buf, len, new_buf, peek_size);
+			if (len < peek_size)
+			{
+				memcpy(buf, new_buf, len);
+			}
+			else
+			{
+				memcpy(buf, new_buf, peek_size);
+			}
 			memcpy_s(from, *fromlen, &entry.first, sizeof(sockaddr_in6));
 			WSASetLastError(WSAEMSGSIZE);
 			return SOCKET_ERROR;
@@ -712,16 +721,17 @@ int kcp_manager::intercept_recvfrom(SOCKET socket, char* buf, int len, sockaddr*
 	std::pair<sockaddr_in6, std::vector<char>> data;
 	if (unaltered_data.try_pop(data))
 	{
-		memcpy_s(buf, len, data.second.data(), data.second.size());
 		memcpy_s(from, *fromlen, &data.first, sizeof(sockaddr_in6));
 		if (len < data.second.size())
 		{
+			memcpy(buf, data.second.data(), len);
 			WSASetLastError(WSAEMSGSIZE);
 			return SOCKET_ERROR;
 		}
 		else
 		{
-			return std::min(len, (int)data.second.size());
+			memcpy(buf, data.second.data(), data.second.size());
+			return data.second.size();
 		}
 	}
 	return KCP_NOT_ALTERED;
@@ -874,7 +884,7 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 		size_t* shard_sizes = new size_t[codec->shards];
 		bool* flags = new bool[codec->shards];
 
-		memset(shards, 0, sizeof(char*));
+		memset(shards, 0, sizeof(char*) * codec->shards);
 		memset(shard_sizes, 0, sizeof(size_t) * codec->shards);
 		memset(flags, 0, sizeof(bool) * codec->shards);
 
@@ -915,9 +925,8 @@ std::vector<std::vector<char>> fec_decoder::decode(fec_packet& in)
 					char* new_buf = new char[max_size];
 					memcpy_s(new_buf, max_size, shards[i], shard_sizes[i]);
 					memset(new_buf + shard_sizes[i], 0, sizeof(char) * (max_size - shard_sizes[i]));
-					
 				}
-				else if (i < codec->data_shards)
+				else
 				{
 					char* new_buf = new char[max_size];
 					memset(new_buf, 0, sizeof(char) * max_size);

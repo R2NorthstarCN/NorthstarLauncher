@@ -5,12 +5,12 @@
 
 /* use small value to save memory */
 #ifndef DATA_SHARDS_MAX
-#define DATA_SHARDS_MAX (255)
+#define DATA_SHARDS_MAX (16)
 #endif
 
-static void* (*reed_solomon_malloc)(size_t) = malloc;
-static void (*reed_solomon_free)(void*) = free;
-static void* (*reed_solomon_calloc)(size_t, size_t) = calloc;
+static void* (*reed_solomon_malloc)(size_t) = 0;
+static void (*reed_solomon_free)(void*) = 0;
+static void* (*reed_solomon_calloc)(size_t, size_t) = 0;
 
 /* use other memory allocator */
 #ifndef RS_MALLOC
