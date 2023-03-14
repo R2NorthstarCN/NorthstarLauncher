@@ -73,13 +73,7 @@ struct fec_packet
 	IUINT16 flag();
 	char* data();
 
-	~fec_packet()
-	{
-		if (buf != nullptr)
-		{
-			delete[] buf;
-		}
-	}
+	~fec_packet();
 };
 
 struct fec_element

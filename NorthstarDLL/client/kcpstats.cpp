@@ -83,6 +83,13 @@ void draw_kcp_stats()
 	window_flags |= ImGuiWindowFlags_NoInputs;
 
 	ImGui::SetNextWindowFocus();
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.0);
+
 	ImGui::Begin("KCP Stats", NULL, window_flags);
 
 	auto current_size = ImGui::GetWindowSize();
@@ -150,24 +157,6 @@ void draw_kcp_stats()
 			ImGui::Text("%.2f ", 100.0 * retrans_segs / (out_segs == 0 ? 1 : out_segs));
 			KCP_SET_VALUE_BG;
 			ImGui::EndTable();
-		}
-
-		IINT32 y_limit = 0;
-		if (y_srtt_max > 200)
-		{
-			y_limit = 400;
-		}
-		else if (y_srtt_max > 100)
-		{
-			y_limit = 200;
-		}
-		else if (y_srtt_max > 50)
-		{
-			y_limit = 100;
-		}
-		else
-		{
-			y_limit = 50;
 		}
 
 		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(68, 67, 67, 102));

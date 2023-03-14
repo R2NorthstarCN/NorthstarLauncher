@@ -778,7 +778,17 @@ char* fec_packet::data()
 	return this->buf + 6;
 }
 
+fec_packet::~fec_packet()
+{
+	if (buf != nullptr)
+	{
+		delete[] buf;
+	}
+}
+
 fec_decoder::fec_decoder()
 {
-
+	this->rxlimit = FEC_RX_MULTI * 3;
 }
+
+fec_decoder::~fec_decoder() {}
