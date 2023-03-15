@@ -416,7 +416,7 @@ int udp_output(const char* buf, int len, ikcpcb* kcp, void* user)
 	{
 		return org_sendto(userdata->socket, buf, len, 0, (const sockaddr*)&userdata->remote_addr, sizeof(sockaddr_in6));
 	}
-	
+
 	return 0;
 }
 
@@ -888,14 +888,7 @@ std::vector<std::vector<char>> fec_decoder::decode(const char* buf, int len)
 
 	fec_element elem = {std::vector<char>(buf, buf + len), iclock()};
 
-	if (insert_idx == n + 1)
-	{
-		rx.push_back(elem);
-	}
-	else
-	{
-		rx.insert(rx.begin() + insert_idx, elem);
-	}
+	rx.insert(rx.begin() + insert_idx, elem);
 
 	IUINT32 shard_begin = fec_seqid(buf) - fec_seqid(buf) % (IUINT32)(codec->shards);
 	IUINT32 shard_end = shard_begin + (IUINT32)(codec->shards) - 1;
