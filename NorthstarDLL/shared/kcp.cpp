@@ -8,6 +8,9 @@
 
 kcp_manager* g_kcp_manager = nullptr;
 
+ConVar* Cvar_kcp_timer_interval;
+ConVar* Cvar_kcp_timeout;
+
 AUTOHOOK_INIT()
 
 // Hooked Original Function Definitions

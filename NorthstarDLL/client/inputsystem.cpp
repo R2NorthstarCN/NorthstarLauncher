@@ -3,6 +3,7 @@
 #include "logging/sourceconsole.h"
 #include "dedicated/dedicated.h"
 #include "core/tier0.h"
+/*
 AUTOHOOK_INIT()
 
 bool m_fullscreen = true;
@@ -137,3 +138,4 @@ ON_DLL_LOAD("inputsystem.dll", IMESUPPORT, (CModule module))
 	AUTOHOOK_DISPATCH_MODULE(inputsystem.dll)
 	m_CandidateList.ImeEnabled = false;
 }
+*/

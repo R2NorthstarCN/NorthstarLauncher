@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "vguihooks.h"
 #include "inputsystem.h"
-#include "shared/kcp.h"
 #include "dedicated/dedicated.h"
+
 AUTOHOOK_INIT()
 SourceInterface<vgui::ISurface>* m_vguiSurface;
 SourceInterface<IMatSystemSurface>* m_matSystemSurface;
@@ -39,6 +39,7 @@ void DrawTextOnScreen(std::string text)
 	// spdlog::info("DRAW");
 	(*m_matSystemSurface)->DrawColoredText(5, 960, 500, 255, 255, 255, 255, text.c_str());
 }
+/*
 void RenderIMECandidateList()
 {
 	if (!localGameSettings || !(*localGameSettings)->isChatEnabled)
@@ -124,7 +125,7 @@ void RenderIMECandidateList()
 		x_ += 2 + widthPx;
 	}
 }
-
+*/
 //const char* KCP_NETGRAPH_LABELS[] = {"SRTT", "RTO", "LOS%", "RTS%"};
 //#define KCP_NETGRAPH_PRINT(x, y, fmt, ...) (*m_matSystemSurface)->DrawColoredText(5, x, y, 255, 255, 255, 255, fmt, __VA_ARGS__)
 
