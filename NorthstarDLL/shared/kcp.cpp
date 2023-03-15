@@ -205,22 +205,11 @@ void ConCommand_kcp_listen(const CCommand& args)
 		spdlog::warn("not enough args");
 		return;
 	}
-	else if (splited.size() == 1)
-	{
-		splited.push_back("1");
-	}
 
 	in6_addr parsed {};
 	if (inet_pton(AF_INET6, splited[0].c_str(), &parsed) != 1)
 	{
 		spdlog::warn("invalid addr");
-		return;
-	}
-
-	IUINT32 conv = atoi(splited[1].c_str());
-	if (conv == 0)
-	{
-		spdlog::warn("invalid conv");
 		return;
 	}
 
