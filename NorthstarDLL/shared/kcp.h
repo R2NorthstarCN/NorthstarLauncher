@@ -153,6 +153,8 @@ struct kcp_connection
 	fec_encoder* encoder;
 	fec_decoder* decoder;
 
+	IUINT64 fec_reconstruct_segs = 0;
+
 	kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv);
 
 	~kcp_connection();
@@ -162,7 +164,7 @@ struct kcp_stats
 {
 	IINT32 srtt, rto;
 
-	IUINT64 out_segs, lost_segs, retrans_segs;
+	IUINT64 out_segs, lost_segs, retrans_segs, reconstruct_segs;
 };
 
 struct kcp_manager

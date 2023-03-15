@@ -60,16 +60,19 @@ struct sliding_window
 	std::vector<double> axis_x;
 	std::vector<double> smoothed;
 
+	bool smooth = true;
+	bool delta = false;
+	double last_val = 0;
+
 	sliding_window(size_t samples);
+	sliding_window(size_t samples, bool smooth, bool delta);
 	~sliding_window();
 
 	void rotate(double new_val);
-	void rotate_delta(double new_val);
 
 	std::pair<std::vector<double>&, std::vector<double>&> get_axes();
 	std::pair<std::vector<double>&, std::vector<double>&> get_smoothed_axes();
 
-	double lastest();
 	double avg();
 	double sum();
 	double max();

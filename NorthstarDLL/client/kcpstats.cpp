@@ -52,7 +52,7 @@ static inline IINT32 itimediff(IUINT32 later, IUINT32 earlier)
 	return ((IINT32)(later - earlier));
 }
 
-const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%"};
+const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%", "RCS%"};
 
 #define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 120, 140))
 #define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140))
@@ -65,11 +65,13 @@ const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%"};
 #define KCP_GREEN_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(0, 255, 0, 255))
 
 sliding_window sw_srtt(50);
-sliding_window sw_retrans_segs(10);
-sliding_window sw_lost_segs(10);
-sliding_window sw_out_segs(10);
+sliding_window sw_retrans_segs(10, false, true);
+sliding_window sw_lost_segs(10, false, true);
+sliding_window sw_reconstruct_segs(10, false, true);
+sliding_window sw_out_segs(10, false, true);
 sliding_window sw_rts(50);
 sliding_window sw_los(50);
+sliding_window sw_rcs(50);
 
 IUINT32 last_rotate = iclock();
 
@@ -111,17 +113,19 @@ void draw_kcp_stats()
 		if (kcp_stats.size() > 0)
 		{
 			sw_srtt.rotate(kcp_stats[0].second.srtt);
-			sw_retrans_segs.rotate_delta(kcp_stats[0].second.retrans_segs);
-			sw_lost_segs.rotate_delta(kcp_stats[0].second.lost_segs);
-			sw_out_segs.rotate_delta(kcp_stats[0].second.out_segs);
+			sw_retrans_segs.rotate(kcp_stats[0].second.retrans_segs);
+			sw_lost_segs.rotate(kcp_stats[0].second.lost_segs);
+			sw_out_segs.rotate(kcp_stats[0].second.out_segs);
+			sw_reconstruct_segs.rotate(kcp_stats[0].second.reconstruct_segs);
 			sw_rts.rotate(100.0 * sw_retrans_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
 			sw_los.rotate(100.0 * sw_lost_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
+			sw_rcs.rotate(100.0 * sw_reconstruct_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
 		}
 
 		last_rotate = iclock();
 	}
 
-	if (ImGui::BeginTable("kcp_stats", 6))
+	if (ImGui::BeginTable("kcp_stats", 8))
 	{
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
@@ -140,7 +144,14 @@ void draw_kcp_stats()
 		ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
 		KCP_SET_HEADER_BG;
 		ImGui::TableNextColumn();
-		ImGui::Text("%.2f ", sw_rts.smoothed[0]);
+		ImGui::Text("%.2f", sw_rts.smoothed[0]);
+		KCP_SET_VALUE_BG;
+		KCP_SET_VALUE_BG;
+		ImGui::TableNextColumn();
+		ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
+		KCP_SET_HEADER_BG;
+		ImGui::TableNextColumn();
+		ImGui::Text("%.2f ", sw_rcs.smoothed[0]);
 		KCP_SET_VALUE_BG;
 		ImGui::EndTable();
 	}
@@ -208,6 +219,17 @@ sliding_window::sliding_window(size_t samples)
 	}
 }
 
+sliding_window::sliding_window(size_t samples, bool smooth, bool delta)
+{
+	this->smooth = smooth;
+	this->delta = delta;
+	raw = std::vector<double>(samples);
+	for (int i = 0; i < raw.size(); ++i)
+	{
+		axis_x.push_back(i);
+	}
+}
+
 sliding_window::~sliding_window()
 {
 	delete smoother;
@@ -216,15 +238,19 @@ sliding_window::~sliding_window()
 void sliding_window::rotate(double new_val)
 {
 	std::rotate(raw.rbegin(), raw.rbegin() + 1, raw.rend());
-	raw[0] = new_val;
-	smoothed = smoother->smooth(raw);
-}
-
-void sliding_window::rotate_delta(double new_val)
-{
-	std::rotate(raw.rbegin(), raw.rbegin() + 1, raw.rend());
-	raw[0] = new_val - raw[1];
-	smoothed = smoother->smooth(raw);
+	if (delta)
+	{
+		raw[0] = new_val - last_val;
+		last_val = new_val;
+	}
+	else
+	{
+		raw[0] = new_val;
+	}
+	if (smooth)
+	{
+		smoothed = smoother->smooth(raw);
+	}
 }
 
 std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_axes()
@@ -235,11 +261,6 @@ std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_axes()
 std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_smoothed_axes()
 {
 	return std::make_pair(std::ref(axis_x), std::ref(smoothed));
-}
-
-double sliding_window::lastest()
-{
-	return raw[0];
 }
 
 double sliding_window::avg()

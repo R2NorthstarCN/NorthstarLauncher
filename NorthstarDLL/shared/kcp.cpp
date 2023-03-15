@@ -472,6 +472,10 @@ void kcp_fec_aware_input(kcp_connection* connection, std::vector<char>& buf)
 			{
 				spdlog::error("[KCP] Input error 2: {}", input_result);
 			}
+			else
+			{
+				connection->fec_reconstruct_segs += 1;
+			}
 		}
 	}
 	else
@@ -761,9 +765,7 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 		stats.out_segs = connection->kcpcb->out_segs;
 		stats.lost_segs = connection->kcpcb->lost_segs;
 		stats.retrans_segs = connection->kcpcb->retrans_segs;
-		connection->kcpcb->out_segs = 0;
-		connection->kcpcb->lost_segs = 0;
-		connection->kcpcb->retrans_segs = 0;
+		stats.reconstruct_segs = connection->fec_reconstruct_segs;
 		result.push_back(std::make_pair(entry.first, stats));
 	}
 	return result;
