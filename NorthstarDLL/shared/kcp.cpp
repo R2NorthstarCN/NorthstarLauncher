@@ -563,7 +563,16 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 					else
 					{
 						lock1.unlock();
-						auto recv_conv = ikcp_getconv(buf.data());
+						IUINT16 flag = fec_flag(buf.data());
+						IUINT32 recv_conv = 0;
+						if (flag == FEC_TYPE_DATA || flag == FEC_TYPE_PARITY)
+						{
+							recv_conv = ikcp_getconv(buf.data() + FEC_HEADER_OFFSET_DATA + 2);
+						}
+						else
+						{
+							recv_conv = ikcp_getconv(buf.data());
+						}
 						std::unique_lock lock3(this->pending_connections_mutex);
 						if (pending_connections.contains(recv_conv))
 						{
