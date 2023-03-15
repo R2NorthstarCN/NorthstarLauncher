@@ -159,11 +159,6 @@ void ConCommand_kcp_connect(const CCommand& args)
 		return;
 	}
 	IUINT32 conv = atoi(splited[2].c_str());
-	if (conv == 0)
-	{
-		spdlog::warn("invalid conv");
-		return;
-	}
 
 	sockaddr_in6 remote_addr {};
 	remote_addr.sin6_family = AF_INET6;
