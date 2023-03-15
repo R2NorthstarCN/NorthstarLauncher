@@ -226,9 +226,6 @@ void ConCommand_kcp_listen(const CCommand& args)
 	spdlog::info("[KCP] Pending local <--> {}%{}", splited[0], conv);
 }
 
-ConVar* Cvar_kcp_timer_interval;
-ConVar* Cvar_kcp_timeout;
-
 ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 {
 	ikcp_allocator(_malloc_base, _free_base);
@@ -242,7 +239,7 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	RegisterConCommand("kcp_listen", ConCommand_kcp_listen, "listen new kcp conn", FCVAR_CLIENTDLL);
 
 	Cvar_kcp_timer_interval =
-		new ConVar("kcp_timer_interval", "10", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
+		new ConVar("kcp_timer_interval", "1", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
 	Cvar_kcp_timeout = new ConVar("kcp_timeout", "5000", FCVAR_NONE, "miliseconds to clean up the kcp connection.");
 
 	if (g_kcp_manager == nullptr)

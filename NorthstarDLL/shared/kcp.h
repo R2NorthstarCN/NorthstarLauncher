@@ -63,6 +63,9 @@ namespace std
 	};
 } // namespace std
 
+ConVar* Cvar_kcp_timer_interval;
+ConVar* Cvar_kcp_timeout;
+
 // FEC
 
 const 
