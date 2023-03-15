@@ -10,6 +10,7 @@ kcp_manager* g_kcp_manager = nullptr;
 
 ConVar* Cvar_kcp_timer_interval;
 ConVar* Cvar_kcp_timeout;
+ConVar* Cvar_kcp_outbound_fec;
 
 AUTOHOOK_INIT()
 
@@ -244,6 +245,7 @@ ON_DLL_LOAD("engine.dll", WSAHOOKS, (CModule module))
 	Cvar_kcp_timer_interval =
 		new ConVar("kcp_timer_interval", "1", FCVAR_NONE, "miliseconds between each kcp update, lower is better but consumes more CPU.");
 	Cvar_kcp_timeout = new ConVar("kcp_timeout", "5000", FCVAR_NONE, "miliseconds to clean up the kcp connection.");
+	Cvar_kcp_outbound_fec = new ConVar("kcp_outbound_fec", "1", FCVAR_NONE, "whether to disable outbound fec.");
 
 	if (g_kcp_manager == nullptr)
 	{
@@ -397,16 +399,24 @@ bool g_kcp_initialized()
 int udp_output(const char* buf, int len, ikcpcb* kcp, void* user)
 {
 	auto userdata = (udp_output_userdata*)user;
-	std::vector<std::vector<char>> encoded = userdata->connection->encoder->encode(buf, len);
-	for (const auto& pkt : encoded)
+	if (Cvar_kcp_outbound_fec->GetBool())
 	{
-		auto sendto_result =
-			org_sendto(userdata->socket, pkt.data(), pkt.size(), 0, (const sockaddr*)&userdata->remote_addr, sizeof(sockaddr_in6));
-		if (sendto_result < 0)
+		std::vector<std::vector<char>> encoded = userdata->connection->encoder->encode(buf, len);
+		for (const auto& pkt : encoded)
 		{
-			return sendto_result;
+			auto sendto_result =
+				org_sendto(userdata->socket, pkt.data(), pkt.size(), 0, (const sockaddr*)&userdata->remote_addr, sizeof(sockaddr_in6));
+			if (sendto_result < 0)
+			{
+				return sendto_result;
+			}
 		}
 	}
+	else
+	{
+		return org_sendto(userdata->socket, buf, len, 0, (const sockaddr*)&userdata->remote_addr, sizeof(sockaddr_in6));
+	}
+	
 	return 0;
 }
 
@@ -443,7 +453,7 @@ void kcp_fec_aware_input(kcp_connection* connection, std::vector<char>& buf)
 {
 	IUINT16 flag = fec_flag(buf.data());
 
-	if ((flag == FEC_TYPE_DATA || flag == FEC_TYPE_PARITY) && buf.size() > FEC_HEADER_OFFSET_DATA + 2)
+	if (flag == FEC_TYPE_DATA || flag == FEC_TYPE_PARITY)
 	{
 		auto recovered = connection->decoder->decode(buf.data(), buf.size());
 		if (flag == FEC_TYPE_DATA)
@@ -798,8 +808,8 @@ kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& rem
 	auto current = iclock();
 	this->last_input = current;
 
-	encoder = new fec_encoder(1, 1);
-	decoder = new fec_decoder(1, 1);
+	encoder = new fec_encoder(3, 2);
+	decoder = new fec_decoder(3, 2);
 
 	std::unique_lock lock1(kcp_manager->timer_mgr_mutex);
 	itimer_evt_start(&kcp_manager->timer_mgr, update_timer, 0, 1);

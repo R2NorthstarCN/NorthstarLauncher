@@ -65,6 +65,7 @@ namespace std
 
 extern ConVar* Cvar_kcp_timer_interval;
 extern ConVar* Cvar_kcp_timeout;
+extern ConVar* Cvar_kcp_outbound_fec;
 
 // FEC
 
