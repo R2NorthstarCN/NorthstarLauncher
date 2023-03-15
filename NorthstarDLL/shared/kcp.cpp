@@ -454,6 +454,10 @@ void kcp_fec_aware_input(kcp_connection* connection, std::vector<char>& buf)
 			{
 				spdlog::error("[KCP] Input error 1: {} {}", input_result, ikcp_getconv(buf.data() + FEC_HEADER_OFFSET_DATA + 2));
 			}
+			else
+			{
+				connection->in_packets += 1;
+			}
 		}
 		for (const auto& rpkt : recovered)
 		{
@@ -474,7 +478,8 @@ void kcp_fec_aware_input(kcp_connection* connection, std::vector<char>& buf)
 			}
 			else
 			{
-				connection->fec_reconstruct_segs += 1;
+				connection->in_packets += 1;
+				connection->reconstruct_packets += 1;
 			}
 		}
 	}
@@ -484,6 +489,10 @@ void kcp_fec_aware_input(kcp_connection* connection, std::vector<char>& buf)
 		if (input_result < 0)
 		{
 			spdlog::error("[KCP] Input error 3: {}", input_result);
+		}
+		else
+		{
+			connection->in_packets += 1;
 		}
 	}
 }
@@ -765,7 +774,8 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 		stats.out_segs = connection->kcpcb->out_segs;
 		stats.lost_segs = connection->kcpcb->lost_segs;
 		stats.retrans_segs = connection->kcpcb->retrans_segs;
-		stats.reconstruct_segs = connection->fec_reconstruct_segs;
+		stats.in_packets = connection->in_packets;
+		stats.reconstruct_packets = connection->reconstruct_packets;
 		result.push_back(std::make_pair(entry.first, stats));
 	}
 	return result;
@@ -903,7 +913,7 @@ std::vector<std::vector<char>> fec_decoder::decode(const char* buf, int len)
 		for (int i = 0; i < shards.size(); i++)
 		{
 			shards[i] = std::vector<char>();
-			shards_flag[i] = false;
+			shards_flag[i] = true;
 		}
 
 		for (int i = search_begin; i <= search_end; i++)
@@ -915,9 +925,8 @@ std::vector<std::vector<char>> fec_decoder::decode(const char* buf, int len)
 			}
 			else if (itimediff(seqid, shard_begin) >= 0)
 			{
-				shards[seqid % (IUINT32)(codec->shards)] =
-					std::vector<char>(fec_data(rx[i].buf.data()), fec_data(rx[i].buf.data()) + rx[i].buf.size() - FEC_HEADER_OFFSET_DATA);
-				shards_flag[seqid % (IUINT32)(codec->shards)] = true;
+				shards[seqid % (IUINT32)(codec->shards)] = std::vector<char>(rx[i].buf.begin() + FEC_HEADER_OFFSET_DATA, rx[i].buf.end());
+				shards_flag[seqid % (IUINT32)(codec->shards)] = false;
 				num_shards++;
 				if (fec_flag(rx[i].buf.data()) == FEC_TYPE_DATA)
 				{
@@ -952,7 +961,7 @@ std::vector<std::vector<char>> fec_decoder::decode(const char* buf, int len)
 			{
 				for (int k = 0; k < codec->data_shards; k++)
 				{
-					if (!shards_flag[k])
+					if (shards_flag[k])
 					{
 						recovered.push_back(shards[k]);
 					}

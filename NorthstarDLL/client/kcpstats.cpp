@@ -65,10 +65,14 @@ const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%", "RCS%"};
 #define KCP_GREEN_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(0, 255, 0, 255))
 
 sliding_window sw_srtt(50);
+
 sliding_window sw_retrans_segs(10, false, true);
 sliding_window sw_lost_segs(10, false, true);
-sliding_window sw_reconstruct_segs(10, false, true);
 sliding_window sw_out_segs(10, false, true);
+
+sliding_window sw_reconstruct_packets(10, false, true);
+sliding_window sw_in_packets(10, false, true);
+
 sliding_window sw_rts(50);
 sliding_window sw_los(50);
 sliding_window sw_rcs(50);
@@ -116,10 +120,11 @@ void draw_kcp_stats()
 			sw_retrans_segs.rotate(kcp_stats[0].second.retrans_segs);
 			sw_lost_segs.rotate(kcp_stats[0].second.lost_segs);
 			sw_out_segs.rotate(kcp_stats[0].second.out_segs);
-			sw_reconstruct_segs.rotate(kcp_stats[0].second.reconstruct_segs);
+			sw_in_packets.rotate(kcp_stats[0].second.in_packets);
+			sw_reconstruct_packets.rotate(kcp_stats[0].second.reconstruct_packets);
 			sw_rts.rotate(100.0 * sw_retrans_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
 			sw_los.rotate(100.0 * sw_lost_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
-			sw_rcs.rotate(100.0 * sw_reconstruct_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
+			sw_rcs.rotate(100.0 * sw_reconstruct_packets.sum() / (sw_in_packets.sum() == 0 ? 1 : sw_in_packets.sum()));
 		}
 
 		last_rotate = iclock();
