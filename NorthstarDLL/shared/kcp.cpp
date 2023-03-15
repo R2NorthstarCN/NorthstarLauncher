@@ -894,9 +894,7 @@ std::vector<std::vector<char>> fec_decoder::decode(const char* buf, int len)
 	}
 	else
 	{
-		rx.push_back({std::vector<char>(), 0});
-		memmove_s(rx.data() + insert_idx + 1, rx.size() - (insert_idx + 1), rx.data() + insert_idx, rx.size() - (insert_idx + 1));
-		rx[insert_idx] = elem;
+		rx.insert(rx.begin() + insert_idx, elem);
 	}
 
 	IUINT32 shard_begin = fec_seqid(buf) - fec_seqid(buf) % (IUINT32)(codec->shards);
