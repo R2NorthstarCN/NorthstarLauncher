@@ -224,8 +224,7 @@ void ConCommand_kcp_listen(const CCommand& args)
 		return;
 	}
 
-	std::unique_lock lock(g_kcp_manager->pending_connections_mutex);
-	g_kcp_manager->pending_connections[parsed].insert(conv);
+	IUINT32 conv = g_kcp_manager->get_next_conv();
 
 	spdlog::info("[KCP] Pending local <--> {}%{}", splited[0], conv);
 }
@@ -582,9 +581,9 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 						lock1.unlock();
 						auto recv_conv = ikcp_getconv(buf.data());
 						std::unique_lock lock3(this->pending_connections_mutex);
-						if (pending_connections.contains(from.sin6_addr) && pending_connections[from.sin6_addr].contains(recv_conv))
+						if (pending_connections.contains(recv_conv))
 						{
-							pending_connections[from.sin6_addr].erase(recv_conv);
+							pending_connections.erase(recv_conv);
 							auto connection = new kcp_connection(this, from, recv_conv);
 							kcp_fec_aware_input(connection, buf);
 							std::unique_lock lock4(this->established_connections_mutex);
@@ -789,6 +788,13 @@ std::vector<std::pair<sockaddr_in6, kcp_stats>> kcp_manager::get_stats()
 		result.push_back(std::make_pair(entry.first, stats));
 	}
 	return result;
+}
+
+IUINT32 kcp_manager::get_next_conv()
+{
+	std::unique_lock lock(pending_connections_mutex);
+	pending_connections.insert(next_conv);
+	return next_conv++;
 }
 
 kcp_connection::kcp_connection(kcp_manager* kcp_manager, const sockaddr_in6& remote_addr, IUINT32 conv)

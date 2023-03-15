@@ -175,7 +175,7 @@ struct kcp_manager
 	std::unordered_map<sockaddr_in6, kcp_connection*> established_connections;
 
 	std::mutex pending_connections_mutex;
-	std::unordered_map<in6_addr, std::unordered_set<IUINT32>> pending_connections;
+	std::unordered_set<IUINT32> pending_connections;
 
 	concurrency::concurrent_queue<std::pair<sockaddr_in6, std::vector<char>>> unaltered_data;
 
@@ -189,6 +189,8 @@ struct kcp_manager
 
 	IUINT32 timer_interval;
 
+	IUINT32 next_conv = 0;
+
 	kcp_manager(IUINT32 timer_interval);
 	~kcp_manager();
 
@@ -199,6 +201,7 @@ struct kcp_manager
 	int intercept_recvfrom(SOCKET socket, char* buf, int len, sockaddr* from, int* fromlen);
 
 	std::vector<std::pair<sockaddr_in6, kcp_stats>> get_stats();
+	IUINT32 get_next_conv();
 };
 
 extern kcp_manager* g_kcp_manager;

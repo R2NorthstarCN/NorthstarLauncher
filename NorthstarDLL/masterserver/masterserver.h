@@ -40,6 +40,7 @@ struct RemoteServerConnectionInfo
 	std::string authToken;
 	in_addr ip;
 	unsigned short port;
+	unsigned int conv;
 };
 
 struct MainMenuPromoData
