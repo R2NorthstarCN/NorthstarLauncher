@@ -188,7 +188,7 @@ void draw_kcp_stats()
 		double avg = sw_srtt.avg();
 		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
 		ImPlot::PopStyleColor();
-		ImPlot::PlotText(fmt::format("SRTT", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 8));
+		ImPlot::PlotText(fmt::format("SRTT", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 7));
 		ImPlot::EndPlot();
 	}
 
@@ -217,7 +217,7 @@ void draw_kcp_stats()
 		double avg = sw_rts.avg();
 		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
 		ImPlot::PopStyleColor();
-		ImPlot::PlotText(fmt::format("RTS%", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 8));
+		ImPlot::PlotText(fmt::format("RTS%", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 7));
 		ImPlot::EndPlot();
 	}
 
