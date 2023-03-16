@@ -36,16 +36,7 @@
     <ClCompile Include="imgui_widgets.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="backends\imgui_impl_dx9.cpp">
-      <Filter>源文件\backends</Filter>
-    </ClCompile>
-    <ClCompile Include="backends\imgui_impl_dx10.cpp">
-      <Filter>源文件\backends</Filter>
-    </ClCompile>
     <ClCompile Include="backends\imgui_impl_dx11.cpp">
-      <Filter>源文件\backends</Filter>
-    </ClCompile>
-    <ClCompile Include="backends\imgui_impl_dx12.cpp">
       <Filter>源文件\backends</Filter>
     </ClCompile>
     <ClCompile Include="backends\imgui_impl_win32.cpp">
@@ -83,16 +74,7 @@
     <ClInclude Include="imstb_truetype.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="backends\imgui_impl_dx9.h">
-      <Filter>头文件\backends</Filter>
-    </ClInclude>
-    <ClInclude Include="backends\imgui_impl_dx10.h">
-      <Filter>头文件\backends</Filter>
-    </ClInclude>
     <ClInclude Include="backends\imgui_impl_dx11.h">
-      <Filter>头文件\backends</Filter>
-    </ClInclude>
-    <ClInclude Include="backends\imgui_impl_dx12.h">
       <Filter>头文件\backends</Filter>
     </ClInclude>
     <ClInclude Include="backends\imgui_impl_win32.h">

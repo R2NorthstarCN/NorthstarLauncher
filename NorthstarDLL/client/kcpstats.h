@@ -63,6 +63,7 @@ struct sliding_window
 	bool smooth = true;
 	bool delta = false;
 	double last_val = 0;
+	double sumed = 0;
 
 	sliding_window(size_t samples);
 	sliding_window(size_t samples, bool smooth, bool delta);
@@ -73,7 +74,9 @@ struct sliding_window
 	std::pair<std::vector<double>&, std::vector<double>&> get_axes();
 	std::pair<std::vector<double>&, std::vector<double>&> get_smoothed_axes();
 
+	double latest_smoothed();
 	double avg();
+	double avg_smoothed();
 	double sum();
 	double max();
 	double min();

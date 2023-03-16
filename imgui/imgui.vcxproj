@@ -140,10 +140,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="backends\imgui_impl_dx10.cpp" />
     <ClCompile Include="backends\imgui_impl_dx11.cpp" />
-    <ClCompile Include="backends\imgui_impl_dx12.cpp" />
-    <ClCompile Include="backends\imgui_impl_dx9.cpp" />
     <ClCompile Include="backends\imgui_impl_win32.cpp" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_demo.cpp" />
@@ -156,10 +153,7 @@
     <ClCompile Include="kiero.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="backends\imgui_impl_dx10.h" />
     <ClInclude Include="backends\imgui_impl_dx11.h" />
-    <ClInclude Include="backends\imgui_impl_dx12.h" />
-    <ClInclude Include="backends\imgui_impl_dx9.h" />
     <ClInclude Include="backends\imgui_impl_win32.h" />
     <ClInclude Include="imconfig.h" />
     <ClInclude Include="imgui.h" />

@@ -6,3 +6,5 @@
 #define NORTHSTAR_FILE_VERSION "v1.12.8\0"
 // clang-format on
 #endif
+
+#define NORTHSTAR_DEDICATED_ONLY 0

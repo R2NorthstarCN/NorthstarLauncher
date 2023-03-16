@@ -1,13 +1,15 @@
 #include "imgui.h"
+#include "dedicated/dedicated.h"
+
+std::vector<imgui_draw*> draw_functions;
+
+#if !NORTHSTAR_DEDICATED_ONLY
 
 #include "core/memalloc.h"
-#include "dedicated/dedicated.h"
 #include "imgui/implot.h"
 #include "imgui/imgui_internal.h"
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-std::vector<imgui_draw*> draw_functions;
 
 Present oPresent;
 HWND window = NULL;
@@ -79,6 +81,32 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT 
 	return oPresent(pSwapChain, SyncInterval, Flags);
 }
 
+void setup_thread_func()
+{
+	while (true)
+	{
+		if (kiero::init(kiero::RenderType::D3D11) != kiero::Status::Success)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			continue;
+		}
+		if (kiero::bind(8, (void**)&oPresent, hkPresent) != kiero::Status::Success)
+		{
+			spdlog::error("[ImGui] bind failed");
+			break;
+		}
+	}
+}
+
+#else
+
+void setup_thread_func()
+{
+	return;
+}
+
+#endif
+
 void imgui_setup()
 {
 	if (IsDedicatedServer())
@@ -86,23 +114,7 @@ void imgui_setup()
 		return;
 	}
 	// ImGui::GetAllocatorFunctions(imgui_malloc, (ImGuiMemFreeFunc*)imgui_free, nullptr);
-	std::jthread setup_thread(
-		[]()
-		{
-			while (true)
-			{
-				if (kiero::init(kiero::RenderType::D3D11) != kiero::Status::Success)
-				{
-					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-					continue;
-				}
-				if (kiero::bind(8, (void**)&oPresent, hkPresent) != kiero::Status::Success)
-				{
-					spdlog::error("[ImGui] bind failed");
-					break;
-				}
-			}
-		});
+	std::jthread setup_thread(setup_thread_func);
 	setup_thread.detach();
 }
 

@@ -57,6 +57,7 @@ const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%", "RCS%"};
 #define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 120, 140))
 #define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140))
 
+#define KCP_WHITE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 255, 255))
 #define KCP_PURPLE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(127, 0, 255, 255))
 #define KCP_RED_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 0, 0, 255))
 #define KCP_ORANGE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 128, 0, 255))
@@ -163,6 +164,9 @@ void draw_kcp_stats()
 
 	ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
 	ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
+
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
+
 	if (ImPlot::BeginPlot("##SRTT", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 	{
 		auto y_srtt_max = sw_srtt.max();
@@ -178,11 +182,16 @@ void draw_kcp_stats()
 			ImPlotCond_Always);
 		auto data = sw_srtt.get_smoothed_axes();
 		ImPlot::PlotLine("SRTT", data.first.data(), data.second.data(), data.first.size());
+		ImPlot::PopStyleColor();
+		KCP_WHITE_LINE;
+		double avg = sw_srtt.avg();
+		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
+		ImPlot::PopStyleColor();
 		ImPlot::EndPlot();
 	}
+
 	ImGui::SameLine();
-	ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
-	ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
+
 	if (ImPlot::BeginPlot("##RTS%", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
 	{
 		auto y_rts_max = sw_rts.max();
@@ -200,8 +209,17 @@ void draw_kcp_stats()
 			ImPlotCond_Always);
 		auto data = sw_rts.get_smoothed_axes();
 		ImPlot::PlotLine("RTS%", data.first.data(), data.second.data(), data.first.size());
+		ImPlot::PopStyleColor();
+		KCP_WHITE_LINE;
+		double avg = sw_rts.avg();
+		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
+		ImPlot::PopStyleColor();
 		ImPlot::EndPlot();
 	}
+
+	ImGui::PopStyleVar();
+
+	ImPlot::PopStyleColor(2);
 
 	ImGui::End();
 }
@@ -242,6 +260,7 @@ sliding_window::~sliding_window()
 
 void sliding_window::rotate(double new_val)
 {
+	sumed -= *(raw.end() - 1);
 	std::rotate(raw.rbegin(), raw.rbegin() + 1, raw.rend());
 	if (delta)
 	{
@@ -252,6 +271,7 @@ void sliding_window::rotate(double new_val)
 	{
 		raw[0] = new_val;
 	}
+	sumed += raw[0];
 	if (smooth)
 	{
 		smoothed = smoother->smooth(raw);
@@ -268,19 +288,19 @@ std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_smooth
 	return std::make_pair(std::ref(axis_x), std::ref(smoothed));
 }
 
+double sliding_window::latest_smoothed()
+{
+	return smoothed[0];
+}
+
 double sliding_window::avg()
 {
-	return sum() / raw.size();
+	return sumed / raw.size();
 }
 
 double sliding_window::sum()
 {
-	double result = 0;
-	for (const auto& e : raw)
-	{
-		result += e;
-	}
-	return result;
+	return sumed;
 }
 
 double sliding_window::max()
