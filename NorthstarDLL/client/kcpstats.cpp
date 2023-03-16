@@ -57,7 +57,7 @@ const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%", "RCS%"};
 #define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 120, 140))
 #define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140))
 
-#define KCP_WHITE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 255, 255))
+#define KCP_WHITE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 255, 160))
 #define KCP_PURPLE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(127, 0, 255, 255))
 #define KCP_RED_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 0, 0, 255))
 #define KCP_ORANGE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 128, 0, 255))
@@ -172,13 +172,14 @@ void draw_kcp_stats()
 		auto y_srtt_max = sw_srtt.max();
 		ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
 		ImPlot::SetupAxis(ImAxis_Y1, NULL);
+		auto y_limit = y_srtt_max > 200	  ? (KCP_RED_LINE, 400)
+					   : y_srtt_max > 100 ? (KCP_ORANGE_LINE, 200)
+					   : y_srtt_max > 50  ? (KCP_LIME_LINE, 100)
+										  : (KCP_GREEN_LINE, 50);
 		ImPlot::SetupAxisLimits(
 			ImAxis_Y1,
 			0,
-			y_srtt_max > 200   ? (KCP_RED_LINE, 400)
-			: y_srtt_max > 100 ? (KCP_ORANGE_LINE, 200)
-			: y_srtt_max > 50  ? (KCP_LIME_LINE, 100)
-							   : (KCP_GREEN_LINE, 50),
+			y_limit,
 			ImPlotCond_Always);
 		auto data = sw_srtt.get_smoothed_axes();
 		ImPlot::PlotLine("SRTT", data.first.data(), data.second.data(), data.first.size());
@@ -187,6 +188,7 @@ void draw_kcp_stats()
 		double avg = sw_srtt.avg();
 		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
 		ImPlot::PopStyleColor();
+		ImPlot::PlotText(fmt::format("SRTT", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 8));
 		ImPlot::EndPlot();
 	}
 
@@ -197,15 +199,16 @@ void draw_kcp_stats()
 		auto y_rts_max = sw_rts.max();
 		ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
 		ImPlot::SetupAxis(ImAxis_Y1, NULL);
+		auto y_limit = y_rts_max > 50.0	  ? (KCP_PURPLE_LINE, 100.0)
+					   : y_rts_max > 25.0 ? (KCP_RED_LINE, 50.0)
+					   : y_rts_max > 13.0 ? (KCP_ORANGE_LINE, 25.0)
+					   : y_rts_max > 6.0  ? (KCP_YELLOW_LINE, 13.0)
+					   : y_rts_max > 3.0  ? (KCP_LIME_LINE, 6.0)
+										  : (KCP_GREEN_LINE, 3.0);
 		ImPlot::SetupAxisLimits(
 			ImAxis_Y1,
 			0,
-			y_rts_max > 50.0   ? (KCP_PURPLE_LINE, 100.0)
-			: y_rts_max > 25.0 ? (KCP_RED_LINE, 50.0)
-			: y_rts_max > 13.0 ? (KCP_ORANGE_LINE, 25.0)
-			: y_rts_max > 6.0  ? (KCP_YELLOW_LINE, 13.0)
-			: y_rts_max > 3.0  ? (KCP_LIME_LINE, 6.0)
-							   : (KCP_GREEN_LINE, 3.0),
+			y_limit,
 			ImPlotCond_Always);
 		auto data = sw_rts.get_smoothed_axes();
 		ImPlot::PlotLine("RTS%", data.first.data(), data.second.data(), data.first.size());
@@ -214,6 +217,7 @@ void draw_kcp_stats()
 		double avg = sw_rts.avg();
 		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
 		ImPlot::PopStyleColor();
+		ImPlot::PlotText(fmt::format("RTS%", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 8));
 		ImPlot::EndPlot();
 	}
 
