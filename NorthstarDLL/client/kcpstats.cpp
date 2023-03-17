@@ -1,3 +1,7 @@
+#include "ns_version.h"
+
+#if !NORTHSTAR_DEDICATED_ONLY
+
 #include "kcpstats.h"
 #include "client/imgui.h"
 #include "imgui/implot.h"
@@ -54,19 +58,6 @@ static inline IINT32 itimediff(IUINT32 later, IUINT32 earlier)
 
 const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%", "RCS%"};
 
-#define KCP_SET_HEADER_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(120, 120, 120, 140))
-#define KCP_SET_VALUE_BG ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140))
-
-#define KCP_WHITE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 255, 160))
-#define KCP_PURPLE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(127, 0, 255, 255))
-#define KCP_RED_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 0, 0, 255))
-#define KCP_ORANGE_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 128, 0, 255))
-#define KCP_YELLOW_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 0, 255))
-#define KCP_LIME_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(128, 255, 0, 255))
-#define KCP_GREEN_LINE ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(0, 255, 0, 255))
-
-sliding_window sw_srtt(50);
-
 sliding_window sw_retrans_segs(10, false, true);
 sliding_window sw_lost_segs(10, false, true);
 sliding_window sw_out_segs(10, false, true);
@@ -74,11 +65,13 @@ sliding_window sw_out_segs(10, false, true);
 sliding_window sw_reconstruct_packets(10, false, true);
 sliding_window sw_in_packets(10, false, true);
 
+sliding_window sw_srtt(50);
 sliding_window sw_rts(50);
 sliding_window sw_los(50);
 sliding_window sw_rcs(50);
 
 IUINT32 last_rotate = iclock();
+bool has_connection = false;
 
 void draw_kcp_stats()
 {
@@ -86,30 +79,6 @@ void draw_kcp_stats()
 	{
 		return;
 	}
-
-	ImGuiWindowFlags window_flags = 0;
-	window_flags |= ImGuiWindowFlags_NoDecoration;
-	window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
-	window_flags |= ImGuiWindowFlags_NoResize;
-	window_flags |= ImGuiWindowFlags_NoMove;
-	window_flags |= ImGuiWindowFlags_NoBackground;
-	window_flags |= ImGuiWindowFlags_NoInputs;
-
-	ImGui::SetNextWindowFocus();
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0);
-	ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0);
-	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0);
-	ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 0.0);
-	ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0);
-	ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.0);
-
-	ImGui::Begin("KCP Stats", NULL, window_flags);
-
-	auto current_size = ImGui::GetWindowSize();
-	auto main_viewport = ImGui::GetMainViewport();
-	auto viewport_pos = main_viewport->WorkPos;
-	auto viewport_size = main_viewport->WorkSize;
-	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y));
 
 	if (itimediff(iclock(), last_rotate) > Cvar_kcp_stats_interval->GetInt())
 	{
@@ -126,104 +95,153 @@ void draw_kcp_stats()
 			sw_rts.rotate(100.0 * sw_retrans_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
 			sw_los.rotate(100.0 * sw_lost_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
 			sw_rcs.rotate(100.0 * sw_reconstruct_packets.sum() / (sw_in_packets.sum() == 0 ? 1 : sw_in_packets.sum()));
+			has_connection = true;
+		}
+		else
+		{
+			has_connection = false;
 		}
 
 		last_rotate = iclock();
 	}
 
-	if (ImGui::BeginTable("kcp_stats", 8))
+	ImGuiWindowFlags window_flags = 0;
+	window_flags |= ImGuiWindowFlags_NoDecoration;
+	window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+	window_flags |= ImGuiWindowFlags_NoResize;
+	window_flags |= ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBackground;
+	window_flags |= ImGuiWindowFlags_NoInputs;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0);
+	ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.0);
+
+	ImGui::Begin("KCP Stats", NULL, window_flags);
+
+	auto current_size = ImGui::GetWindowSize();
+	auto main_viewport = ImGui::GetMainViewport();
+	auto viewport_pos = main_viewport->WorkPos;
+	auto viewport_size = main_viewport->WorkSize;
+	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y));
+
+	if (!has_connection)
 	{
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		ImGui::Text("%s", KCP_NETGRAPH_LABELS[0]);
-		KCP_SET_HEADER_BG;
-		ImGui::TableNextColumn();
-		ImGui::Text("%d", std::max((int)sw_srtt.smoothed[0], 0));
-		KCP_SET_VALUE_BG;
-		ImGui::TableNextColumn();
-		ImGui::Text("%s", KCP_NETGRAPH_LABELS[1]);
-		KCP_SET_HEADER_BG;
-		ImGui::TableNextColumn();
-		ImGui::Text("%.2f", std::max(sw_los.smoothed[0], 0.0));
-		KCP_SET_VALUE_BG;
-		ImGui::TableNextColumn();
-		ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
-		KCP_SET_HEADER_BG;
-		ImGui::TableNextColumn();
-		ImGui::Text("%.2f", std::max(sw_rts.smoothed[0], 0.0));
-		KCP_SET_VALUE_BG;
-		KCP_SET_VALUE_BG;
-		ImGui::TableNextColumn();
-		ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
-		KCP_SET_HEADER_BG;
-		ImGui::TableNextColumn();
-		ImGui::Text("%.2f ", std::max(sw_rcs.smoothed[0], 0.0));
-		KCP_SET_VALUE_BG;
-		ImGui::EndTable();
+		ImGui::Text("No KCP connection");
 	}
-
-	ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
-	ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
-
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
-
-	if (ImPlot::BeginPlot("##SRTT", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
+	else
 	{
-		auto y_srtt_max = sw_srtt.max();
-		ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
-		ImPlot::SetupAxis(ImAxis_Y1, NULL);
-		auto y_limit = y_srtt_max > 200	  ? (KCP_RED_LINE, 400)
-					   : y_srtt_max > 100 ? (KCP_ORANGE_LINE, 200)
-					   : y_srtt_max > 50  ? (KCP_LIME_LINE, 100)
-										  : (KCP_GREEN_LINE, 50);
-		ImPlot::SetupAxisLimits(
-			ImAxis_Y1,
-			0,
-			y_limit,
-			ImPlotCond_Always);
-		auto data = sw_srtt.get_smoothed_axes();
-		ImPlot::PlotLine("SRTT", data.first.data(), data.second.data(), data.first.size());
-		ImPlot::PopStyleColor();
-		KCP_WHITE_LINE;
-		double avg = sw_srtt.avg();
-		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
-		ImPlot::PopStyleColor();
-		ImPlot::PlotText(fmt::format("SRTT", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 7));
-		ImPlot::EndPlot();
+		if (ImGui::BeginTable("kcp_stats", 8))
+		{
+			ImGui::TableNextRow();
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[0]);
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%d", std::max((int)sw_srtt.latest_smoothed(), 0));
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[1]);
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%.2f", std::max(sw_los.latest_smoothed(), 0.0));
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%.2f", std::max(sw_rts.latest_smoothed(), 0.0));
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%.2f ", std::max(sw_rcs.latest_smoothed(), 0.0));
+
+			ImGui::EndTable();
+		}
+
+		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
+		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
+
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
+
+		if (ImPlot::BeginPlot("##SRTT", ImVec2(160, 100), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
+		{
+			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
+			ImPlot::SetupAxis(ImAxis_Y1, NULL);
+
+			auto y_max = sw_srtt.max();
+			double y_avg = sw_srtt.avg();
+
+			ImPlot::SetupAxisLimits(ImAxis_Y1, 0, y_max, ImPlotCond_Always);
+
+			y_avg < 30	  ? ImPlot::PushGreenLineColor()
+			: y_avg < 60  ? ImPlot::PushLimeLineColor()
+			: y_avg < 100 ? ImPlot::PushYellowLineColor()
+			: y_avg < 150 ? ImPlot::PushOrangeLineColor()
+			: y_avg < 200 ? ImPlot::PushRedLineColor()
+						  : ImPlot::PushPurpleLineColor();
+
+			auto data = sw_srtt.get_smoothed_axes();
+			ImPlot::PlotLine("SRTT", data.first.data(), data.second.data(), data.first.size());
+			ImPlot::PopStyleColor();
+
+			ImPlot::PushAvgLineColor();
+			ImPlot::PlotInfLines("AVG", &y_avg, 1, ImPlotInfLinesFlags_Horizontal);
+			ImPlot::PopStyleColor();
+
+			ImPlot::PlotText("SRTT", data.first.size() / 2.0, y_max, ImVec2(0, 7));
+			ImPlot::EndPlot();
+		}
+
+		ImGui::SameLine();
+
+		if (ImPlot::BeginPlot("##RTS%", ImVec2(160, 100), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
+		{
+			ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
+			ImPlot::SetupAxis(ImAxis_Y1, NULL);
+
+			auto y_max = sw_rts.max();
+			double y_avg = sw_rts.avg();
+
+			ImPlot::SetupAxisLimits(ImAxis_Y1, 0, y_max, ImPlotCond_Always);
+
+			y_avg < 3	 ? ImPlot::PushGreenLineColor()
+			: y_avg < 6	 ? ImPlot::PushLimeLineColor()
+			: y_avg < 10 ? ImPlot::PushYellowLineColor()
+			: y_avg < 15 ? ImPlot::PushOrangeLineColor()
+			: y_avg < 20 ? ImPlot::PushRedLineColor()
+						 : ImPlot::PushPurpleLineColor();
+
+			auto data = sw_rts.get_smoothed_axes();
+			ImPlot::PlotLine("RTS%", data.first.data(), data.second.data(), data.first.size());
+			ImPlot::PopStyleColor();
+
+			ImPlot::PushAvgLineColor();
+			ImPlot::PlotInfLines("AVG", &y_avg, 1, ImPlotInfLinesFlags_Horizontal);
+			ImPlot::PopStyleColor();
+
+			ImPlot::PlotText("RTS%", data.first.size() / 2.0, y_max, ImVec2(0, 7));
+			ImPlot::EndPlot();
+		}
+
+		ImGui::PopStyleVar();
+
+		ImPlot::PopStyleColor(2);
 	}
-
-	ImGui::SameLine();
-
-	if (ImPlot::BeginPlot("##RTS%", ImVec2(150, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
-	{
-		auto y_rts_max = sw_rts.max();
-		ImPlot::SetupAxis(ImAxis_X1, NULL, ImPlotAxisFlags_NoTickLabels);
-		ImPlot::SetupAxis(ImAxis_Y1, NULL);
-		auto y_limit = y_rts_max > 50.0	  ? (KCP_PURPLE_LINE, 100.0)
-					   : y_rts_max > 25.0 ? (KCP_RED_LINE, 50.0)
-					   : y_rts_max > 13.0 ? (KCP_ORANGE_LINE, 25.0)
-					   : y_rts_max > 6.0  ? (KCP_YELLOW_LINE, 13.0)
-					   : y_rts_max > 3.0  ? (KCP_LIME_LINE, 6.0)
-										  : (KCP_GREEN_LINE, 3.0);
-		ImPlot::SetupAxisLimits(
-			ImAxis_Y1,
-			0,
-			y_limit,
-			ImPlotCond_Always);
-		auto data = sw_rts.get_smoothed_axes();
-		ImPlot::PlotLine("RTS%", data.first.data(), data.second.data(), data.first.size());
-		ImPlot::PopStyleColor();
-		KCP_WHITE_LINE;
-		double avg = sw_rts.avg();
-		ImPlot::PlotInfLines("AVG", &avg, 1, ImPlotInfLinesFlags_Horizontal);
-		ImPlot::PopStyleColor();
-		ImPlot::PlotText(fmt::format("RTS%", avg).c_str(), data.first.size() / 2, y_limit, ImVec2(0, 7));
-		ImPlot::EndPlot();
-	}
-
-	ImGui::PopStyleVar();
-
-	ImPlot::PopStyleColor(2);
 
 	ImGui::End();
 }
@@ -380,12 +398,12 @@ double linear_regression::get_slope()
 int bandwidth_to_m(int degree, double bandwidth)
 {
 	double radius = (0.74548 + 0.24943 * degree) / bandwidth - 1.0;
-	return (int) std::round(radius);
+	return (int)std::round(radius);
 }
 
 std::vector<double> get_coeffs(int degree, int m)
 {
-	std::vector<std::vector<double>> &corr_for_deg = CORRECTION_DATA[degree / 2];
+	std::vector<std::vector<double>>& corr_for_deg = CORRECTION_DATA[degree / 2];
 	if (corr_for_deg.size() == 0)
 	{
 		return std::vector<double>();
@@ -516,3 +534,5 @@ std::vector<double> modified_sinc_smoother::smooth_except_boudaries(std::vector<
 	}
 	return smoothed;
 }
+
+#endif

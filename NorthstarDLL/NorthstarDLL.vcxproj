@@ -125,7 +125,6 @@
   <ItemGroup>
     <ClInclude Include="client\audio.h" />
     <ClInclude Include="client\imgui.h" />
-    <ClInclude Include="client\inputsystem.h" />
     <ClInclude Include="client\kcpstats.h" />
     <ClInclude Include="client\localchatwriter.h" />
     <ClInclude Include="client\r2client.h" />
@@ -202,7 +201,6 @@
     <ClCompile Include="client\clientruihooks.cpp" />
     <ClCompile Include="client\clientvideooverrides.cpp" />
     <ClCompile Include="client\imgui.cpp" />
-    <ClCompile Include="client\inputsystem.cpp" />
     <ClCompile Include="client\kcpstats.cpp" />
     <ClCompile Include="client\rejectconnectionfixes.cpp" />
     <ClCompile Include="client\debugoverlay.cpp" />

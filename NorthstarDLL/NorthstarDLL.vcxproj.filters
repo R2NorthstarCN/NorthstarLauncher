@@ -342,9 +342,6 @@
     <ClInclude Include="scripts\scriptmatchmakingevents.h">
       <Filter>Header Files\scripts</Filter>
     </ClInclude>
-    <ClInclude Include="client\inputsystem.h">
-      <Filter>Header Files\client</Filter>
-    </ClInclude>
     <ClInclude Include="client\vguihooks.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
@@ -630,9 +627,6 @@
       <Filter>Source Files\dedicated</Filter>
     </ClCompile>
     <ClCompile Include="client\rejectconnectionfixes.cpp">
-      <Filter>Source Files\client</Filter>
-    </ClCompile>
-    <ClCompile Include="client\inputsystem.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
     <ClCompile Include="client\vguihooks.cpp">

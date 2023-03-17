@@ -1,13 +1,14 @@
-#include "imgui.h"
+#include "ns_version.h"
 #include "dedicated/dedicated.h"
-
-std::vector<imgui_draw*> draw_functions;
 
 #if !NORTHSTAR_DEDICATED_ONLY
 
+#include "imgui.h"
 #include "core/memalloc.h"
 #include "imgui/implot.h"
 #include "imgui/imgui_internal.h"
+
+std::vector<imgui_draw*> draw_functions;
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -98,14 +99,55 @@ void setup_thread_func()
 	}
 }
 
-#else
-
-void setup_thread_func()
+void ImGui::TableCellHeaderBg()
 {
-	return;
+	ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(60, 60, 60, 140));
 }
 
-#endif
+void ImGui::TableCellValueBg()
+{
+	ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140));
+}
+
+void ImPlot::PushAvgLineColor()
+{
+	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 255, 160));
+}
+
+void ImPlot::PushPurpleLineColor()
+{
+	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(127, 0, 255, 255));
+}
+
+void ImPlot::PushRedLineColor()
+{
+	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 0, 0, 255));
+}
+
+void ImPlot::PushOrangeLineColor()
+{
+	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 128, 0, 255));
+}
+
+void ImPlot::PushYellowLineColor()
+{
+	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 0, 255));
+}
+
+void ImPlot::PushLimeLineColor()
+{
+	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(128, 255, 0, 255));
+}
+
+void ImPlot::PushGreenLineColor()
+{
+	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(0, 255, 0, 255));
+}
+
+void imgui_add_draw(imgui_draw* func)
+{
+	draw_functions.push_back(func);
+}
 
 void imgui_setup()
 {
@@ -118,7 +160,4 @@ void imgui_setup()
 	setup_thread.detach();
 }
 
-void imgui_add_draw(imgui_draw* func)
-{
-	draw_functions.push_back(func);
-}
+#endif

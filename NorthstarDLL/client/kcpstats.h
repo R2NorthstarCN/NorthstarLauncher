@@ -1,5 +1,7 @@
 #pragma once
 
+#if !NORTHSTAR_DEDICATED_ONLY
+
 extern ConVar* Cvar_kcp_stats;
 extern ConVar* Cvar_kcp_stats_interval;
 
@@ -81,3 +83,5 @@ struct sliding_window
 	double max();
 	double min();
 };
+
+#endif

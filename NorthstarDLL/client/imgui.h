@@ -15,7 +15,22 @@ typedef HRESULT(__stdcall* Present)(IDXGISwapChain* pSwapChain, UINT SyncInterva
 typedef LRESULT(CALLBACK* WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 typedef uintptr_t PTR;
 
-#endif
+namespace ImGui
+{
+	void TableCellHeaderBg();
+	void TableCellValueBg();
+} // namespace ImGui
+
+namespace ImPlot
+{
+	void PushAvgLineColor();
+	void PushPurpleLineColor();
+	void PushRedLineColor();
+	void PushOrangeLineColor();
+	void PushYellowLineColor();
+	void PushLimeLineColor();
+	void PushGreenLineColor();
+} // namespace ImPlot
 
 typedef void imgui_draw();
 
@@ -24,3 +39,5 @@ extern std::vector<imgui_draw*> draw_functions;
 void imgui_setup();
 
 void imgui_add_draw(imgui_draw* func);
+
+#endif

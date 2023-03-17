@@ -24,9 +24,6 @@
     <ClCompile Include="imgui.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="imgui_demo.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="imgui_draw.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
