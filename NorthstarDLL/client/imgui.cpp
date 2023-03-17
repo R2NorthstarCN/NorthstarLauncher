@@ -1,7 +1,4 @@
-#include "ns_version.h"
-#include "dedicated/dedicated.h"
-
-#if !NORTHSTAR_DEDICATED_ONLY
+#ifndef NORTHSTAR_DEDICATED_ONLY
 
 #include "imgui.h"
 #include "core/memalloc.h"
@@ -151,10 +148,6 @@ void imgui_add_draw(imgui_draw* func)
 
 void imgui_setup()
 {
-	if (IsDedicatedServer())
-	{
-		return;
-	}
 	// ImGui::GetAllocatorFunctions(imgui_malloc, (ImGuiMemFreeFunc*)imgui_free, nullptr);
 	std::jthread setup_thread(setup_thread_func);
 	setup_thread.detach();

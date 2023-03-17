@@ -1,6 +1,6 @@
 #pragma once
 
-#if !NORTHSTAR_DEDICATED_ONLY
+#ifndef NORTHSTAR_DEDICATED_ONLY
 
 extern ConVar* Cvar_kcp_stats;
 extern ConVar* Cvar_kcp_stats_interval;

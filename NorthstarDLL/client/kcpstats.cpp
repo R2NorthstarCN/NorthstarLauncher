@@ -1,6 +1,4 @@
-#include "ns_version.h"
-
-#if !NORTHSTAR_DEDICATED_ONLY
+#ifndef NORTHSTAR_DEDICATED_ONLY
 
 #include "kcpstats.h"
 #include "client/imgui.h"

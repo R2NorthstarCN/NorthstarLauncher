@@ -1,8 +1,6 @@
 #pragma once
 
-#include "ns_version.h"
-
-#if !NORTHSTAR_DEDICATED_ONLY
+#ifndef NORTHSTAR_DEDICATED_ONLY
 
 #include <d3d11.h>
 
