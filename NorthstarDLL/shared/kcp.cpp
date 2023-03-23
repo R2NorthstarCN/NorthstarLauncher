@@ -418,6 +418,7 @@ void kcp_update_timer_cb(void* data, void* user)
 			manager->established_connections.erase(((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr);
 		}
 		itimer_evt_stop(&manager->timer_mgr, connection->update_timer);
+		lock1.release();
 		delete connection;
 
 		return;
