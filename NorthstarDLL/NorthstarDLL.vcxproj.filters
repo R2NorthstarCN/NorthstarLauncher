@@ -641,6 +641,9 @@
     <ClCompile Include="client\kcpstats.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
+    <ClCompile Include="server\alltalk.cpp">
+      <Filter>Source Files\server</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="audio_asm.asm">
