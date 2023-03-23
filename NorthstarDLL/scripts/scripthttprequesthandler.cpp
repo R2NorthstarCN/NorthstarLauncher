@@ -567,32 +567,6 @@ template <ScriptContext context> void HttpRequestHandler::RegisterSQFuncs()
 		SQ_IsLocalHttpAllowed<context>);
 }
 
-template <ScriptContext context> void HttpRequestHandler::RegisterSQFuncs()
-{
-	g_pSquirrel<context>->AddFuncRegistration(
-		"int",
-		"NS_InternalMakeHttpRequest",
-		"int method, string baseUrl, table<string, array<string> > headers, table<string, array<string> > queryParams, string contentType, "
-		"string body, "
-		"int timeout, string userAgent",
-		"[Internal use only] Passes the HttpRequest struct fields to be reconstructed in native and used for an http request",
-		SQ_InternalMakeHttpRequest<context>);
-
-	g_pSquirrel<context>->AddFuncRegistration(
-		"bool",
-		"NSIsHttpEnabled",
-		"",
-		"Whether or not HTTP requests are enabled. You can opt-out by starting the game with -disablehttprequests.",
-		SQ_IsHttpEnabled<context>);
-
-	g_pSquirrel<context>->AddFuncRegistration(
-		"bool",
-		"NSIsLocalHttpAllowed",
-		"",
-		"Whether or not HTTP requests can be made to a private network address. You can enable this by starting the game with "
-		"-allowlocalhttp.",
-		SQ_IsLocalHttpAllowed<context>);
-}
 
 ON_DLL_LOAD_RELIESON("client.dll", HttpRequestHandler_ClientInit, ClientSquirrel, (CModule module))
 {
