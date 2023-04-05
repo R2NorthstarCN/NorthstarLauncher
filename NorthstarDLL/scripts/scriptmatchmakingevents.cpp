@@ -8,6 +8,8 @@
 #include "scriptmatchmakingevents.h"
 #include "core/tier0.h"
 
+// #define NSCN_MATCHMAKING
+
 AUTOHOOK_INIT()
 
 MatchmakeManager* g_pMatchmakerManager = new MatchmakeManager;
@@ -112,6 +114,7 @@ void MatchmakeManager::CancelMatchmake()
 	g_pMasterServerManager->CancelMatchmaking();
 }
 
+#ifdef NSCN_MATCHMAKING
 // clang-format off
 AUTOHOOK(CCLIENT__StartMatchmaking, client.dll + 0x213D00, SQRESULT, __fastcall, (HSquirrelVM* clientsqvm))
 // clang-format on
@@ -182,3 +185,4 @@ ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptMatchmakingEvents, ClientSquirre
 	}
 	AUTOHOOK_DISPATCH();
 }
+#endif
