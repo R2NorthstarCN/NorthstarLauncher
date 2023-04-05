@@ -167,7 +167,7 @@ void ConCommand_kcp_connect(const CCommand& args)
 	remote_addr.sin6_scope_struct = scopeid_unspecified;
 
 	{
-		std::unique_lock lock3(g_kcp_manager->established_connections_mutex);
+		std::unique_lock lock(g_kcp_manager->established_connections_mutex);
 		if (g_kcp_manager->established_connections.contains(remote_addr))
 		{
 			spdlog::warn("[KCP] Control block is already created");
@@ -410,20 +410,16 @@ void kcp_update_timer_cb(void* data, void* user)
 
 	std::unique_lock lock1(*connection->mutex);
 	auto current = iclock();
-	if (itimediff(current, connection->last_input) > Cvar_kcp_timeout->GetInt())
+	auto delta = itimediff(current, connection->last_input);
+	if (delta > Cvar_kcp_timeout->GetInt())
 	{
+		manager->established_connections.erase(((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr);
 		ikcp_flush(connection->kcpcb);
-		{
-			std::unique_lock lock2(manager->established_connections_mutex);
-			manager->established_connections.erase(((const udp_output_userdata*)(connection->kcpcb->user))->remote_addr);
-		}
 		itimer_evt_stop(&manager->timer_mgr, connection->update_timer);
-		lock1.release();
+		lock1.unlock();
 		delete connection;
-
 		return;
 	}
-
 	ikcp_update(connection->kcpcb, current);
 	current = iclock();
 	auto next = ikcp_check(connection->kcpcb, current) - current;
@@ -508,7 +504,8 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 					break;
 				}
 				{
-					std::unique_lock lock(this->timer_mgr_mutex);
+					std::unique_lock lock1(this->established_connections_mutex);
+					std::unique_lock lock2(this->timer_mgr_mutex);
 					itimer_mgr_run(&this->timer_mgr, iclock());
 				}
 				if (!this->is_initialized())
@@ -555,7 +552,8 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 					if (established_connections.contains(from))
 					{
 						const auto& connection = established_connections[from];
-						std::scoped_lock lock2(*connection->mutex, this->timer_mgr_mutex);
+						std::unique_lock lock2(this->timer_mgr_mutex);
+						std::unique_lock lock3(*connection->mutex);
 						kcp_fec_aware_input(connection, buf);
 						connection->last_input = iclock();
 						itimer_evt_stop(&this->timer_mgr, connection->update_timer);
@@ -574,19 +572,20 @@ kcp_manager::kcp_manager(IUINT32 timer_interval)
 						{
 							recv_conv = ikcp_getconv(buf.data());
 						}
-						std::unique_lock lock3(this->pending_connections_mutex);
+						std::unique_lock lock2(this->pending_connections_mutex);
 						if (pending_connections.contains(recv_conv))
 						{
 							pending_connections.erase(recv_conv);
+							lock2.unlock();
 							auto connection = new kcp_connection(this, from, recv_conv);
 							kcp_fec_aware_input(connection, buf);
-							std::unique_lock lock4(this->established_connections_mutex);
+							std::unique_lock lock3(this->established_connections_mutex);
 							this->established_connections[from] = connection;
 							spdlog::info("[KCP] Established local <--> {}%{}", ntop((const sockaddr*)&from), recv_conv);
 						}
 						else
 						{
-							lock3.unlock();
+							lock2.unlock();
 							unaltered_data.push(std::make_pair(from, buf));
 						}
 					}
@@ -677,7 +676,8 @@ int kcp_manager::intercept_sendto(SOCKET socket, const char* buf, int len, const
 		return KCP_NOT_ALTERED;
 	}
 	const auto& connection = established_connections[*converted_to];
-	std::scoped_lock lock2(*connection->mutex, timer_mgr_mutex);
+	std::unique_lock lock2(timer_mgr_mutex);
+	std::unique_lock lock3(*connection->mutex);
 	auto send_result = ikcp_send(connection->kcpcb, buf, len);
 	switch (send_result)
 	{
@@ -853,7 +853,6 @@ fec_decoder::fec_decoder(int data_shards, int parity_shards)
 {
 	rxlimit = FEC_RX_MULTI * (data_shards + parity_shards);
 	codec = reed_solomon_new(data_shards, parity_shards);
-
 	decode_cache = std::vector<std::vector<char>>(codec->shards);
 	flag_cache = std::vector<char>(codec->shards);
 }
