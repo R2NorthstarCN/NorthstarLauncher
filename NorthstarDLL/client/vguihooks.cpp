@@ -10,9 +10,9 @@ SourceInterface<vgui::IPanel>* m_iPanel;
 
 std::wstring utf8_to_wide(const std::string_view& str)
 {
-	int size = MultiByteToWideChar(CP_UTF8, MB_COMPOSITE, str.data(), static_cast<int>(str.length()), nullptr, 0);
+	int size = MultiByteToWideChar(CP_UTF8, 0, str.data(), static_cast<int>(str.length()), nullptr, 0);
 	std::wstring utf16_str(size, '\0');
-	MultiByteToWideChar(CP_UTF8, MB_COMPOSITE, str.data(), static_cast<int>(str.length()), &utf16_str[0], size);
+	MultiByteToWideChar(CP_UTF8, 0, str.data(), static_cast<int>(str.length()), &utf16_str[0], size);
 	return std::move(utf16_str);
 }
 
