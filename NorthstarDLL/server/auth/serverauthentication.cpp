@@ -16,6 +16,8 @@
 #include "server/r2server.h"
 #include "scripts/scriptmasterservermessages.h"
 #include "httplib.h"
+#include "nlohmann/json.hpp"
+#include "shared/playlist.h"
 #include "shared/kcp.h"
 #include <fstream>
 #include <filesystem>
@@ -46,11 +48,43 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 		{
 			// this is just a super basic way to verify that servers have ports open, masterserver will try to read this before ensuring
 			// server is legit
+			m_PlayerAuthServer.Post(
+				"/rui_message",
+				[this](const httplib::Request& request, httplib::Response& response)
+				{
+					if (!request.has_param("serverAuthToken") ||
+						strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
+					{
+						// return;
+					}
+
+					g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(request.body);
+
+					response.set_content("{\"success\":true}", "application/json");
+				});
 
 			m_PlayerAuthServer.Get(
 				"/verify",
 				[](const httplib::Request& request, httplib::Response& response)
 				{ response.set_content(AUTHSERVER_VERIFY_STRING, "text/plain"); });
+
+			m_PlayerAuthServer.Get(
+				"/status",
+				[](const httplib::Request& request, httplib::Response& response)
+				{
+					std::string result;
+					nlohmann::json json;
+					int maxplayers = 0;
+					auto p_maxplayers = R2::GetCurrentPlaylistVar("max_players", true);
+					if (p_maxplayers)
+					{
+						maxplayers = std::stoi(p_maxplayers);
+					}
+					json["maxplayers"] = maxplayers;
+					json["playercount"] = g_pServerAuthentication->m_PlayerAuthenticationData.size();
+					result = json.dump();
+					response.set_content(result, "application/json");
+				});
 
 			m_PlayerAuthServer.Post(
 				"/authenticate_incoming_player",
@@ -92,20 +126,7 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 			m_PlayerAuthServer.listen("0.0.0.0", Cvar_ns_player_auth_port->GetInt());
 		});
 
-	m_PlayerAuthServer.Post(
-		"/rui_message",
-		[this](const httplib::Request& request, httplib::Response& response)
-		{
-			if (!request.has_param("serverAuthToken") ||
-				strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
-			{
-				// return;
-			}
-
-			g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(request.body);
-
-			response.set_content("{\"success\":true}", "application/json");
-		});
+	
 
 	serverThread.detach();
 }

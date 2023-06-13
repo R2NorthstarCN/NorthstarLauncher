@@ -69,7 +69,6 @@ extern ConVar* Cvar_kcp_outbound_fec;
 
 // FEC
 
-const 
 const IUINT32 FEC_RX_MULTI = 3;
 const IUINT16 FEC_TYPE_DATA = 0xf1;
 const IUINT16 FEC_TYPE_PARITY = 0xf2;

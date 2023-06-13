@@ -11,7 +11,7 @@
 AUTOHOOK_INIT()
 
 std::vector<std::shared_ptr<ColoredLogger>> loggers {};
-
+bool isLogFileReady;
 namespace NS::log
 {
 	std::shared_ptr<ColoredLogger> SCRIPT_UI;
@@ -54,12 +54,14 @@ void CreateLogFiles()
 				logger->sinks().push_back(sink);
 			}
 			spdlog::flush_on(spdlog::level::info);
+			isLogFileReady = true;
 		}
 		catch (...)
 		{
 			spdlog::error("Failed creating log file!");
 			MessageBoxA(
 				0, "Failed creating log file! Make sure the profile directory is writable.", "Northstar Warning", MB_ICONWARNING | MB_OK);
+			isLogFileReady = false;
 		}
 	}
 }
@@ -205,6 +207,8 @@ void InitialiseLogging()
 
 void NS::log::FlushLoggers()
 {
+	if (!isLogFileReady)
+		return;
 	for (auto& logger : loggers)
 		logger->flush();
 
