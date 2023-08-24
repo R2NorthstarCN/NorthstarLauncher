@@ -126,6 +126,7 @@ class MasterServerManager
 
 extern MasterServerManager* g_pMasterServerManager;
 extern ConVar* Cvar_ns_masterserver_hostname;
+extern ConVar* Cvar_ns_matchmaker_hostname;
 
 /** Result returned in the std::future of a MasterServerPresenceReporter::ReportPresence() call. */
 enum class MasterServerReportPresenceResult

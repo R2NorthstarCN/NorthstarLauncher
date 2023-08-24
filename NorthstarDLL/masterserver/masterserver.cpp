@@ -25,6 +25,7 @@ using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
 ClientAnticheatSystem g_ClientAnticheatSystem;
 
+ConVar* Cvar_ns_matchmaker_hostname;
 ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
 ConVar* Cvar_ns_server_reg_token;
@@ -108,7 +109,31 @@ httplib::Client SetupHttpClient()
 	}
 	return cli;
 }
-
+httplib::Client SetupMatchmakerHttpClient()
+{
+	std::string ms_addr = Cvar_ns_matchmaker_hostname->GetString();
+	httplib::Client cli(ms_addr);
+	//, {"Accept-Encoding", "gzip"}, {"Content-Encoding", "gzip"}
+	cli.set_default_headers({{"User-Agent", NSUserAgent}});
+	cli.set_compress(true);
+	cli.set_decompress(true);
+	cli.set_read_timeout(10, 0);
+	cli.set_write_timeout(10, 0);
+	cli.enable_server_certificate_verification(false);
+	if (!strstr(GetCommandLineA(), "-disabledoh"))
+	{
+		std::string doh_result = g_DohWorker->GetDOHResolve(ms_addr);
+		if (g_DohWorker->m_bDohAvailable)
+		{
+			cli.set_hostname_addr_map({{ms_addr, doh_result}});
+		}
+		else
+		{
+			spdlog::warn("[DOH] service is not available. falling back to DNS");
+		}
+	}
+	return cli;
+}
 void MasterServerManager::ClearServerList()
 {
 	// this doesn't really do anything lol, probably isn't threadsafe
@@ -135,51 +160,49 @@ bool MasterServerManager::StartMatchmaking(MatchmakeInfo* status)
 	const std::string local_uid = R2::g_pLocalPlayerUserID;
 	char* local_uid_escaped = curl_easy_escape(curl, local_uid.c_str(), local_uid.length());
 	char* token_escaped = curl_easy_escape(curl, token.c_str(), token.length());
-	std::string query_fmt_str = "{}/matchmaking/join?id={}&token={}";
+	std::string query_fmt_str = "{}/join?id={}&token={}&aa_enabled={}";
 	for (int i = 0; i < status->playlistList.size(); i++)
 	{
-		query_fmt_str.append(fmt::format("&playlistList[{}]={}", i, status->playlistList[i]));
+		query_fmt_str.append(fmt::format("&playlist={}", i, status->playlistList[i]));
 	}
-	spdlog::warn("{}", query_fmt_str);
-	curl_easy_setopt(
-		curl,
-		CURLOPT_URL,
-		fmt::format(query_fmt_str, Cvar_ns_masterserver_hostname->GetString(), local_uid_escaped, token_escaped).c_str());
+	std::string query = fmt::format(query_fmt_str, Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped, "true")
+							.c_str(); // TODO: add working AA selection
+	spdlog::warn("{}", query);
+	curl_easy_setopt(curl, CURLOPT_URL, query.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
-
+	
 	const CURLcode result = curl_easy_perform(curl);
-
+	spdlog::info("[Matchmaker] Result:{},buffer:{}", result, read_buffer.c_str());
 	if (result == CURLcode::CURLE_OK)
 	{
-		rapidjson_document server_response;
-		server_response.Parse(read_buffer.c_str());
-
-		if (server_response.HasParseError())
+		try
 		{
-			// spdlog::error(
-			//"Failed reading player clantag: encountered parse error \"{}\"",
-			// rapidjson::GetParseError_En(serverresponse.GetParseError()));
+			nlohmann::json resjson = nlohmann::json::parse(read_buffer);
+			if (resjson.at("success") == true)
+			{
+				// success
+				curl_easy_cleanup(curl);
+				return true;
+			}
+			else
+			{
+				// fucked
+				goto REQUEST_END_CLEANUP;
+			}
+		}
+		catch (nlohmann::json::parse_error& e)
+		{
+			spdlog::error("Failed communicating with matchmaker: encountered parse error \"{}\"", e.what());
 			goto REQUEST_END_CLEANUP;
 		}
-
-		if (!server_response.IsObject() || !server_response.HasMember("success"))
+		catch (nlohmann::json::out_of_range& e)
 		{
-			// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
+			spdlog::error("Failed communicating with matchmaker: encountered data error \"{}\"", e.what());
 			goto REQUEST_END_CLEANUP;
 		}
-
-		if (server_response["success"].IsTrue())
-		{
-			// std::cout << "Successfully set local player clantag." << std::endl;
-			curl_easy_cleanup(curl);
-			return true;
-		}
-
-		// spdlog::error("Failed reading player clantag");
 	}
-
 	// we goto this instead of returning so we always hit this
 REQUEST_END_CLEANUP:
 
@@ -200,7 +223,7 @@ bool MasterServerManager::CancelMatchmaking()
 	curl_easy_setopt(
 		curl,
 		CURLOPT_URL,
-		fmt::format("{}/matchmaking/quit?id={}&token={}", Cvar_ns_masterserver_hostname->GetString(), local_uid_escaped, token_escaped)
+		fmt::format("{}/quit?id={}&token={}", Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped)
 			.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
@@ -210,28 +233,30 @@ bool MasterServerManager::CancelMatchmaking()
 
 	if (result == CURLcode::CURLE_OK)
 	{
-		rapidjson_document server_response;
-		server_response.Parse(readBuffer.c_str());
-
-		if (server_response.HasParseError())
+		try
 		{
-			// spdlog::error(
-			//"Failed reading player clantag: encountered parse error \"{}\"",
-			// rapidjson::GetParseError_En(serverresponse.GetParseError()));
+			nlohmann::json resjson = nlohmann::json::parse(readBuffer);
+			if (resjson.at("success") == true)
+			{
+				// success
+				curl_easy_cleanup(curl);
+				return true;
+			}
+			else
+			{
+				// fucked
+				goto REQUEST_END_CLEANUP;
+			}
+		}
+		catch (nlohmann::json::parse_error& e)
+		{
+			spdlog::error("Failed communicating with matchmaker: encountered parse error \"{}\"", e.what());
 			goto REQUEST_END_CLEANUP;
 		}
-
-		if (!server_response.IsObject() || !server_response.HasMember("success"))
+		catch (nlohmann::json::out_of_range& e)
 		{
-			// spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
+			spdlog::error("Failed communicating with matchmaker: encountered data error \"{}\"", e.what());
 			goto REQUEST_END_CLEANUP;
-		}
-
-		if (server_response["success"].IsTrue())
-		{
-			// std::cout << "Successfully set local player clantag." << std::endl;
-			curl_easy_cleanup(curl);
-			return true;
 		}
 
 		// spdlog::error("Failed reading player clantag");
@@ -258,7 +283,7 @@ bool MasterServerManager::UpdateMatchmakingStatus(MatchmakeInfo* status)
 	curl_easy_setopt(
 		curl,
 		CURLOPT_URL,
-		fmt::format("{}/matchmaking/state?id={}&token={}", Cvar_ns_masterserver_hostname->GetString(), local_uid_escaped, token_escaped)
+		fmt::format("{}/state?id={}&token={}", Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped)
 			.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
@@ -268,92 +293,56 @@ bool MasterServerManager::UpdateMatchmakingStatus(MatchmakeInfo* status)
 
 	if (result == CURLcode::CURLE_OK)
 	{
-		rapidjson_document server_response;
-		server_response.Parse(read_buffer.c_str());
-
-		if (server_response.HasParseError())
+		try
 		{
+			nlohmann::json server_response = nlohmann::json::parse(read_buffer);
+			if (server_response.at("success") == true)
+			{
+				std::string state_type = server_response.at("state").at("type");
 
-			goto REQUEST_END_CLEANUP;
-		}
-
-		if (!server_response.IsObject() || !server_response.HasMember("success") && server_response.HasMember("state") &&
-											   server_response["state"].HasMember("type") && server_response["success"].IsTrue())
-		{
-
-			goto REQUEST_END_CLEANUP;
-		}
-		// spdlog::info("{}", serverresponse["state"]["type"].GetString());
-		if (!strcmp(server_response["state"]["type"].GetString(), "#MATCHMAKING_QUEUED"))
-		{
-			if (!server_response["state"].HasMember("eta_seconds") || !server_response["state"]["eta_seconds"].IsNumber())
+				if (!strcmp(state_type.c_str(), "#MATCHMAKING_SEARCHING_FOR_MATCH"))
+				{
+					status->etaSeconds = "";
+					status->status = server_response.at("state").at("type");
+					spdlog::info("[Matchmaker] MATCHMAKING_SEARCHING_FOR_MATCH");
+					curl_easy_cleanup(curl);
+					return true;
+				}
+				if (!strcmp(state_type.c_str(), "#MATCHMAKING_QUEUED"))
+				{
+					status->etaSeconds = server_response.at("info").at("etaSeconds");
+					status->status = server_response.at("state").at("type");
+					spdlog::info("[Matchmaker] MATCHMAKING_QUEUED");
+					curl_easy_cleanup(curl);
+					return true;
+				}
+				if (!strcmp(state_type.c_str(), "#MATCHMAKING_ALLOCATING"))
+				{
+					status->status = server_response.at("state").at("type");
+					curl_easy_cleanup(curl);
+					return true;
+				}
+				if (!strcmp(state_type.c_str(), "#MATCHMAKING_CONNECTING"))
+				{
+					status->status = server_response.at("state").at("type");
+					status->serverId = server_response.at("id");
+					status->serverReady = true;
+					curl_easy_cleanup(curl);
+					return true;
+				}
+			}
+			else
+			{
 				goto REQUEST_END_CLEANUP;
-			status->etaSeconds = std::to_string(server_response["info"]["etaSeconds"].GetInt());
-			status->status = server_response["state"]["type"].GetString();
-			spdlog::info("[Matchmaker] MATCHMAKING_QUEUED");
-			curl_easy_cleanup(curl);
-			return true;
+			}
 		}
-
-		if (!strcmp(server_response["state"]["type"].GetString(), "#MATCHMAKING_CONFIRMING"))
+		catch (nlohmann::json::parse_error& e)
 		{
-			if (!server_response["state"].HasMember("timeout") || !server_response["state"]["timeout"].IsNumber() ||
-				!server_response["state"].HasMember("playlist_name") || !server_response["state"]["playlist_name"].IsString())
-				goto REQUEST_END_CLEANUP;
-			status->timeout = std::to_string(server_response["info"]["timeout"].GetInt());
-			status->playlistName = server_response["info"]["playlist_name"].GetString();
-			status->status = server_response["state"]["type"].GetString();
-			curl_easy_cleanup(curl);
-			return true;
+			spdlog::error("Failed communicating with matchmaker: encountered parse error \"{}\"", e.what());
 		}
-
-		if (!strcmp(server_response["state"]["type"].GetString(), "#MATCHMAKING_CONFIRMED"))
+		catch (nlohmann::json::out_of_range& e)
 		{
-			spdlog::info("[Matchmaker] TODO: MATCHMAKING_CONFIRMED");
-			status->status = server_response["state"]["type"].GetString();
-			curl_easy_cleanup(curl);
-			return true;
-		}
-
-		if (!strcmp(server_response["state"]["type"].GetString(), "#MATCHMAKING_ALLOCATING"))
-		{
-			spdlog::info("[Matchmaker] TODO: MATCHMAKING_ALLOCATING");
-			status->status = server_response["state"]["type"].GetString();
-			curl_easy_cleanup(curl);
-			return true;
-		}
-
-		if (!strcmp(server_response["state"]["type"].GetString(), "#MATCHMAKING_CONNECTING"))
-		{
-			if (!server_response["state"].HasMember("ip") || !server_response["state"]["ip"].IsString() ||
-				!server_response["state"].HasMember("auth_token") || !server_response["state"]["auth_token"].IsString() ||
-				!server_response["state"].HasMember("port") || !server_response["state"]["port"].IsNumber())
-				goto REQUEST_END_CLEANUP;
-
-			status->etaSeconds = std::to_string(server_response["state"]["etaSeconds"].GetInt());
-			auto* connection_info = new MatchmakeConnectionInfo;
-			connection_info->ip.S_un.S_addr = inet_addr(server_response["state"]["ip"].GetString());
-			connection_info->port = static_cast<unsigned short>(server_response["state"]["port"].GetUint());
-
-			strncpy_s(
-				connection_info->authToken,
-				sizeof(m_pendingConnectionInfo.authToken),
-				server_response["state"]["authToken"].GetString(),
-				sizeof(m_pendingConnectionInfo.authToken) - 1);
-
-			status->connectionInfo = connection_info;
-			status->serverReady = true;
-			status->status = server_response["state"]["type"].GetString();
-			curl_easy_cleanup(curl);
-			return true;
-		}
-
-		if (!strcmp(server_response["state"]["type"].GetString(), "#MATCHMAKING_NOTHING"))
-		{
-			spdlog::info("[Matchmaker] TODO: MATCHMAKING_NOTHING");
-			status->status = server_response["state"]["type"].GetString();
-			curl_easy_cleanup(curl);
-			return true;
+			spdlog::error("Failed communicating with matchmaker: encountered data error \"{}\"", e.what());
 		}
 
 		spdlog::error("Failed reading matchmaking status");
@@ -844,6 +833,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", MasterServer, (ConCommand, ServerPresence), (
 	g_pMasterServerManager = new MasterServerManager;
 	Cvar_ns_server_reg_token = new ConVar("ns_server_reg_token", "0", FCVAR_GAMEDLL, "Server account string used for registration");
 	Cvar_ns_masterserver_hostname = new ConVar("ns_masterserver_hostname", "127.0.0.1", FCVAR_NONE, "");
+	Cvar_ns_matchmaker_hostname = new ConVar("ns_matchmaker_hostname", "127.0.0.1", FCVAR_NONE, "");
 	Cvar_ns_curl_log_enable = new ConVar("ns_curl_log_enable", "0", FCVAR_NONE, "Whether curl should log to the console");
 
 	RegisterConCommand("ns_fetchservers", ConCommand_ns_fetchservers, "Fetch all servers from the masterserver", FCVAR_CLIENTDLL);
@@ -1031,7 +1021,7 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 			const std::string querystring = fmt::format(
 				"/server/"
 				"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&serverRegToken="
-				"{}",
+				"{}&isMmServer={}",
 				threaded_presence.m_iPort,
 				threaded_presence.m_iAuthPort,
 				encode_query_param(threaded_presence.m_sServerName),
@@ -1040,7 +1030,8 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				encode_query_param(threaded_presence.m_PlaylistName),
 				threaded_presence.m_iMaxPlayers,
 				encode_query_param(threaded_presence.m_Password),
-				encode_query_param(server_account));
+				encode_query_param(server_account),
+				Tier0::CommandLine()->CheckParm("-matchmaking") ? "true" : "false");
 
 			// Lambda to quickly cleanup resources and return a value.
 			auto return_cleanup =

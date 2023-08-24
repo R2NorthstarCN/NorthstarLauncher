@@ -8,7 +8,7 @@
 #include "scriptmatchmakingevents.h"
 #include "core/tier0.h"
 
-// #define NSCN_MATCHMAKING
+#define NSCN_MATCHMAKING
 
 AUTOHOOK_INIT()
 
@@ -62,20 +62,40 @@ MatchmakeManager::MatchmakeManager()
 					g_pMasterServerManager->UpdateMatchmakingStatus(info);
 					if (!strcmp(info->status.c_str(), "#MATCHMAKING_MATCH_CONNECTING"))
 					{
+						for (auto& pair : g_pServerAuthentication->m_PlayerAuthenticationData)
+							g_pServerAuthentication->WritePersistentData(pair.first);
+
+						// do auth
+						g_pMasterServerManager->AuthenticateWithServer(
+							R2::g_pLocalPlayerUserID,
+							g_pMasterServerManager->m_sOwnClientAuthToken,
+							info->serverId// id,
+							,"");
 						// matchmake done, connect to the server
-						if (info->connectionInfo != nullptr && info->serverReady == true)
-							R2::g_pCVar->FindVar("serverfilter")->SetValue(info->connectionInfo->authToken);
+						if (!g_pMasterServerManager->m_bHasPendingConnectionInfo)
+						{
+							spdlog::error("No pending connection info!");
+						}
+
+						RemoteServerConnectionInfo& conn_info = g_pMasterServerManager->m_pendingConnectionInfo;
+
+						// set auth token, then try to connect
+						// i'm honestly not entirely sure how silentconnect works regarding ports and encryption so using connect for now
+						R2::g_pCVar->FindVar("serverfilter")->SetValue(conn_info.authToken.c_str());
 						R2::Cbuf_AddText(
 							R2::Cbuf_GetCurrentPlayer(),
 							fmt::format(
-								"connect {}.{}.{}.{}:{}",
-								info->connectionInfo->ip.S_un.S_un_b.s_b1,
-								info->connectionInfo->ip.S_un.S_un_b.s_b2,
-								info->connectionInfo->ip.S_un.S_un_b.s_b3,
-								info->connectionInfo->ip.S_un.S_un_b.s_b4,
-								info->connectionInfo->port)
+								"kcp_connect ::ffff:{}.{}.{}.{} {} {}",
+								conn_info.ip.S_un.S_un_b.s_b1,
+								conn_info.ip.S_un.S_un_b.s_b2,
+								conn_info.ip.S_un.S_un_b.s_b3,
+								conn_info.ip.S_un.S_un_b.s_b4,
+								conn_info.port,
+								conn_info.conv)
 								.c_str(),
 							R2::cmd_source_t::kCommandSrcCode);
+
+						g_pMasterServerManager->m_bHasPendingConnectionInfo = false;
 						LocalState = 0;
 					}
 					break;
@@ -89,6 +109,8 @@ MatchmakeManager::MatchmakeManager()
 
 	// Creating a status object
 	MatchmakeInfo* statusptr = new MatchmakeInfo;
+	statusptr->mapIdx = -1;
+	statusptr->modeIdx = -1;
 	this->info = statusptr;
 }
 void MatchmakeManager::StartMatchmake(std::string playlistlist)
@@ -179,10 +201,10 @@ AUTOHOOK(CCLIENT__GetMyMatchmakingStatus, client.dll + 0x3B1B70, SQRESULT, __fas
 
 ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptMatchmakingEvents, ClientSquirrel, (CModule module))
 {
-	if (!Tier0::CommandLine()->CheckParm("-norestrictservercommands"))
-	{
-		return;
-	}
+	//if (!Tier0::CommandLine()->CheckParm("-norestrictservercommands"))
+	//{
+	//	return;
+	//}
 	AUTOHOOK_DISPATCH();
 }
 #endif

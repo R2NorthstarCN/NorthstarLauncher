@@ -6,7 +6,6 @@ struct MatchmakeConnectionInfo
 {
   public:
 	char authToken[32];
-
 	in_addr ip;
 	unsigned short port;
 };
@@ -30,7 +29,7 @@ class MatchmakeInfo
 	std::vector<std::string> playlistList;
 	std::string timeout;
 	bool serverReady;
-	MatchmakeConnectionInfo* connectionInfo;
+	std::string serverId;
 	std::string GetByParam(int idx);
 };
 
