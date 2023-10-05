@@ -117,6 +117,11 @@ class MasterServerManager
 	void AuthenticateOriginWithMasterServer(const char* uid, const char* originToken);
 	void AuthenticateWithOwnServer(const char* uid, const std::string& playerToken);
 	void AuthenticateWithServer(const char* uid, const std::string& playerToken, const std::string& serverId, const char* password);
+	bool AuthenticateWithMatchmakingServer(
+		RemoteServerConnectionInfo& conn_info,const char* uid,
+		const std::string& playerToken,
+		const std::string& serverId,
+		const char* password);
 	void WritePlayerPersistentData(const char* player_id, const char* pdata, size_t pdata_size);
 	bool SetLocalPlayerClanTag(std::string clantag);
 	bool StartMatchmaking(MatchmakeInfo* status);

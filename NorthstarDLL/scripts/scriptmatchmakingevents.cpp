@@ -55,44 +55,64 @@ MatchmakeManager::MatchmakeManager()
 				case 0: // idle
 					break;
 				case 1: // new matchmaking event
-					g_pMasterServerManager->StartMatchmaking(info);
-					LocalState = 2;
-					break;
+					if (!g_pMasterServerManager->StartMatchmaking(info))
+					{
+						LocalState = 0;
+						break;
+					}
+					else
+					{
+						LocalState = 2;
+						break;
+					}
+					
 				case 2: // matchmaking
-					g_pMasterServerManager->UpdateMatchmakingStatus(info);
+					if (!g_pMasterServerManager->UpdateMatchmakingStatus(info))
+					{
+						LocalState = 0;
+						break;
+					}
 					if (!strcmp(info->status.c_str(), "#MATCHMAKING_MATCH_CONNECTING"))
 					{
 						for (auto& pair : g_pServerAuthentication->m_PlayerAuthenticationData)
 							g_pServerAuthentication->WritePersistentData(pair.first);
 
-						// do auth
+						
+						// matchmake done, connect to the server
 						g_pMasterServerManager->AuthenticateWithServer(
 							R2::g_pLocalPlayerUserID,
 							g_pMasterServerManager->m_sOwnClientAuthToken,
-							info->serverId// id,
-							,"");
-						// matchmake done, connect to the server
+							info->serverId,
+							"");
+						while (g_pMasterServerManager->m_bScriptAuthenticatingWithGameServer)
+						{
+							std::this_thread::sleep_for(std::chrono::milliseconds(100));
+						}
+						
+						RemoteServerConnectionInfo& conn_info = g_pMasterServerManager->m_pendingConnectionInfo;
 						if (!g_pMasterServerManager->m_bHasPendingConnectionInfo)
 						{
-							spdlog::error("No pending connection info!");
+							spdlog::error(
+								"[Matchmaking] Failed while authenticating with matchmaking server: {} {}",
+								g_pMasterServerManager->m_sAuthFailureReason,
+								g_pMasterServerManager->m_sAuthFailureMessage);
+							LocalState = 0;
+							break;
+							// TODO: cleanup
 						}
-
-						RemoteServerConnectionInfo& conn_info = g_pMasterServerManager->m_pendingConnectionInfo;
-
-						// set auth token, then try to connect
-						// i'm honestly not entirely sure how silentconnect works regarding ports and encryption so using connect for now
+						std::string connection_cmd = fmt::format(
+							"kcp_connect ::ffff:{}.{}.{}.{} {} {}",
+							conn_info.ip.S_un.S_un_b.s_b1,
+							conn_info.ip.S_un.S_un_b.s_b2,
+							conn_info.ip.S_un.S_un_b.s_b3,
+							conn_info.ip.S_un.S_un_b.s_b4,
+							conn_info.port,
+							conn_info.conv);
+						spdlog::info("Connect: {}", connection_cmd);
 						R2::g_pCVar->FindVar("serverfilter")->SetValue(conn_info.authToken.c_str());
 						R2::Cbuf_AddText(
 							R2::Cbuf_GetCurrentPlayer(),
-							fmt::format(
-								"kcp_connect ::ffff:{}.{}.{}.{} {} {}",
-								conn_info.ip.S_un.S_un_b.s_b1,
-								conn_info.ip.S_un.S_un_b.s_b2,
-								conn_info.ip.S_un.S_un_b.s_b3,
-								conn_info.ip.S_un.S_un_b.s_b4,
-								conn_info.port,
-								conn_info.conv)
-								.c_str(),
+								connection_cmd.c_str(),
 							R2::cmd_source_t::kCommandSrcCode);
 
 						g_pMasterServerManager->m_bHasPendingConnectionInfo = false;
@@ -109,12 +129,18 @@ MatchmakeManager::MatchmakeManager()
 
 	// Creating a status object
 	MatchmakeInfo* statusptr = new MatchmakeInfo;
-	statusptr->mapIdx = -1;
-	statusptr->modeIdx = -1;
+	statusptr->mapIdx = 1;
+	statusptr->modeIdx = 1;
+	statusptr->status = "";
 	this->info = statusptr;
 }
 void MatchmakeManager::StartMatchmake(std::string playlistlist)
 {
+	if (this->LocalState == 2)
+	{
+		spdlog::warn("[Matchmaker] calling StartMatchmake while matchmaking!");
+		return;
+	}
 	spdlog::info("[Matchmaker] Starting Matchmake");
 	this->info->playlistListstr = playlistlist;
 	std::vector<std::string> playlistvec;
@@ -131,6 +157,11 @@ void MatchmakeManager::StartMatchmake(std::string playlistlist)
 }
 void MatchmakeManager::CancelMatchmake()
 {
+	if (this->LocalState != 2)
+	{
+		spdlog::warn("[Matchmaker] calling StopMatchmake while not matchmaking!");
+		return;
+	}
 	spdlog::info("[Matchmaker] Cancelling Matchmake");
 	LocalState = 0;
 	g_pMasterServerManager->CancelMatchmaking();
@@ -162,11 +193,7 @@ AUTOHOOK(CCLIENT__CancelMatchmaking, client.dll + 0x211640, SQRESULT, __fastcall
 AUTOHOOK(CCLIENT__AreWeMatchmaking, client.dll + 0x211970, SQRESULT, __fastcall, (HSquirrelVM * clientsqvm))
 // clang-format on
 {
-	bool are_we_matchmaking = false;
-	if (g_pMatchmakerManager->LocalState == 2)
-		are_we_matchmaking = true;
-	// patch false
-	g_pSquirrel<ScriptContext::CLIENT>->pushbool(clientsqvm, are_we_matchmaking);
+	g_pSquirrel<ScriptContext::CLIENT>->pushbool(clientsqvm, (g_pMatchmakerManager->LocalState == 2));
 	return SQRESULT_NOTNULL;
 }
 // clang-format off
@@ -201,10 +228,11 @@ AUTOHOOK(CCLIENT__GetMyMatchmakingStatus, client.dll + 0x3B1B70, SQRESULT, __fas
 
 ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptMatchmakingEvents, ClientSquirrel, (CModule module))
 {
-	//if (!Tier0::CommandLine()->CheckParm("-norestrictservercommands"))
-	//{
-	//	return;
-	//}
+	if (Tier0::CommandLine()->CheckParm("-norestrictservercommands"))
+	{
+		spdlog::info("[Matchmaker] NSCN Matchmaker is disabled! (found -norestrictservercommands)");
+		return;
+	}
 	AUTOHOOK_DISPATCH();
 }
 #endif

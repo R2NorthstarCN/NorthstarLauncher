@@ -163,18 +163,19 @@ bool MasterServerManager::StartMatchmaking(MatchmakeInfo* status)
 	std::string query_fmt_str = "{}/join?id={}&token={}&aa_enabled={}";
 	for (int i = 0; i < status->playlistList.size(); i++)
 	{
-		query_fmt_str.append(fmt::format("&playlist={}", i, status->playlistList[i]));
+		query_fmt_str.append(fmt::format("&playlist={}", status->playlistList[i]));
 	}
 	std::string query = fmt::format(query_fmt_str, Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped, "true")
 							.c_str(); // TODO: add working AA selection
-	spdlog::warn("{}", query);
+	//spdlog::warn("{}", query);
+	//return false;
 	curl_easy_setopt(curl, CURLOPT_URL, query.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
 	
 	const CURLcode result = curl_easy_perform(curl);
-	spdlog::info("[Matchmaker] Result:{},buffer:{}", result, read_buffer.c_str());
+	//spdlog::info("[Matchmaker] JOIN: Result:{},buffer:{}", result, read_buffer.c_str());
 	if (result == CURLcode::CURLE_OK)
 	{
 		try
@@ -215,7 +216,7 @@ bool MasterServerManager::CancelMatchmaking()
 	// ps,aitdm,ttdm
 	CURL* curl = curl_easy_init();
 	SetCommonHttpClientOptions(curl);
-	std::string readBuffer;
+	std::string read_buffer;
 	const std::string token = m_sOwnClientAuthToken;
 	char* token_escaped = curl_easy_escape(curl, token.c_str(), token.length());
 	const std::string local_uid = R2::g_pLocalPlayerUserID;
@@ -227,15 +228,17 @@ bool MasterServerManager::CancelMatchmaking()
 			.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
 
 	const CURLcode result = curl_easy_perform(curl);
 
+
 	if (result == CURLcode::CURLE_OK)
 	{
+		//spdlog::info("[Matchmaker] Result:{},buffer:{}", result, read_buffer.c_str());
 		try
 		{
-			nlohmann::json resjson = nlohmann::json::parse(readBuffer);
+			nlohmann::json resjson = nlohmann::json::parse(read_buffer);
 			if (resjson.at("success") == true)
 			{
 				// success
@@ -293,38 +296,32 @@ bool MasterServerManager::UpdateMatchmakingStatus(MatchmakeInfo* status)
 
 	if (result == CURLcode::CURLE_OK)
 	{
+		//spdlog::info("[Matchmaker] STATE: Result:{},buffer:{}", result, read_buffer.c_str());
 		try
 		{
 			nlohmann::json server_response = nlohmann::json::parse(read_buffer);
 			if (server_response.at("success") == true)
 			{
-				std::string state_type = server_response.at("state").at("type");
-
-				if (!strcmp(state_type.c_str(), "#MATCHMAKING_SEARCHING_FOR_MATCH"))
-				{
-					status->etaSeconds = "";
-					status->status = server_response.at("state").at("type");
-					spdlog::info("[Matchmaker] MATCHMAKING_SEARCHING_FOR_MATCH");
-					curl_easy_cleanup(curl);
-					return true;
-				}
+				std::string state_type = server_response.at("state");
+				
 				if (!strcmp(state_type.c_str(), "#MATCHMAKING_QUEUED"))
 				{
-					status->etaSeconds = server_response.at("info").at("etaSeconds");
-					status->status = server_response.at("state").at("type");
-					spdlog::info("[Matchmaker] MATCHMAKING_QUEUED");
+					status->etaSeconds = "";
+					status->status = state_type;
+					//spdlog::info("[Matchmaker] MATCHMAKING_QUEUED");
 					curl_easy_cleanup(curl);
 					return true;
 				}
-				if (!strcmp(state_type.c_str(), "#MATCHMAKING_ALLOCATING"))
+				if (!strcmp(state_type.c_str(), "#MATCHMAKING_ALLOCATING_SERVER"))
 				{
-					status->status = server_response.at("state").at("type");
+					//spdlog::info("[Matchmaker] MATCHMAKING_ALLOCATING_SERVER");
+					status->status = state_type;
 					curl_easy_cleanup(curl);
 					return true;
 				}
-				if (!strcmp(state_type.c_str(), "#MATCHMAKING_CONNECTING"))
+				if (!strcmp(state_type.c_str(), "#MATCHMAKING_MATCH_CONNECTING"))
 				{
-					status->status = server_response.at("state").at("type");
+					status->status = state_type;
 					status->serverId = server_response.at("id");
 					status->serverReady = true;
 					curl_easy_cleanup(curl);
@@ -339,10 +336,12 @@ bool MasterServerManager::UpdateMatchmakingStatus(MatchmakeInfo* status)
 		catch (nlohmann::json::parse_error& e)
 		{
 			spdlog::error("Failed communicating with matchmaker: encountered parse error \"{}\"", e.what());
+			goto REQUEST_END_CLEANUP;
 		}
 		catch (nlohmann::json::out_of_range& e)
 		{
 			spdlog::error("Failed communicating with matchmaker: encountered data error \"{}\"", e.what());
+			goto REQUEST_END_CLEANUP;
 		}
 
 		spdlog::error("Failed reading matchmaking status");
@@ -673,7 +672,6 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 
 	requestThread.detach();
 }
-
 void MasterServerManager::AuthenticateWithServer(
 	const char* uid, const std::string& playerToken, const std::string& serverId, const char* password)
 {
@@ -718,6 +716,7 @@ void MasterServerManager::AuthenticateWithServer(
 					nlohmann::json connection_info_json = nlohmann::json::parse(res->body);
 					if (connection_info_json.at("success") == true)
 					{
+						spdlog::info("[auth_with_server] body: {}", res->body);
 						m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(std::string(connection_info_json.at("ip")).c_str());
 						m_pendingConnectionInfo.port = static_cast<unsigned short>(connection_info_json.at("port"));
 						m_pendingConnectionInfo.authToken = connection_info_json.at("authToken");
@@ -729,6 +728,7 @@ void MasterServerManager::AuthenticateWithServer(
 						{
 							m_pendingConnectionInfo.conv = 0;
 						}
+
 						m_bHasPendingConnectionInfo = true;
 						m_bSuccessfullyAuthenticatedWithGameServer = true;
 						m_bScriptAuthenticatingWithGameServer = false;
@@ -745,11 +745,11 @@ void MasterServerManager::AuthenticateWithServer(
 				}
 				catch (nlohmann::json::parse_error& e)
 				{
-					spdlog::error("Failed authenticating with local server: encountered parse error \"{}\"", e.what());
+					spdlog::error("Failed authenticating with server: encountered parse error \"{}\"", e.what());
 				}
 				catch (nlohmann::json::out_of_range& e)
 				{
-					spdlog::error("Failed authenticating with local server: encountered data error \"{}\"", e.what());
+					spdlog::error("Failed authenticating with server: encountered data error \"{}\"", e.what());
 				}
 			}
 			else
@@ -896,18 +896,14 @@ void MasterServerPresenceReporter::DestroyPresence(const ServerPresence* pServer
 	// Not bothering with better thread safety in this case since DestroyPresence() is called when the game is shutting down.
 	*g_pMasterServerManager->m_sOwnServerId = 0;
 
-	std::thread request_thread(
-		[this]
-		{
-			httplib::Client cli = SetupHttpClient();
-			const std::string querystring = fmt::format(
-				"/server/remove_server?id={}?serverAuthToken={}",
-				encode_query_param(g_pMasterServerManager->m_sOwnServerId),
-				encode_query_param(g_pMasterServerManager->m_sOwnServerAuthToken));
-			cli.Delete(querystring);
-		});
 
-	request_thread.detach();
+	httplib::Client cli = SetupHttpClient();
+	const std::string querystring = fmt::format(
+		"/server/remove_server?id={}?serverAuthToken={}",
+		encode_query_param(g_pMasterServerManager->m_sOwnServerId),
+		encode_query_param(g_pMasterServerManager->m_sOwnServerAuthToken));
+	cli.Delete(querystring);
+
 }
 
 void MasterServerPresenceReporter::RunFrame(double flCurrentTime, const ServerPresence* pServerPresence)
