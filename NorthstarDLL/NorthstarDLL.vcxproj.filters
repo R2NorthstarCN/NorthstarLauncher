@@ -354,6 +354,12 @@
     <ClInclude Include="client\kcpstats.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
+    <ClInclude Include="mods\modsavefiles.h">
+      <Filter>Header Files\mods</Filter>
+    </ClInclude>
+    <ClInclude Include="scripts\scriptjson.h">
+      <Filter>Header Files\scripts</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">
@@ -643,6 +649,9 @@
     </ClCompile>
     <ClCompile Include="server\alltalk.cpp">
       <Filter>Source Files\server</Filter>
+    </ClCompile>
+    <ClCompile Include="mods\modsavefiles.cpp">
+      <Filter>Source Files\mods</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -221,12 +221,14 @@
     <ClInclude Include="logging\sourceconsole.h" />
     <ClInclude Include="masterserver\masterserver.h" />
     <ClInclude Include="mods\modmanager.h" />
+    <ClInclude Include="mods\modsavefiles.h" />
     <ClInclude Include="ns_version.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="plugins\plugins.h" />
     <ClInclude Include="plugins\plugin_abi.h" />
     <ClInclude Include="scripts\scriptgamestate.h" />
     <ClInclude Include="scripts\scripthttprequesthandler.h" />
+    <ClInclude Include="scripts\scriptjson.h" />
     <ClInclude Include="scripts\scriptmasterservermessages.h" />
     <ClInclude Include="scripts\scriptmatchmakingevents.h" />
     <ClInclude Include="server\auth\bansystem.h" />
@@ -302,6 +304,7 @@
     <ClCompile Include="mods\compiled\modpdef.cpp" />
     <ClCompile Include="mods\compiled\modscriptsrson.cpp" />
     <ClCompile Include="mods\modmanager.cpp" />
+    <ClCompile Include="mods\modsavefiles.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

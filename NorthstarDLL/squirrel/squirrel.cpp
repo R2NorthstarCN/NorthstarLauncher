@@ -5,7 +5,7 @@
 #include "dedicated/dedicated.h"
 #include "engine/r2engine.h"
 #include "core/tier0.h"
-
+#include "mods/modsavefiles.h"
 #include <any>
 
 AUTOHOOK_INIT()
@@ -207,6 +207,7 @@ template <ScriptContext context> void SquirrelManager<context>::VMCreated(CSquir
 
 		defconst(m_pSQVM, pair.first.c_str(), bWasFound);
 	}
+	defconst(m_pSQVM, "MAX_FOLDER_SIZE", GetMaxSaveFolderSize() / 1024);
 	g_pSquirrel<context>->messageBuffer = new SquirrelMessageBuffer();
 }
 
