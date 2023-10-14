@@ -86,5 +86,8 @@
     <ClInclude Include="implot_internal.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="backends\d3dcompiler.h">
+      <Filter>头文件\backends</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

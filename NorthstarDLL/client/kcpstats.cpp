@@ -1,5 +1,3 @@
-#ifndef NORTHSTAR_DEDICATED_ONLY
-
 #include "kcpstats.h"
 #include "client/imgui.h"
 #include "imgui/implot.h"
@@ -492,5 +490,3 @@ std::vector<double> modified_sinc_smoother::smooth_except_boudaries(std::vector<
 	}
 	return smoothed;
 }
-
-#endif
