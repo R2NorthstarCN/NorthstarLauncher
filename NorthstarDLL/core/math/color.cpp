@@ -13,6 +13,7 @@ namespace NS::Colors
 	Color RPAK			(255, 190, 0  );
 	Color NORTHSTAR		(66 , 72 , 128);
 	Color ECHO			(150, 150, 159);
+	Color NEW_NET		(255, 127, 0  );
 
 	Color TRACE		(0  , 255, 255);
 	Color DEBUG		(0  , 255, 255);

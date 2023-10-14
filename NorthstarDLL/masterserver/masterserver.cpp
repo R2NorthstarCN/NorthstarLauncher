@@ -165,7 +165,8 @@ bool MasterServerManager::StartMatchmaking(MatchmakeInfo* status)
 	{
 		query_fmt_str.append(fmt::format("&playlist={}", status->playlistList[i]));
 	}
-	std::string query = fmt::format(query_fmt_str, Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped, "true")
+	std::string query =
+		fmt::format(fmt::runtime(query_fmt_str), Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped, "true")
 							.c_str(); // TODO: add working AA selection
 	//spdlog::warn("{}", query);
 	//return false;
@@ -526,7 +527,7 @@ void MasterServerManager::RequestServerList()
 			else
 			{
 				auto err = res.error();
-				spdlog::error("Failed requesting servers: error {}", err);
+				spdlog::error("Failed requesting servers: error {}", httplib::to_string(err));
 				m_bSuccessfullyConnected = false;
 			}
 			m_bRequestingServerList = false;
@@ -653,7 +654,7 @@ void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::
 			else
 			{
 				auto err = res.error();
-				spdlog::error("Failed authenticating with local server: encountered connection error {}", err);
+				spdlog::error("Failed authenticating with local server: encountered connection error {}", httplib::to_string(err));
 				m_bSuccessfullyConnected = false;
 				m_bSuccessfullyAuthenticatedWithGameServer = false;
 				m_bScriptAuthenticatingWithGameServer = false;
@@ -808,7 +809,7 @@ void MasterServerManager::WritePlayerPersistentData(const char* player_id, const
 			else
 			{
 				auto err = res.error();
-				spdlog::error("[Pdata] Write persistence failed for user: {}, error: {}", strPlayerId, err);
+				spdlog::error("[Pdata] Write persistence failed for user: {}, error: {}", strPlayerId, httplib::to_string(err));
 
 				m_bSuccessfullyConnected = false;
 			}

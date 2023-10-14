@@ -18,7 +18,7 @@
 #include "httplib.h"
 #include "nlohmann/json.hpp"
 #include "shared/playlist.h"
-#include "shared/kcp.h"
+
 #include <fstream>
 #include <filesystem>
 #include <thread>
@@ -110,6 +110,7 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 					std::lock_guard<std::mutex> guard(m_AuthDataMutex);
 					m_RemoteAuthenticationData.insert(std::make_pair(request.get_param_value("authToken"), newAuthData));
 
+					/*
 					if (g_kcp_initialized())
 					{
 						response.set_content(
@@ -120,7 +121,7 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 						response.set_content(
 							"{\"success\":true}", "application/json");
 					}
-					
+					*/
 				});
 
 			m_PlayerAuthServer.listen("0.0.0.0", Cvar_ns_player_auth_port->GetInt());

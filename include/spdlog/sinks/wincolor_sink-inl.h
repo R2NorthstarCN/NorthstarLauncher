@@ -4,7 +4,7 @@
 #pragma once
 
 #ifndef SPDLOG_HEADER_ONLY
-#include <spdlog/sinks/wincolor_sink.h>
+#    include <spdlog/sinks/wincolor_sink.h>
 #endif
 
 #include <spdlog/details/windows_include.h>
@@ -45,7 +45,7 @@ template<typename ConsoleMutex>
 void SPDLOG_INLINE wincolor_sink<ConsoleMutex>::set_color(level::level_enum level, std::uint16_t color)
 {
     std::lock_guard<mutex_t> lock(mutex_);
-    colors_[level] = color;
+    colors_[static_cast<size_t>(level)] = color;
 }
 
 template<typename ConsoleMutex>
@@ -66,7 +66,7 @@ void SPDLOG_INLINE wincolor_sink<ConsoleMutex>::log(const details::log_msg &msg)
         // before color range
         print_range_(formatted, 0, msg.color_range_start);
         // in color range
-        auto orig_attribs = static_cast<WORD>(set_foreground_color_(colors_[msg.level]));
+        auto orig_attribs = static_cast<WORD>(set_foreground_color_(colors_[static_cast<size_t>(msg.level)]));
         print_range_(formatted, msg.color_range_start, msg.color_range_end);
         // reset to orig colors
         ::SetConsoleTextAttribute(static_cast<HANDLE>(out_handle_), orig_attribs);
@@ -129,10 +129,10 @@ std::uint16_t SPDLOG_INLINE wincolor_sink<ConsoleMutex>::set_foreground_color_(s
     if (!::GetConsoleScreenBufferInfo(static_cast<HANDLE>(out_handle_), &orig_buffer_info))
     {
         // just return white if failed getting console info
-        return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE; 
+        return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
     }
-    
-    // change only the foreground bits (lowest 4 bits) 
+
+    // change only the foreground bits (lowest 4 bits)
     auto new_attribs = static_cast<WORD>(attribs) | (orig_buffer_info.wAttributes & 0xfff0);
     auto ignored = ::SetConsoleTextAttribute(static_cast<HANDLE>(out_handle_), static_cast<WORD>(new_attribs));
     (void)(ignored);

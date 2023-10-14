@@ -395,13 +395,12 @@ ADD_SQFUNC("void", NSConnectToAuthedServer, "", "", ScriptContext::UI)
 	R2::Cbuf_AddText(
 		R2::Cbuf_GetCurrentPlayer(),
 		fmt::format(
-			"kcp_connect ::ffff:{}.{}.{}.{} {} {}",
+			"connect {}.{}.{}.{}:{}",
 			info.ip.S_un.S_un_b.s_b1,
 			info.ip.S_un.S_un_b.s_b2,
 			info.ip.S_un.S_un_b.s_b3,
 			info.ip.S_un.S_un_b.s_b4,
-			info.port,
-			info.conv)
+			info.port)
 			.c_str(),
 		R2::cmd_source_t::kCommandSrcCode);
 

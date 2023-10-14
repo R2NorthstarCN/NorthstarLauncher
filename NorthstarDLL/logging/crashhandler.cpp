@@ -52,13 +52,13 @@ void PrintExceptionLog(ExceptionLog& exc)
 	// Generate format string for stack trace
 	std::stringstream formatString;
 	formatString << "    {:<" << exc.longestModuleNameLength + 2 << "} {:<" << exc.longestRelativeAddressLength << "} {}";
-	std::string guide = fmt::format(formatString.str(), "Module Name", "Offset", "Full Address");
+	std::string guide = fmt::format(fmt::runtime(formatString.str()), "Module Name", "Offset", "Full Address");
 	std::string line(guide.length() + 2, '-');
 	spdlog::error(guide);
 	spdlog::error(line);
 
 	for (const auto& module : exc.trace)
-		spdlog::error(formatString.str(), module.name, module.relativeAddress, module.address);
+		spdlog::error(fmt::runtime(formatString.str()), module.name, module.relativeAddress, module.address);
 
 	// Print dump of most CPU registers
 	spdlog::error("");

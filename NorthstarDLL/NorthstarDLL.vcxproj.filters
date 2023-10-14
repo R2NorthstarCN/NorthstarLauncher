@@ -345,7 +345,7 @@
     <ClInclude Include="client\vguihooks.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
-    <ClInclude Include="shared\kcp.h">
+    <ClInclude Include="shared\kcpintegration.h">
       <Filter>Header Files\shared</Filter>
     </ClInclude>
     <ClInclude Include="client\imgui.h">
@@ -359,6 +359,12 @@
     </ClInclude>
     <ClInclude Include="scripts\scriptjson.h">
       <Filter>Header Files\scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="shared\ikcp.h">
+      <Filter>Header Files\shared</Filter>
+    </ClInclude>
+    <ClInclude Include="shared\rs.h">
+      <Filter>Header Files\shared</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -638,7 +644,7 @@
     <ClCompile Include="client\vguihooks.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
-    <ClCompile Include="shared\kcp.cpp">
+    <ClCompile Include="shared\kcpintegration.cpp">
       <Filter>Source Files\shared</Filter>
     </ClCompile>
     <ClCompile Include="client\imgui.cpp">
@@ -652,6 +658,12 @@
     </ClCompile>
     <ClCompile Include="mods\modsavefiles.cpp">
       <Filter>Source Files\mods</Filter>
+    </ClCompile>
+    <ClCompile Include="shared\ikcp.cpp">
+      <Filter>Source Files\shared</Filter>
+    </ClCompile>
+    <ClCompile Include="shared\rs.cpp">
+      <Filter>Source Files\shared</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

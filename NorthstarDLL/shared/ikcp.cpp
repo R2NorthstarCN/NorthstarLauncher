@@ -9,7 +9,7 @@
 // + Lightweight, distributed as a single source file.
 //
 //=====================================================================
-#include "ikcp.h"
+#include "shared/ikcp.h"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -51,21 +51,21 @@ const IUINT32 IKCP_FASTACK_LIMIT = 5;		// max times to trigger fastack
 //---------------------------------------------------------------------
 
 /* encode 8 bits unsigned int */
-static inline char *ikcp_encode8u(char *p, unsigned char c)
+char *ikcp_encode8u(char *p, unsigned char c)
 {
 	*(unsigned char*)p++ = c;
 	return p;
 }
 
 /* decode 8 bits unsigned int */
-static inline const char *ikcp_decode8u(const char *p, unsigned char *c)
+const char *ikcp_decode8u(const char *p, unsigned char *c)
 {
 	*c = *(unsigned char*)p++;
 	return p;
 }
 
 /* encode 16 bits unsigned int (lsb) */
-static inline char *ikcp_encode16u(char *p, unsigned short w)
+char *ikcp_encode16u(char *p, unsigned short w)
 {
 #if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
 	*(unsigned char*)(p + 0) = (w & 255);
@@ -78,7 +78,7 @@ static inline char *ikcp_encode16u(char *p, unsigned short w)
 }
 
 /* decode 16 bits unsigned int (lsb) */
-static inline const char *ikcp_decode16u(const char *p, unsigned short *w)
+const char *ikcp_decode16u(const char *p, unsigned short *w)
 {
 #if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
 	*w = *(const unsigned char*)(p + 1);
@@ -91,7 +91,7 @@ static inline const char *ikcp_decode16u(const char *p, unsigned short *w)
 }
 
 /* encode 32 bits unsigned int (lsb) */
-static inline char *ikcp_encode32u(char *p, IUINT32 l)
+char *ikcp_encode32u(char *p, IUINT32 l)
 {
 #if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
 	*(unsigned char*)(p + 0) = (unsigned char)((l >>  0) & 0xff);
@@ -106,7 +106,7 @@ static inline char *ikcp_encode32u(char *p, IUINT32 l)
 }
 
 /* decode 32 bits unsigned int (lsb) */
-static inline const char *ikcp_decode32u(const char *p, IUINT32 *l)
+const char *ikcp_decode32u(const char *p, IUINT32 *l)
 {
 #if IWORDS_BIG_ENDIAN || IWORDS_MUST_ALIGN
 	*l = *(const unsigned char*)(p + 3);
@@ -291,9 +291,6 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	kcp->output = NULL;
 	kcp->writelog = NULL;
 
-	kcp->out_segs = 0;
-	kcp->retrans_segs = 0;
-
 	return kcp;
 }
 
@@ -473,6 +470,7 @@ int ikcp_send(ikcpcb *kcp, const char *buffer, int len)
 {
 	IKCPSEG *seg;
 	int count, i;
+	int sent = 0;
 
 	assert(kcp->mss > 0);
 	if (len < 0) return -1;
@@ -500,17 +498,22 @@ int ikcp_send(ikcpcb *kcp, const char *buffer, int len)
 				len -= extend;
 				iqueue_del_init(&old->node);
 				ikcp_segment_delete(kcp, old);
+				sent = extend;
 			}
 		}
 		if (len <= 0) {
-			return 0;
+			return sent;
 		}
 	}
 
 	if (len <= (int)kcp->mss) count = 1;
 	else count = (len + kcp->mss - 1) / kcp->mss;
 
-	if (count >= (int)IKCP_WND_RCV) return -2;
+	if (count >= (int)IKCP_WND_RCV) {
+		if (kcp->stream != 0 && sent > 0) 
+			return sent;
+		return -2;
+	}
 
 	if (count == 0) count = 1;
 
@@ -534,9 +537,10 @@ int ikcp_send(ikcpcb *kcp, const char *buffer, int len)
 			buffer += size;
 		}
 		len -= size;
+		sent += size;
 	}
 
-	return 0;
+	return sent;
 }
 
 
@@ -906,7 +910,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 //---------------------------------------------------------------------
 // ikcp_encode_seg
 //---------------------------------------------------------------------
-static char *ikcp_encode_seg(ikcpcb* kcp, char *ptr, const IKCPSEG *seg)
+static char *ikcp_encode_seg(char *ptr, const IKCPSEG *seg)
 {
 	ptr = ikcp_encode32u(ptr, seg->conv);
 	ptr = ikcp_encode8u(ptr, (IUINT8)seg->cmd);
@@ -916,9 +920,6 @@ static char *ikcp_encode_seg(ikcpcb* kcp, char *ptr, const IKCPSEG *seg)
 	ptr = ikcp_encode32u(ptr, seg->sn);
 	ptr = ikcp_encode32u(ptr, seg->una);
 	ptr = ikcp_encode32u(ptr, seg->len);
-
-	kcp->out_segs += 1;
-
 	return ptr;
 }
 
@@ -968,7 +969,7 @@ void ikcp_flush(ikcpcb *kcp)
 			ptr = buffer;
 		}
 		ikcp_ack_get(kcp, i, &seg.sn, &seg.ts);
-		ptr = ikcp_encode_seg(kcp, ptr, &seg);
+		ptr = ikcp_encode_seg(ptr, &seg);
 	}
 
 	kcp->ackcount = 0;
@@ -1003,7 +1004,7 @@ void ikcp_flush(ikcpcb *kcp)
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
-		ptr = ikcp_encode_seg(kcp, ptr, &seg);
+		ptr = ikcp_encode_seg(ptr, &seg);
 	}
 
 	// flush window probing commands
@@ -1014,7 +1015,7 @@ void ikcp_flush(ikcpcb *kcp)
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
-		ptr = ikcp_encode_seg(kcp, ptr, &seg);
+		ptr = ikcp_encode_seg(ptr, &seg);
 	}
 
 	kcp->probe = 0;
@@ -1074,9 +1075,6 @@ void ikcp_flush(ikcpcb *kcp)
 			}
 			segment->resendts = current + segment->rto;
 			lost = 1;
-
-			kcp->lost_segs += 1;
-			kcp->retrans_segs += 1;
 		}
 		else if (segment->fastack >= resent) {
 			if ((int)segment->xmit <= kcp->fastlimit || 
@@ -1087,8 +1085,6 @@ void ikcp_flush(ikcpcb *kcp)
 				segment->resendts = current + segment->rto;
 				change++;
 			}
-
-			kcp->retrans_segs += 1;
 		}
 
 		if (needsend) {
@@ -1105,7 +1101,7 @@ void ikcp_flush(ikcpcb *kcp)
 				ptr = buffer;
 			}
 
-			ptr = ikcp_encode_seg(kcp, ptr, segment);
+			ptr = ikcp_encode_seg(ptr, segment);
 
 			if (segment->len > 0) {
 				memcpy(ptr, segment->data, segment->len);

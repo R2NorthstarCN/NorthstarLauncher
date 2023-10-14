@@ -101,7 +101,7 @@ MatchmakeManager::MatchmakeManager()
 							// TODO: cleanup
 						}
 						std::string connection_cmd = fmt::format(
-							"kcp_connect ::ffff:{}.{}.{}.{} {} {}",
+							"kcp_connect {}.{}.{}.{} {} {}",
 							conn_info.ip.S_un.S_un_b.s_b1,
 							conn_info.ip.S_un.S_un_b.s_b2,
 							conn_info.ip.S_un.S_un_b.s_b3,

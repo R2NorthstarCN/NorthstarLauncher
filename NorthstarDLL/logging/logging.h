@@ -1,8 +1,11 @@
 #pragma once
+#include "spdlog/common.h"
 #include "spdlog/sinks/base_sink.h"
 #include "spdlog/logger.h"
 #include "squirrel/squirrel.h"
 #include "core/math/color.h"
+
+namespace fmt_lib = fmt;
 
 void CreateLogFiles();
 void InitialiseLogging();
@@ -59,7 +62,7 @@ class ColoredLogger : public spdlog::logger
 			{
 				sink->log(custom_msg);
 			}
-			SPDLOG_LOGGER_CATCH()
+			SPDLOG_LOGGER_CATCH(custom_msg.source)
 		}
 
 		for (auto& sink : custom_sinks_)
@@ -68,7 +71,7 @@ class ColoredLogger : public spdlog::logger
 			{
 				sink->custom_log(custom_msg);
 			}
-			SPDLOG_LOGGER_CATCH()
+			SPDLOG_LOGGER_CATCH(custom_msg.source)
 		}
 
 		if (should_flush_(custom_msg))
@@ -97,6 +100,8 @@ namespace NS::log
 	extern std::shared_ptr<ColoredLogger> rpak;
 	// Echo
 	extern std::shared_ptr<ColoredLogger> echo;
+
+	extern std::shared_ptr<ColoredLogger> NEW_NET;
 
 	extern std::shared_ptr<ColoredLogger> NORTHSTAR;
 
