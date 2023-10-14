@@ -1,7 +1,5 @@
 #pragma once
 
-#ifndef NORTHSTAR_DEDICATED_ONLY
-
 #include <d3d11.h>
 
 #include "imgui/kiero.h"
@@ -37,5 +35,3 @@ extern std::vector<imgui_draw*> draw_functions;
 void imgui_setup();
 
 void imgui_add_draw(imgui_draw* func);
-
-#endif

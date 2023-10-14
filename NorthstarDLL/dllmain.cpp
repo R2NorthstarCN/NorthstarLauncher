@@ -170,9 +170,7 @@ bool InitialiseNorthstar()
 	// run callbacks for any libraries that are already loaded by now
 	CallAllPendingDLLLoadCallbacks();
 
-	#ifndef NORTHSTAR_DEDICATED_ONLY
 	imgui_setup();
-	#endif
 
 	return true;
 }

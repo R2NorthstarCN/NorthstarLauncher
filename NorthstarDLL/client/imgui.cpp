@@ -1,5 +1,3 @@
-#ifndef NORTHSTAR_DEDICATED_ONLY
-
 #include "imgui.h"
 #include "core/memalloc.h"
 #include "imgui/implot.h"
@@ -157,5 +155,3 @@ void imgui_setup()
 	std::jthread setup_thread(setup_thread_func);
 	setup_thread.detach();
 }
-
-#endif

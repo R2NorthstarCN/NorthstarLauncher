@@ -219,6 +219,7 @@
     <ClCompile Include="kiero.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="backends\d3dcompiler.h" />
     <ClInclude Include="backends\imgui_impl_dx11.h" />
     <ClInclude Include="backends\imgui_impl_win32.h" />
     <ClInclude Include="imconfig.h" />
