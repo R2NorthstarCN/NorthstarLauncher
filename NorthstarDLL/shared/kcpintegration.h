@@ -17,7 +17,7 @@ struct NetContext
 	sockaddr_in6 addr;
 };
 
-template<> struct fmt::formatter<NetContext>
+template <> struct fmt::formatter<NetContext>
 {
 	constexpr auto parse(format_parse_context& ctx) -> format_parse_context::iterator
 	{
@@ -338,6 +338,7 @@ class FecLayer : public NetSource, public NetSink
 
 	void bindTop(std::shared_ptr<NetSink> top);
 	void bindBottom(std::weak_ptr<NetSource> bottom);
+
   private:
 	std::shared_ptr<NetSink> top;
 	std::weak_ptr<NetSource> bottom;
@@ -392,9 +393,20 @@ class KcpLayer : public NetSource, NetSink
 	KcpLayer();
 	~KcpLayer();
 
+	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
+	virtual int input(const NetBuffer& buf, const NetContext& ctx);
+	virtual bool initialized();
+
+	void startUpdateThread();
+
   private:
+	std::shared_ptr<NetSink> top;
+	std::weak_ptr<NetSource> bottom;
+
 	std::jthread updateThread;
 
 	std::condition_variable updateCv;
 	std::mutex updateCvMutex;
+
+	ikcpcb* cb;
 };

@@ -880,7 +880,7 @@ std::pair<int, int> FecLayer::AutoTuner::findPeriods()
 			}
 			currentFinding = pulses[i].bit;
 			currentFinds = 1;
-		}	
+		}
 	}
 
 	auto ds = std::max_element(
@@ -898,6 +898,14 @@ std::pair<int, int> FecLayer::AutoTuner::findPeriods()
 
 void updateThreadPayload(std::stop_token stoken) {}
 
-KcpLayer::KcpLayer() {}
+KcpLayer::KcpLayer()
+{
+	cb = ikcp_create(0, );
+}
 
 KcpLayer::~KcpLayer() {}
+
+bool KcpLayer::initialized()
+{
+	return top && !bottom.expired() && top->initialized() && bottom.lock()->initialized() && updateThread.joinable() && cb != nullptr && cb->user != nullptr;
+}
