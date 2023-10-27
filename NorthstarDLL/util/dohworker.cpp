@@ -72,7 +72,7 @@ std::string DohWorker::ResolveDomain(std::string domainname)
 		curl,
 		CURLOPT_URL,
 		fmt::format(
-			"https://223.5.5.5/resolve?name={}&type=1&short=1",
+			"https://223.6.6.6/resolve?name={}&type=1&short=1",
 			domainnameescaped)
 		.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
