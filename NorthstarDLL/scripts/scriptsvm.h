@@ -8,16 +8,22 @@ SQRESULT NSSvmTrain(HSquirrelVM* sqvm)
 {
 	//g_pSquirrel<ScriptContext::SERVER>->__sq_get
 	SQArray* array = sqvm->_stackOfCurrentFunction[1]._VAL.asArray;
-	std::vector<Vector3> origins;
+	std::vector<std::pair<Vector3,int>> origins;
 
-	for (int vIdx = 0; vIdx < array->_usedSlots; ++vIdx)
+
+
+	SQTable* originsTable = sqvm->_stackOfCurrentFunction[1]._VAL.asTable;
+	for (int idx = 0; idx < originsTable->_numOfNodes; ++idx)
 	{
-		if (array->_values[vIdx]._Type == OT_STRING)
+		tableNode* node = &originsTable->_nodes[idx];
+
+		if (node->key._Type == OT_VECTOR && node->val._Type == OT_INTEGER)
 		{
-			origins.push_back(Vector3(
-				array->_values[vIdx]._VAL.asVector->x, array->_values[vIdx]._VAL.asVector->y, array->_values[vIdx]._VAL.asVector->z));
+			origins.push_back(
+				std::make_pair(Vector3(node->key._VAL.asVector->x, node->key._VAL.asVector->y,node->key._VAL.asVector->z),node->val._VAL.as64Integer));		
 		}
 	}
+
 
 	// origins operations
 
