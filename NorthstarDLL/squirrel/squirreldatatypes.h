@@ -92,6 +92,7 @@ union SQObjectValue
 	int asInteger;
 	SQUserData* asUserdata;
 	SQStructInstance* asStructInstance;
+	SQVector* asVector;
 };
 
 /* 160 */
