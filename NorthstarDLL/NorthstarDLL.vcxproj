@@ -130,7 +130,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;kcp.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;kcp.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;libsvm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceSymbolReferences>
       </ForceSymbolReferences>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -231,6 +231,7 @@
     <ClInclude Include="scripts\scriptjson.h" />
     <ClInclude Include="scripts\scriptmasterservermessages.h" />
     <ClInclude Include="scripts\scriptmatchmakingevents.h" />
+    <ClInclude Include="scripts\scriptsvm.h" />
     <ClInclude Include="server\auth\bansystem.h" />
     <ClInclude Include="server\auth\serverauthentication.h" />
     <ClInclude Include="server\r2server.h" />
