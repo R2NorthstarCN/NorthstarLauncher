@@ -6,12 +6,7 @@
 // userdata NSSvmTrain(players origin)
 SQRESULT NSSvmTrain(HSquirrelVM* sqvm)
 {
-	//g_pSquirrel<ScriptContext::SERVER>->__sq_get
-	SQArray* array = sqvm->_stackOfCurrentFunction[1]._VAL.asArray;
 	std::vector<std::pair<Vector3,int>> origins;
-
-
-
 	SQTable* originsTable = sqvm->_stackOfCurrentFunction[1]._VAL.asTable;
 	for (int idx = 0; idx < originsTable->_numOfNodes; ++idx)
 	{
@@ -45,6 +40,6 @@ SQRESULT NSSvmPredict(HSquirrelVM* sqvm)
 
 ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptPlayerInfo, ClientSquirrel, (CModule module))
 {
-	g_pSquirrel<ScriptContext::SERVER>->AddFuncRegistration("userdata", "NSSvmTrain", "array origins", "", NSSvmTrain);
+	g_pSquirrel<ScriptContext::SERVER>->AddFuncRegistration("userdata", "NSSvmTrain", "table origins", "", NSSvmTrain);
 	g_pSquirrel<ScriptContext::SERVER>->AddFuncRegistration("int", "NSSvmPredict", "vector origin", "", NSSvmPredict);
 }
