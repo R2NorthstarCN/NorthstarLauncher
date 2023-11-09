@@ -360,9 +360,6 @@
     <ClInclude Include="scripts\scriptjson.h">
       <Filter>Header Files\scripts</Filter>
     </ClInclude>
-    <ClInclude Include="scripts\scriptsvm.h">
-      <Filter>Header Files\scripts</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">
@@ -655,6 +652,9 @@
     </ClCompile>
     <ClCompile Include="mods\modsavefiles.cpp">
       <Filter>Source Files\mods</Filter>
+    </ClCompile>
+    <ClCompile Include="scriptsvm.cpp">
+      <Filter>Source Files\scripts</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

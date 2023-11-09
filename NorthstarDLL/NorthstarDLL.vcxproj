@@ -231,7 +231,6 @@
     <ClInclude Include="scripts\scriptjson.h" />
     <ClInclude Include="scripts\scriptmasterservermessages.h" />
     <ClInclude Include="scripts\scriptmatchmakingevents.h" />
-    <ClInclude Include="scripts\scriptsvm.h" />
     <ClInclude Include="server\auth\bansystem.h" />
     <ClInclude Include="server\auth\serverauthentication.h" />
     <ClInclude Include="server\r2server.h" />
@@ -312,6 +311,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Dedicated|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="plugins\plugins.cpp" />
+    <ClCompile Include="scriptsvm.cpp" />
     <ClCompile Include="scripts\clantag.cpp" />
     <ClCompile Include="scripts\client\clientchathooks.cpp" />
     <ClCompile Include="scripts\client\cursorposition.cpp" />

@@ -20,6 +20,7 @@ struct SQArray;
 struct tableNode;
 struct SQUserData;
 struct CSquirrelVM;
+struct SQVector;
 
 typedef void (*releasehookType)(void* val, int size);
 
@@ -92,7 +93,6 @@ union SQObjectValue
 	int asInteger;
 	SQUserData* asUserdata;
 	SQStructInstance* asStructInstance;
-	SQVector* asVector;
 };
 
 /* 160 */
