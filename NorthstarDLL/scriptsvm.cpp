@@ -1,27 +1,22 @@
 #include "squirrel/squirrel.h"
 #include <svm.h>
 
+const float COORD_MIN = -16384.0;
+const float COORD_LEN = 32767.0;
+
 struct SvmPoint
 {
 	Vector3 origin;
 	int faction;
 };
-struct SvmLimits
-{
-	float x_max = 0.0f;
-	float x_min = 0.0f;
-	float y_max = 0.0f;
-	float y_min = 0.0f;
-	float z_max = 0.0f;
-	float z_min = 0.0f;
-};
 
 void releasehook(void* val, int size)
 {
-	spdlog::error("Release hook: {:p} {}", val, size);
 	svm_free_and_destroy_model((svm_model**)val);
-	SvmLimits** userdata_limits = (SvmLimits**)((uintptr_t)val + 8);
-	delete *userdata_limits;
+}
+
+void svm_print_string(const char* str)
+{
 }
 
 ADD_SQFUNC(
@@ -81,48 +76,22 @@ ADD_SQFUNC(
 	svm_node* x_space = new svm_node[4 * prob.l];
 	prob.x = new svm_node*[prob.l];
 
-	SvmLimits* limits = new SvmLimits;
-
-	limits->x_max = std::numeric_limits<float>::min();
-	limits->x_min = std::numeric_limits<float>::max();
-	limits->y_max = std::numeric_limits<float>::min();
-	limits->y_min = std::numeric_limits<float>::max();
-	limits->z_max = std::numeric_limits<float>::min();
-	limits->z_min = std::numeric_limits<float>::max();
-
-	for (const auto& p : points)
-	{
-		limits->x_max = std::max(limits->x_max, p.origin.x);
-		limits->x_min = std::min(limits->x_min, p.origin.x);
-		limits->y_max = std::max(limits->y_max, p.origin.y);
-		limits->y_min = std::min(limits->y_min, p.origin.y);
-		limits->z_max = std::max(limits->z_max, p.origin.z);
-		limits->z_min = std::min(limits->z_min, p.origin.z);
-	}
-
-	//spdlog::info("determined axis limits : x {} - {}, y {} - {}, z {} - {}", x_min, x_max,y_min,y_max,z_min,z_max);
-	float x_len = limits->x_max - limits->x_min;
-	float y_len = limits->y_max - limits->y_min;
-	float z_len = limits->z_max - limits->z_min;
-
 	for (int i = 0; i < points.size(); ++i)
 	{
 		x_space[4 * i].index = 1;
-		x_space[4 * i].value = ((points[i].origin.x - limits->x_min) / x_len);
+		x_space[4 * i].value = ((points[i].origin.x - COORD_MIN) / COORD_LEN);
 		x_space[4 * i + 1].index = 2;
-		x_space[4 * i + 1].value = ((points[i].origin.y - limits->y_min) / y_len);
+		x_space[4 * i + 1].value = ((points[i].origin.y - COORD_MIN) / COORD_LEN);
 		x_space[4 * i + 2].index = 3;
-		x_space[4 * i + 2].value = ((points[i].origin.z - limits->z_min) / z_len);
+		x_space[4 * i + 2].value = ((points[i].origin.z - COORD_MIN) / COORD_LEN);
 		x_space[4 * i + 3].index = -1;
 		prob.x[i] = &x_space[4 * i];
 		prob.y[i] = points[i].faction;
 	}
-
+	svm_set_print_string_function(svm_print_string);
 	svm_model* model = svm_train(&prob, &param);
-	svm_model** userdata_model = g_pSquirrel<context>->createuserdata<svm_model*>(sqvm, 16);
+	svm_model** userdata_model = g_pSquirrel<context>->createuserdata<svm_model*>(sqvm, 8);
 	*userdata_model = model;
-	SvmLimits** userdata_limits = (SvmLimits**)(((uintptr_t)userdata_model) + 8);
-	*userdata_limits = limits;
 
 	SQUserData* userdata = (SQUserData*)(((uintptr_t)userdata_model) - 80);
 	userdata->releaseHook = releasehook;
@@ -145,18 +114,15 @@ ADD_SQFUNC(
 	svm_model** model = nullptr;
 	g_pSquirrel<context>->__sq_getobject(sqvm, 1, obj);
 	model = (svm_model**)obj->_VAL.asUserdata->data;
-	SvmLimits** limits = (SvmLimits**)(((uintptr_t)model) + 8);
 	Vector3 vec =g_pSquirrel<context>->getvector(sqvm, 2);
-	float x_len = (*limits)->x_max - (*limits)->x_min;
-	float y_len = (*limits)->y_max - (*limits)->y_min;
-	float z_len = (*limits)->z_max - (*limits)->z_min;
+
 	svm_node x[4];
 	x[0].index = 1;
-	x[0].value = (vec.x - (*limits)->x_min) / x_len;
+	x[0].value = (vec.x - COORD_MIN) / COORD_LEN;
 	x[1].index = 2;
-	x[1].value = (vec.y - (*limits)->y_min) / y_len;
+	x[1].value = (vec.y - COORD_MIN) / COORD_LEN;
 	x[2].index = 3;
-	x[2].value = (vec.z - (*limits)->z_min) / z_len;
+	x[2].value = (vec.z - COORD_MIN) / COORD_LEN;
 	x[3].index = -1;
 	// code
 	int result = svm_predict(*model, x);
