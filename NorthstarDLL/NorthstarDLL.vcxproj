@@ -140,7 +140,8 @@
       </Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" &amp;&amp; copy /Y "$(TargetPath)" "$(SolutionDir)..\NorthstarCN_Binaries\</Command>
+      <Command>IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries_Dedicated\Northstar.dll" del "$(SolutionDir)..\NorthstarCN_Binaries_Dedicated\Northstar.dll" &amp;&amp; copy /Y "$(TargetPath)" "$(SolutionDir)..\NorthstarCN_Binaries_Dedicated\
+IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" &amp;&amp; copy /Y "$(TargetPath)" "$(SolutionDir)..\NorthstarCN_Binaries\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Dedicated|x64'">

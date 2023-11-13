@@ -147,11 +147,12 @@ void imgui_add_draw(imgui_draw* func)
 void imgui_setup()
 {
 	// ImGui::GetAllocatorFunctions(imgui_malloc, (ImGuiMemFreeFunc*)imgui_free, nullptr);
-	if (!strstr(GetCommandLineA(), "-enableimgui"))
+	if (strstr(GetCommandLineA(), "-disableimgui"))
 	{
-		spdlog::info("[IMGUI] IMGUI is Disabled! use argument -enableimgui for advanced status display!");
+		spdlog::info("[IMGUI] IMGUI is disabled!");
 		return;
 	}
+	spdlog::info("[IMGUI] IMGUI is enabled! use argument -disableimgui if you find any compatibility issues!");
 	std::jthread setup_thread(setup_thread_func);
 	setup_thread.detach();
 }
