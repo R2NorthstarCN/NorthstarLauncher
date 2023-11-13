@@ -57,11 +57,11 @@ ADD_SQFUNC(
 	param.svm_type = C_SVC;
 	param.kernel_type = RBF;
 	param.degree = 3;
-	param.gamma = 0.5;
+	param.gamma = 1.0/3;
 	param.coef0 = 0;
 	param.nu = 0.5;
 	param.cache_size = 100;
-	param.C = 100;
+	param.C = 1000;
 	param.eps = 1e-3;
 	param.p = 0.1;
 	param.shrinking = 1;
