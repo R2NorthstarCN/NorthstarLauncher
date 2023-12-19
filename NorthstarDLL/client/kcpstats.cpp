@@ -69,7 +69,7 @@ sliding_window sw_rcs(50);
 IUINT32 last_rotate = iclock();
 bool has_connection = false;
 
-void draw_kcp_stats()
+void draw_kcp_stats(ID3D11Device* device)
 {
 	if (Cvar_kcp_stats == nullptr || !Cvar_kcp_stats->GetBool() || !g_kcp_initialized())
 	{

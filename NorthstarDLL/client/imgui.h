@@ -28,10 +28,26 @@ namespace ImPlot
 	void PushGreenLineColor();
 } // namespace ImPlot
 
-typedef void imgui_draw();
+typedef void imgui_draw(ID3D11Device*  pDevice);
 
 extern std::vector<imgui_draw*> draw_functions;
+
+bool imgui_ready();
 
 void imgui_setup();
 
 void imgui_add_draw(imgui_draw* func);
+
+
+#ifndef IMGUI_FONTS
+#define IMGUI_FONTS
+
+extern ImFont* IMGUI_FONT_MSYH_13;
+extern ImFont* IMGUI_FONT_MSYH_16;
+extern ImFont* IMGUI_FONT_MSYH_22;
+extern ImFont* IMGUI_FONT_MSYH_36;
+extern ImFont* IMGUI_FONT_MSYHBD_13;
+extern ImFont* IMGUI_FONT_MSYHBD_16;
+extern ImFont* IMGUI_FONT_MSYHBD_22;
+extern ImFont* IMGUI_FONT_MSYHBD_28;
+#endif

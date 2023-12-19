@@ -7,12 +7,22 @@ std::vector<imgui_draw*> draw_functions;
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+bool imgui_isready = false;
 Present oPresent;
 HWND window = NULL;
 WNDPROC oWndProc;
 ID3D11Device* pDevice = NULL;
 ID3D11DeviceContext* pContext = NULL;
 ID3D11RenderTargetView* mainRenderTargetView;
+
+ImFont* IMGUI_FONT_MSYH_13 = NULL;
+ImFont* IMGUI_FONT_MSYH_16 = NULL;
+ImFont* IMGUI_FONT_MSYH_22 = NULL;
+ImFont* IMGUI_FONT_MSYH_36 = NULL;
+ImFont* IMGUI_FONT_MSYHBD_13 = NULL;
+ImFont* IMGUI_FONT_MSYHBD_16 = NULL;
+ImFont* IMGUI_FONT_MSYHBD_22 = NULL;
+ImFont* IMGUI_FONT_MSYHBD_28 = NULL;
 
 LRESULT __stdcall WndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -31,6 +41,37 @@ void InitImGui()
 	io.ConfigFlags = ImGuiConfigFlags_NoMouseCursorChange;
 	ImGui_ImplWin32_Init(window);
 	ImGui_ImplDX11_Init(pDevice, pContext);
+	// Base font
+	//io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+	// Bold headings H2 and H3
+	io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 22.0f, nullptr, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+	IMGUI_FONT_MSYHBD_22 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 22.0f, nullptr, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+	IMGUI_FONT_MSYHBD_28 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 28.0f, nullptr, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+	/*IMGUI_FONT_MSYH_13 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+	IMGUI_FONT_MSYH_16 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 15.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+	
+	IMGUI_FONT_MSYH_36 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 36.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+	IMGUI_FONT_MSYHBD_13 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+	IMGUI_FONT_MSYHBD_16 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 15.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+	IMGUI_FONT_MSYHBD_22 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 22.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+	IMGUI_FONT_MSYHBD_36 =
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 36.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());*/
+	
+	spdlog::info("[IMGUI] Custom fonts loaded.");
+	imgui_isready = true;
+}
+
+bool imgui_ready()
+{
+	return imgui_isready;
 }
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
@@ -66,7 +107,7 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT 
 
 	for (const auto& func : draw_functions)
 	{
-		func();
+		func(pDevice);
 	}
 
 	ImGui::EndFrame();
