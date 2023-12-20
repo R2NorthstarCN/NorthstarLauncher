@@ -10,6 +10,14 @@
 #include <unordered_set>
 ConVar* Cvar_markdown_draw;
 ID3D11Device* g_pd3dDevice = NULL;
+void LinkCallback(ImGui::MarkdownLinkCallbackData data_);
+inline ImGui::MarkdownImageData ImageCallback(ImGui::MarkdownLinkCallbackData data_);
+
+ImFont* H1 = NULL;
+ImFont* H2 = NULL;
+ImFont* H3 = NULL;
+
+static ImGui::MarkdownConfig mdConfig;
 
 struct TextureResource
 {
@@ -18,7 +26,11 @@ struct TextureResource
 	int size_y;
 };
 
+bool g_RequestingMarkDownUrl = false;
+
 std::map<std::string, TextureResource*> g_StaticTextureResourceCache;
+std::mutex g_StaticTextureResourceCacheMutex;
+
 std::unordered_set<std::string> g_StaticImageDownloadHistory;
 
 std::queue<std::string> g_ImageDownloadQueue;
@@ -27,7 +39,7 @@ std::condition_variable g_ImageDownloadQueueCondition;
 
 std::string g_TextCache;
 
-void QueueURLForDownload(std::string url)
+void QueueUrlForDownload(std::string url)
 {
 	std::thread queue_thread(
 		[url]()
@@ -39,26 +51,30 @@ void QueueURLForDownload(std::string url)
 	queue_thread.detach();
 }
 
-TextureResource* GetStaticTextureFromURL(std::string url)
+TextureResource* GetStaticTextureFromUrl(std::string url)
 {
 	std::vector<unsigned char> emptydata;
+	g_StaticTextureResourceCacheMutex.lock();
+	
 	if (g_StaticTextureResourceCache.contains(url))
 	{
+		g_StaticTextureResourceCacheMutex.unlock();
 		return g_StaticTextureResourceCache[url];
 	}
 	else
 	{
-		
+		g_StaticTextureResourceCacheMutex.unlock();
 		// if an image has been downloaded before but not in cache, its likely still in download or failed.
 		if (g_StaticImageDownloadHistory.contains(url))
 		{
 			return NULL;
 		}
 		spdlog::info("[Markdown] Image {} is not cached. Downloading!", url);
-		QueueURLForDownload(url);
+		QueueUrlForDownload(url);
 		g_StaticImageDownloadHistory.emplace(url);
 		return NULL;
 	}
+	
 }
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::vector<unsigned char>* data)
 {
@@ -73,6 +89,8 @@ size_t CurlWriteStringBufferCallback(char* contents, size_t size, size_t nmemb, 
 }
 std::string DownloadMOTDFromUrl(const std::string& url)
 {
+	g_RequestingMarkDownUrl = true;
+
 	if (!g_TextCache.empty())
 	{
 		return g_TextCache;
@@ -102,6 +120,7 @@ std::string DownloadMOTDFromUrl(const std::string& url)
 	}
 	spdlog::info("[Markdown] Successfully downloaded text from url: {}", url);
 	g_TextCache = text;
+	g_RequestingMarkDownUrl = false;
 	return text;
 }
 
@@ -135,7 +154,7 @@ bool CreateTextureFromImage(std::vector<unsigned char> pngData, ID3D11ShaderReso
 	}
 	int image_width = 0;
 	int image_height = 0;
-	unsigned char* image_data = stbi_load_from_memory(pngData.data(), pngData.size(), &image_width, &image_height, NULL, 0);
+	unsigned char* image_data = stbi_load_from_memory(pngData.data(), pngData.size(), &image_width, &image_height, NULL, 4);
 	if (image_data == NULL)
 		return false;
 
@@ -146,7 +165,7 @@ bool CreateTextureFromImage(std::vector<unsigned char> pngData, ID3D11ShaderReso
 	desc.Height = image_height;
 	desc.MipLevels = 1;
 	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	desc.SampleDesc.Count = 1;
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -162,7 +181,8 @@ bool CreateTextureFromImage(std::vector<unsigned char> pngData, ID3D11ShaderReso
 	// Create texture view
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	ZeroMemory(&srvDesc, sizeof(srvDesc));
-	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = desc.MipLevels;
 	srvDesc.Texture2D.MostDetailedMip = 0;
@@ -192,30 +212,43 @@ void InitStaticImageDownloadThread()
 				}
 
 				std::string nexturl = g_ImageDownloadQueue.front();
-				spdlog::info("[Markdown] Processing next image: {}", nexturl);
-				std::vector<unsigned char> image = DownloadPNGFromUrl(nexturl);
-
-				if (!image.empty())
-				{
-					ID3D11ShaderResourceView* my_texture = NULL;
-					int my_image_width = 0;
-					int my_image_height = 0;
-
-					CreateTextureFromImage(image, &my_texture, &my_image_width, &my_image_height);
-
-					TextureResource* tex = new TextureResource();
-					tex->texture = my_texture;
-					tex->size_x = my_image_width;
-					tex->size_y = my_image_height;
-
-
-					g_StaticTextureResourceCache.emplace(std::make_pair(nexturl, tex));
-				}
-				else
-				{
-					spdlog::error("[Markdown] Error Processing image: {}", nexturl);
-				}
 				g_ImageDownloadQueue.pop();
+				spdlog::info("[Markdown] Processing next image: {}", nexturl);
+
+				std::thread process_thread(
+					[nexturl]()
+					{
+
+						std::vector<unsigned char> image = DownloadPNGFromUrl(nexturl);
+
+						if (!image.empty())
+						{
+							ID3D11ShaderResourceView* my_texture = NULL;
+							int my_image_width = 0;
+							int my_image_height = 0;
+
+							CreateTextureFromImage(image, &my_texture, &my_image_width, &my_image_height);
+
+							TextureResource* tex = new TextureResource();
+							tex->texture = my_texture;
+							tex->size_x = my_image_width;
+							tex->size_y = my_image_height;
+							while (!g_StaticTextureResourceCacheMutex.try_lock())
+							{
+								std::this_thread::sleep_for(std::chrono::milliseconds(100));
+							}
+							g_StaticTextureResourceCache.emplace(std::make_pair(nexturl, tex));
+							g_StaticTextureResourceCacheMutex.unlock();
+						}
+						else
+						{
+							spdlog::error("[Markdown] Error Processing image: {}", nexturl);
+						}
+					});
+
+				process_thread.detach();
+
+				
 			}
 
 		});
@@ -223,24 +256,37 @@ void InitStaticImageDownloadThread()
 	downloader_thread.detach();
 }
 
-void LinkCallback(ImGui::MarkdownLinkCallbackData data_);
-inline ImGui::MarkdownImageData ImageCallback(ImGui::MarkdownLinkCallbackData data_);
-
-ImFont* H1 = NULL;
-ImFont* H2 = NULL;
-ImFont* H3 = NULL;
-
-static ImGui::MarkdownConfig mdConfig;
 
 
+void MarkdownRequestUrlUpdate(std::string url)
+{
+	if (g_RequestingMarkDownUrl)
+	{
+		spdlog::error("[Markdown] Requsting a page while another page is still being load!");
+		return;
+	}
+
+	g_TextCache.clear();
+
+	g_TextCache = DownloadMOTDFromUrl(url);
+}
 
 
 void LinkCallback(ImGui::MarkdownLinkCallbackData data_)
 {
 	std::string url(data_.link, data_.linkLength);
+	if (url.starts_with("[external]"))
+	{
+		url = url.erase(0, 10);
+		ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+		return;
+	}
+	
 	if (!data_.isImage)
 	{
-		ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+		
+		MarkdownRequestUrlUpdate(url);
+		return;
 	}
 }
 
@@ -257,7 +303,7 @@ inline ImGui::MarkdownImageData ImageCallback(ImGui::MarkdownLinkCallbackData da
 	imageData.isValid = true;
 	imageData.useLinkCallback = false;
 
-	auto texture = GetStaticTextureFromURL(imageUrl);
+	auto texture = GetStaticTextureFromUrl(imageUrl);
 	if (texture != NULL)
 	{
 		my_image_width = texture->size_x;
@@ -326,7 +372,7 @@ void ExampleMarkdownFormatCallback(const ImGui::MarkdownFormatInfo& markdownForm
 		{
 			if (start_)
 			{
-				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_Text]);
 			}
 			else
 			{
@@ -359,27 +405,35 @@ void Markdown(const std::string& markdown_)
 	ImGui::Markdown(markdown_.c_str(), markdown_.length(), mdConfig);
 	//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
+char textbuffer[2048];
 
 void MarkdownExample(ID3D11Device* device)
 {
 	g_pd3dDevice = device;
 
-	if (Cvar_markdown_draw == nullptr || !Cvar_markdown_draw->GetBool())
+	if (Cvar_markdown_draw == nullptr || !Cvar_markdown_draw->GetBool() || g_RequestingMarkDownUrl)
 	{
-		g_TextCache.clear();
 		return;
 	}
 	
-	std::string markdownText = DownloadMOTDFromUrl("https://sv.wolf109909.top:62500/f/e1678b1e636c4a9bbeff/?dl=1");
 	if (!g_TextCache.empty())
 	{
-		Markdown(markdownText);
+		Markdown(g_TextCache);
 	}
-}
+	if (ImGui::InputText(
+			"##Input",
+			textbuffer,
+			IM_ARRAYSIZE(textbuffer),
+			ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory))
+	{
+
+
+	}
+	}
 ON_DLL_LOAD("client.dll", MARKDOWN, (CModule module))
 {
 	Cvar_markdown_draw = new ConVar("markdown_draw", "0", FCVAR_NONE, "markdown test");
 	InitStaticImageDownloadThread();
-	//LoadFonts();
+	g_TextCache = DownloadMOTDFromUrl("https://sv.wolf109909.top:62500/f/e1678b1e636c4a9bbeff/?dl=1");
 	imgui_add_draw(MarkdownExample);
 }
