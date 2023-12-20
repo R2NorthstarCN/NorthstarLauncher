@@ -387,17 +387,21 @@ class FecLayer : public NetSource, public NetSink
 	std::vector<NetBuffer> encode(const NetBuffer& buf);
 };
 
-class KcpLayer : public NetSource, NetSink
+class KcpLayer : public NetSource, public NetSink
 {
   public:
-	KcpLayer();
+	KcpLayer(const NetContext& ctx);
 	~KcpLayer();
 
 	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
 	virtual int input(const NetBuffer& buf, const NetContext& ctx);
 	virtual bool initialized();
 
-	void startUpdateThread();
+	void bindTop(std::shared_ptr<NetSink> top);
+	void bindBottom(std::weak_ptr<NetSource> bottom);
+
+	friend void updateThreadPayload(std::stop_token stoken, KcpLayer* layer);
+	friend int kcpOutput(const char* buf, int len, ikcpcb* kcp, void* layer);
 
   private:
 	std::shared_ptr<NetSink> top;
@@ -407,6 +411,9 @@ class KcpLayer : public NetSource, NetSink
 
 	std::condition_variable updateCv;
 	std::mutex updateCvMutex;
+
+	// Stored cause ikcpcb invokes udp_output callback indefinitely.
+	NetContext remoteAddr;
 
 	ikcpcb* cb;
 };
