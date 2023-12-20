@@ -173,7 +173,7 @@ struct NetBuffer
 	size_t currentOffset;
 
 	inline NetBuffer() : NetBuffer(std::vector<char>()) {}
-	inline NetBuffer(std::vector<char>&& buf) : NetBuffer(buf.data(), buf.size()) {}
+	NetBuffer(std::vector<char>&& buf);
 	inline NetBuffer(const std::vector<char>& buf) : NetBuffer(buf.data(), buf.size()) {}
 	inline NetBuffer(const char* buf, const int len) : NetBuffer(buf, len, NET_BUFFER_DEFAULT_HEADER_EXTRA_LEN) {}
 	NetBuffer(const char* buf, const int len, const int headerExtraLen);

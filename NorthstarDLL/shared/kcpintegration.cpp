@@ -139,6 +139,12 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_fec_send_parity_shards = new ConVar("kcp_fec_send_parity_shards", "2", FCVAR_NONE, "number of FEC parity shards.");
 }
 
+NetBuffer::NetBuffer(std::vector<char>&& buf)
+{
+	inner = std::move(buf);
+	currentOffset = 0;
+}
+
 NetBuffer::NetBuffer(const char* buf, int len, int headerExtraLen)
 {
 	inner = std::vector<char>(headerExtraLen + len, 0);
@@ -996,8 +1002,21 @@ int KcpLayer::input(const NetBuffer& buf, const NetContext& ctx)
 	{
 		NS::log::NEW_NET.get()->error("[KCP] input {}: error {}", ctx, result);
 	}
+	auto peeksize = ikcp_peeksize(cb);
+	while (peeksize >= 0)
+	{
+		if (peeksize >= 0)
+		{
+			NetBuffer buf(std::move(std::vector<char>(peeksize)));
+			auto recvsize = ikcp_recv(cb, buf.data(), peeksize);
+			buf.resize(recvsize, 0);
+			top->input(buf, ctx);
+		}
+		peeksize = ikcp_peeksize(cb);
+	}
 	std::unique_lock<std::mutex> lk(updateCvMutex);
 	updateCv.notify_all();
+
 	return result;
 }
 
