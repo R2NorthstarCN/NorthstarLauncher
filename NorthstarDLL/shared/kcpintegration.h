@@ -159,6 +159,7 @@ extern ConVar* Cvar_kcp_timer_resolution;
 extern ConVar* Cvar_kcp_select_timeout;
 extern ConVar* Cvar_kcp_conn_timeout;
 extern ConVar* Cvar_kcp_fec_timeout;
+extern ConVar* Cvar_kcp_fec_autotune;
 extern ConVar* Cvar_kcp_fec_rx_multi;
 extern ConVar* Cvar_kcp_fec_send_data_shards;
 extern ConVar* Cvar_kcp_fec_send_parity_shards;

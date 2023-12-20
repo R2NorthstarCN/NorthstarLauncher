@@ -7,6 +7,7 @@ ConVar* Cvar_kcp_select_timeout;
 ConVar* Cvar_kcp_conn_timeout;
 ConVar* Cvar_kcp_fec_timeout;
 ConVar* Cvar_kcp_fec_rx_multi;
+ConVar* Cvar_kcp_fec_autotune;
 ConVar* Cvar_kcp_fec_send_data_shards;
 ConVar* Cvar_kcp_fec_send_parity_shards;
 
@@ -130,6 +131,8 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 
 	Cvar_kcp_fec_timeout = new ConVar(
 		"kcp_fec_timeout", "5000", FCVAR_NONE, "miliseconds before FEC drops unused packets, higher is better but consumes more memory.");
+
+	Cvar_kcp_fec_autotune = new ConVar("kcp_fec_autotune", "1", FCVAR_NONE, "controls the FEC autotune.");
 
 	Cvar_kcp_fec_rx_multi =
 		new ConVar("kcp_fec_rx_multi", "3", FCVAR_NONE, "multiplier of FEC receive queue, higher is better but consumes more memory.");
@@ -599,7 +602,7 @@ int FecLayer::input(const NetBuffer& buf, const NetContext& ctx)
 			{
 				nBuf.resize(fecSize - 2, 0);
 
-				auto inputResult = top->input(nBuf, ctx);
+				auto inputResult = top->input(nBuf, ctx); 
 				if (inputResult == SOCKET_ERROR)
 				{
 					NS::log::NEW_NET.get()->error("[FEC] top->input {} error: {}", ctx, inputResult);
@@ -688,7 +691,7 @@ std::vector<NetBuffer> FecLayer::reconstruct(const NetBuffer& buf, const NetCont
 		}
 	}
 
-	if (shouldTune)
+	if (shouldTune && Cvar_kcp_fec_autotune->GetInt())
 	{
 		auto ps = autoTuner.findPeriods();
 		if (ps.first > 0 && ps.second > 0 && ps.first < 256 && ps.second < 256)
