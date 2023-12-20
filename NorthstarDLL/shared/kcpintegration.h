@@ -224,18 +224,22 @@ struct NetBuffer
 //    input  │     │  output
 //           │     ▼
 
+const int FROM_CAL = -1;
+const int FROM_TOP = 1;
+const int FROM_BOT = 2;
+
 class NetSource
 {
   public:
 	virtual int sendto(const NetBuffer& buf, const NetContext& ctx) = 0;
-	virtual bool initialized() = 0;
+	virtual bool initialized(int from) = 0;
 };
 
 class NetSink
 {
   public:
 	virtual int input(const NetBuffer& buf, const NetContext& ctx) = 0;
-	virtual bool initialized() = 0;
+	virtual bool initialized(int from) = 0;
 };
 
 class NetManager
@@ -271,7 +275,7 @@ class GameSink : public NetSink
 {
   public:
 	virtual int input(const NetBuffer& buf, const NetContext& ctx);
-	virtual bool initialized();
+	virtual bool initialized(int from);
 
 	int recvfrom(
 		_In_ SOCKET s,
@@ -305,7 +309,7 @@ class UdpSource : public NetSource
 	~UdpSource();
 
 	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
-	virtual bool initialized();
+	virtual bool initialized(int from);
 
 	void bindSocket(const SOCKET& s);
 
@@ -334,7 +338,7 @@ class FecLayer : public NetSource, public NetSink
 
 	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
 	virtual int input(const NetBuffer& buf, const NetContext& ctx);
-	virtual bool initialized();
+	virtual bool initialized(int from);
 
 	void bindTop(std::shared_ptr<NetSink> top);
 	void bindBottom(std::weak_ptr<NetSource> bottom);
@@ -395,7 +399,7 @@ class KcpLayer : public NetSource, public NetSink
 
 	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
 	virtual int input(const NetBuffer& buf, const NetContext& ctx);
-	virtual bool initialized();
+	virtual bool initialized(int from);
 
 	void bindTop(std::shared_ptr<NetSink> top);
 	void bindBottom(std::weak_ptr<NetSource> bottom);

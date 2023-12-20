@@ -292,7 +292,7 @@ void selectThreadPayload(std::stop_token stoken)
 {
 	while (!stoken.stop_requested())
 	{
-		if (!UdpSource::instance()->initialized())
+		if (!UdpSource::instance()->initialized(FROM_CAL))
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
@@ -340,7 +340,7 @@ void selectThreadPayload(std::stop_token stoken)
 
 		if (route.has_value())
 		{
-			if (!route->first->initialized())
+			if (!route->first->initialized(FROM_CAL))
 			{
 				NS::log::NEW_NET.get()->warn("[UdpSource] Routed {} to uninitalized NetSink*", ctx);
 				continue;
@@ -358,7 +358,7 @@ void selectThreadPayload(std::stop_token stoken)
 		NS::log::NEW_NET.get()->info("[UdpSource] Accepting new connection from {}", ctx);
 		auto newRoute = NetManager::instance()->initAndBind(ctx);
 
-		if (!newRoute.first->initialized())
+		if (!newRoute.first->initialized(FROM_CAL))
 		{
 			NS::log::NEW_NET.get()->warn("[UdpSource] Routed {} to uninitalized NetSink*", ctx);
 			continue;
@@ -397,7 +397,7 @@ int UdpSource::sendto(const NetBuffer& buf, const NetContext& ctx)
 	return sendtoResult;
 }
 
-bool UdpSource::initialized()
+bool UdpSource::initialized(int from)
 {
 	return socket != NULL;
 }
@@ -421,7 +421,7 @@ int GameSink::input(const NetBuffer& buf, const NetContext& ctx)
 	return 0;
 }
 
-bool GameSink::initialized()
+bool GameSink::initialized(int from)
 {
 	return true;
 }
@@ -461,7 +461,7 @@ int GameSink::recvfrom(
 		}
 	}
 
-	if (UdpSource::instance()->initialized() && UdpSource::instance()->socket == s)
+	if (UdpSource::instance()->initialized(FROM_CAL) && UdpSource::instance()->socket == s)
 	{
 		WSASetLastError(WSAEWOULDBLOCK);
 		return SOCKET_ERROR;
@@ -492,7 +492,7 @@ int GameSink::sendto(
 
 	if (route.has_value())
 	{
-		if (!route->second->initialized())
+		if (!route->second->initialized(FROM_CAL))
 		{
 			NS::log::NEW_NET.get()->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
 			return NET_HOOK_NOT_ALTERED;
@@ -512,7 +512,7 @@ int GameSink::sendto(
 		NS::log::NEW_NET.get()->info("[GameSink] Initiating new connection to {}", ctx);
 		auto newRoute = NetManager::instance()->initAndBind(ctx);
 
-		if (!newRoute.first->initialized())
+		if (!newRoute.first->initialized(FROM_CAL))
 		{
 			NS::log::NEW_NET.get()->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
 			return NET_HOOK_NOT_ALTERED;
@@ -627,10 +627,21 @@ int FecLayer::input(const NetBuffer& buf, const NetContext& ctx)
 	return 0;
 }
 
-bool FecLayer::initialized()
+bool FecLayer::initialized(int from)
 {
-	return top && !bottom.expired() && decoderCodec != nullptr && encoderCodec != nullptr && top->initialized() &&
-		   bottom.lock()->initialized();
+	bool current = top && !bottom.expired() && decoderCodec != nullptr && encoderCodec != nullptr; 
+	if (from == FROM_TOP)
+	{
+		return current && bottom.lock()->initialized(FROM_TOP);
+	}
+	else if (from == FROM_BOT)
+	{
+		return current && top->initialized(FROM_BOT);
+	}
+	else
+	{
+		return current && top->initialized(FROM_BOT) && bottom.lock()->initialized(FROM_TOP);
+	}
 }
 
 void FecLayer::bindTop(std::shared_ptr<NetSink> top)
@@ -915,7 +926,7 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 {
 	while (!stoken.stop_requested())
 	{
-		if (!layer->initialized())
+		if (!layer->initialized(FROM_CAL))
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
@@ -936,7 +947,7 @@ int kcpOutput(const char* buf, int len, ikcpcb* kcp, void* user)
 {
 	KcpLayer* layer = (KcpLayer*)user;
 	auto source = layer->bottom.lock();
-	if (!source->initialized())
+	if (!source->initialized(FROM_CAL))
 	{
 		NS::log::NEW_NET.get()->error("[KCP] kcpOutput: Uninitalized bottom");
 		return -1;
@@ -993,10 +1004,21 @@ int KcpLayer::input(const NetBuffer& buf, const NetContext& ctx)
 	return result;
 }
 
-bool KcpLayer::initialized()
+bool KcpLayer::initialized(int from)
 {
-	return top && !bottom.expired() && top->initialized() && bottom.lock()->initialized() && updateThread.joinable() && cb != nullptr &&
-		   cb->user != nullptr;
+	bool current = top && !bottom.expired() && updateThread.joinable() && cb != nullptr && cb->user != nullptr;
+	if (from == FROM_TOP)
+	{
+		return current && bottom.lock()->initialized(FROM_TOP);
+	}
+	else if (from == FROM_BOT)
+	{
+		return current && top->initialized(FROM_BOT);
+	}
+	else
+	{
+		return current && top->initialized(FROM_BOT) && bottom.lock()->initialized(FROM_TOP);
+	}
 }
 
 void KcpLayer::bindTop(std::shared_ptr<NetSink> top)
