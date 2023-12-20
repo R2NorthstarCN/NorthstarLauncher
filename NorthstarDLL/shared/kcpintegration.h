@@ -420,4 +420,5 @@ class KcpLayer : public NetSource, public NetSink
 	NetContext remoteAddr;
 
 	ikcpcb* cb;
+	std::mutex cbMutex;
 };

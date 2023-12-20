@@ -935,14 +935,20 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
 		}
-		ikcp_update(layer->cb, iclock());
-		auto current = iclock();
-		auto next = ikcp_check(layer->cb, current);
-		auto duration = itimediff(next, current);
+
+		IINT32 duration;
+		{
+			std::unique_lock<std::mutex> lk1(layer->cbMutex);
+			ikcp_update(layer->cb, iclock());
+			auto current = iclock();
+			auto next = ikcp_check(layer->cb, current);
+			duration = itimediff(next, current);
+		}
+		
 		if (duration > 0)
 		{
-			std::unique_lock<std::mutex> lk(layer->updateCvMutex);
-			auto cvResult = layer->updateCv.wait_for(lk, std::chrono::milliseconds(duration));
+			std::unique_lock<std::mutex> lk2(layer->updateCvMutex);
+			auto cvResult = layer->updateCv.wait_for(lk2, std::chrono::milliseconds(duration));
 		}
 	}
 }
@@ -968,6 +974,7 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 {
 	cb = ikcp_create(0, this);
 	cb->output = kcpOutput;
+	
 	ikcp_nodelay(cb, 1, Cvar_kcp_timer_resolution->GetInt(), 2, 1);
 
 	remoteAddr = ctx;
@@ -985,36 +992,47 @@ KcpLayer::~KcpLayer()
 
 int KcpLayer::sendto(const NetBuffer& buf, const NetContext& ctx)
 {
-	auto result = ikcp_send(cb, buf.data(), buf.size());
+	int result;
+	{
+		std::unique_lock<std::mutex> lk1(cbMutex);
+		result = ikcp_send(cb, buf.data(), buf.size());
+	}
+
 	if (result < 0)
 	{
 		NS::log::NEW_NET.get()->error("[KCP] sendto {}: error {}", ctx, result);
 	}
-	std::unique_lock<std::mutex> lk(updateCvMutex);
+
+	std::unique_lock<std::mutex> lk2(updateCvMutex);
 	updateCv.notify_all();
 	return result;
 }
 
 int KcpLayer::input(const NetBuffer& buf, const NetContext& ctx)
 {
-	auto result = ikcp_input(cb, buf.data(), buf.size());
-	if (result < 0)
+	int result;
 	{
-		NS::log::NEW_NET.get()->error("[KCP] input {}: error {}", ctx, result);
-	}
-	auto peeksize = ikcp_peeksize(cb);
-	while (peeksize >= 0)
-	{
-		if (peeksize >= 0)
+		std::unique_lock<std::mutex> lk1(cbMutex);
+		result = ikcp_input(cb, buf.data(), buf.size());
+		if (result < 0)
 		{
-			NetBuffer buf(std::move(std::vector<char>(peeksize)));
-			auto recvsize = ikcp_recv(cb, buf.data(), peeksize);
-			buf.resize(recvsize, 0);
-			top->input(buf, ctx);
+			NS::log::NEW_NET.get()->error("[KCP] input {}: error {}", ctx, result);
 		}
-		peeksize = ikcp_peeksize(cb);
+		auto peeksize = ikcp_peeksize(cb);
+		while (peeksize >= 0)
+		{
+			if (peeksize >= 0)
+			{
+				NetBuffer buf(std::move(std::vector<char>(peeksize)));
+				auto recvsize = ikcp_recv(cb, buf.data(), peeksize);
+				buf.resize(recvsize, 0);
+				top->input(buf, ctx);
+			}
+			peeksize = ikcp_peeksize(cb);
+		}
 	}
-	std::unique_lock<std::mutex> lk(updateCvMutex);
+
+	std::unique_lock<std::mutex> lk2(updateCvMutex);
 	updateCv.notify_all();
 
 	return result;
