@@ -228,7 +228,6 @@ void recycleThreadPayload(std::stop_token stoken)
 NetManager::NetManager()
 {
 	recycleThread = std::jthread(recycleThreadPayload);
-	recycleThread.detach();
 }
 
 NetManager::~NetManager()
@@ -374,7 +373,6 @@ void selectThreadPayload(std::stop_token stoken)
 UdpSource::UdpSource()
 {
 	selectThread = std::jthread(selectThreadPayload);
-	selectThread.detach();
 }
 
 UdpSource::~UdpSource()
@@ -968,7 +966,6 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 
 	remoteAddr = ctx;
 	updateThread = std::jthread(updateThreadPayload, this);
-	updateThread.detach();
 }
 
 KcpLayer::~KcpLayer()
