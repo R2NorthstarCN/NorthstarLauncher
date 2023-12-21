@@ -20,6 +20,7 @@ struct SQArray;
 struct tableNode;
 struct SQUserData;
 struct CSquirrelVM;
+struct SQVector;
 
 typedef void (*releasehookType)(void* val, int size);
 

@@ -131,7 +131,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;libsvm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceSymbolReferences>
       </ForceSymbolReferences>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -141,7 +141,8 @@
       </Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" &amp;&amp; copy /Y "$(TargetPath)" "$(SolutionDir)..\NorthstarCN_Binaries\</Command>
+      <Command>IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries_Dedicated\Northstar.dll" del "$(SolutionDir)..\NorthstarCN_Binaries_Dedicated\Northstar.dll" &amp;&amp; copy /Y "$(TargetPath)" "$(SolutionDir)..\NorthstarCN_Binaries_Dedicated\
+IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" &amp;&amp; copy /Y "$(TargetPath)" "$(SolutionDir)..\NorthstarCN_Binaries\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Dedicated|x64'">
@@ -166,7 +167,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;kcp.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;kcp.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;libsvm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceSymbolReferences>
       </ForceSymbolReferences>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -301,6 +302,7 @@
     <ClCompile Include="logging\logging.cpp" />
     <ClCompile Include="logging\loghooks.cpp" />
     <ClCompile Include="logging\sourceconsole.cpp" />
+    <ClCompile Include="markdown.cpp" />
     <ClCompile Include="masterserver\masterserver.cpp" />
     <ClCompile Include="mods\compiled\kb_act.cpp" />
     <ClCompile Include="mods\compiled\modkeyvalues.cpp" />
@@ -314,6 +316,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Dedicated|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="plugins\plugins.cpp" />
+    <ClCompile Include="scriptsvm.cpp" />
     <ClCompile Include="scripts\clantag.cpp" />
     <ClCompile Include="scripts\client\clientchathooks.cpp" />
     <ClCompile Include="scripts\client\cursorposition.cpp" />

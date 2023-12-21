@@ -665,6 +665,12 @@
     <ClCompile Include="shared\rs.cpp">
       <Filter>Source Files\shared</Filter>
     </ClCompile>
+    <ClCompile Include="scriptsvm.cpp">
+      <Filter>Source Files\scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="markdown.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="audio_asm.asm">

@@ -15,6 +15,7 @@
 #include "rapidjson/error/en.h"
 #include "server/auth/bansystem.h"
 #include "core/anticheat.h"
+#include "httplib.h"
 #include <cstring>
 #include <regex>
 #include "util/base64.h"
