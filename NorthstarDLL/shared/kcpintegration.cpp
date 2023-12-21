@@ -612,6 +612,7 @@ int FecLayer::input(const NetBuffer& buf, const NetContext& ctx)
 		for (auto& rBuf : reconstructed)
 		{
 			auto fecSize = rBuf.getU16H();
+			
 			if (fecSize < 2)
 			{
 				NS::log::NEW_NET.get()->warn("[FEC] top->input {} spurious reconstructed with fecSize < 2", ctx);
@@ -832,6 +833,7 @@ std::vector<NetBuffer> FecLayer::encode(const NetBuffer& buf)
 	newBuf.putU16H(buf.size() + 2);
 	newBuf.putU16H(FEC_TYPE_DATA); // flag
 	newBuf.putU32H(eNext); // seqid
+	eNext++;
 
 	result.push_back(newBuf);
 
