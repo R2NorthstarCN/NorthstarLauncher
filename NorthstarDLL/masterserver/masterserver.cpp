@@ -722,14 +722,6 @@ void MasterServerManager::AuthenticateWithServer(
 						m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(std::string(connection_info_json.at("ip")).c_str());
 						m_pendingConnectionInfo.port = static_cast<unsigned short>(connection_info_json.at("port"));
 						m_pendingConnectionInfo.authToken = connection_info_json.at("authToken");
-						if (connection_info_json.contains("conv"))
-						{
-							m_pendingConnectionInfo.conv = connection_info_json.at("conv");
-						}
-						else
-						{
-							m_pendingConnectionInfo.conv = 0;
-						}
 
 						m_bHasPendingConnectionInfo = true;
 						m_bSuccessfullyAuthenticatedWithGameServer = true;

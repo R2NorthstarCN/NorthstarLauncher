@@ -101,13 +101,12 @@ MatchmakeManager::MatchmakeManager()
 							// TODO: cleanup
 						}
 						std::string connection_cmd = fmt::format(
-							"kcp_connect {}.{}.{}.{} {} {}",
+							"connect {}.{}.{}.{}:{}",
 							conn_info.ip.S_un.S_un_b.s_b1,
 							conn_info.ip.S_un.S_un_b.s_b2,
 							conn_info.ip.S_un.S_un_b.s_b3,
 							conn_info.ip.S_un.S_un_b.s_b4,
-							conn_info.port,
-							conn_info.conv);
+							conn_info.port);
 						spdlog::info("Connect: {}", connection_cmd);
 						R2::g_pCVar->FindVar("serverfilter")->SetValue(conn_info.authToken.c_str());
 						R2::Cbuf_AddText(
