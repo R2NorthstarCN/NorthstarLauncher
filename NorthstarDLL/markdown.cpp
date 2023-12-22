@@ -55,7 +55,7 @@ TextureResource* GetStaticTextureFromUrl(std::string url)
 {
 	std::vector<unsigned char> emptydata;
 	g_StaticTextureResourceCacheMutex.lock();
-	
+
 	if (g_StaticTextureResourceCache.contains(url))
 	{
 		g_StaticTextureResourceCacheMutex.unlock();
@@ -74,7 +74,6 @@ TextureResource* GetStaticTextureFromUrl(std::string url)
 		g_StaticImageDownloadHistory.emplace(url);
 		return NULL;
 	}
-	
 }
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::vector<unsigned char>* data)
 {
@@ -196,7 +195,6 @@ bool CreateTextureFromImage(std::vector<unsigned char> pngData, ID3D11ShaderReso
 	return true;
 }
 
-
 void InitStaticImageDownloadThread()
 {
 	std::thread downloader_thread(
@@ -204,7 +202,7 @@ void InitStaticImageDownloadThread()
 		{
 			while (true)
 			{
-			
+
 				std::unique_lock<std::mutex> lock(g_ImageDownloadQueueMutex);
 				while (g_ImageDownloadQueue.empty())
 				{
@@ -218,7 +216,6 @@ void InitStaticImageDownloadThread()
 				std::thread process_thread(
 					[nexturl]()
 					{
-
 						std::vector<unsigned char> image = DownloadPNGFromUrl(nexturl);
 
 						if (!image.empty())
@@ -247,16 +244,11 @@ void InitStaticImageDownloadThread()
 					});
 
 				process_thread.detach();
-
-				
 			}
-
 		});
 
 	downloader_thread.detach();
 }
-
-
 
 void MarkdownRequestUrlUpdate(std::string url)
 {
@@ -271,7 +263,6 @@ void MarkdownRequestUrlUpdate(std::string url)
 	g_TextCache = DownloadMOTDFromUrl(url);
 }
 
-
 void LinkCallback(ImGui::MarkdownLinkCallbackData data_)
 {
 	std::string url(data_.link, data_.linkLength);
@@ -281,18 +272,16 @@ void LinkCallback(ImGui::MarkdownLinkCallbackData data_)
 		ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 		return;
 	}
-	
+
 	if (!data_.isImage)
 	{
-		
+
 		MarkdownRequestUrlUpdate(url);
 		return;
 	}
 }
 
-
-
-inline ImGui::MarkdownImageData ImageCallback(ImGui::MarkdownLinkCallbackData data_ )
+inline ImGui::MarkdownImageData ImageCallback(ImGui::MarkdownLinkCallbackData data_)
 {
 	ID3D11ShaderResourceView* my_texture = NULL;
 	std::string imageUrl(data_.link, data_.linkLength);
@@ -341,19 +330,18 @@ void LoadFonts(float fontSize_ = 15.0f)
 			}
 			// io.Fonts->AddFontFromFileTTF("c:/windows/fonts/simhei.ttf", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
 			ImGuiIO& io = ImGui::GetIO();
-			//io.Fonts->Clear();
-			// Base font
+			// io.Fonts->Clear();
+			//  Base font
 			io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", fontSize_, nullptr, io.Fonts->GetGlyphRangesChineseFull());
 			// Bold headings H2 and H3
 			H2 = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", fontSize_, nullptr, io.Fonts->GetGlyphRangesChineseFull());
 			H3 = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", fontSize_, nullptr, io.Fonts->GetGlyphRangesChineseFull());
 			// bold heading H1
-			//float fontSizeH1 = fontSize_ * 1.1f;
+			// float fontSizeH1 = fontSize_ * 1.1f;
 			H1 = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 18.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
 			spdlog::info("[IMGUI] Custom fonts loaded.");
 		});
 	setfontthread.detach();
-	
 }
 
 void ExampleMarkdownFormatCallback(const ImGui::MarkdownFormatInfo& markdownFormatInfo_, bool start_)
@@ -403,7 +391,7 @@ void Markdown(const std::string& markdown_)
 	mdConfig.userData = NULL;
 	mdConfig.formatCallback = ExampleMarkdownFormatCallback;
 	ImGui::Markdown(markdown_.c_str(), markdown_.length(), mdConfig);
-	//std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	// std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 char textbuffer[2048];
 
@@ -415,21 +403,16 @@ void MarkdownExample(ID3D11Device* device)
 	{
 		return;
 	}
-	
+
 	if (!g_TextCache.empty())
 	{
 		Markdown(g_TextCache);
 	}
 	if (ImGui::InputText(
-			"##Input",
-			textbuffer,
-			IM_ARRAYSIZE(textbuffer),
-			ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory))
+			"##Input", textbuffer, IM_ARRAYSIZE(textbuffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory))
 	{
-
-
 	}
-	}
+}
 ON_DLL_LOAD("client.dll", MARKDOWN, (CModule module))
 {
 	Cvar_markdown_draw = new ConVar("markdown_draw", "0", FCVAR_NONE, "markdown test");
