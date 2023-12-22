@@ -1,8 +1,24 @@
 #pragma once
 
 #include "shared/kcpintegration.h"
+#include <shared_mutex>
+#include <concurrent_unordered_map.h>
 
 extern float* g_frameTime;
+
+struct NetStats
+{
+	float frameTime;
+	IUINT64 outsegs;
+	IUINT64 lostsegs;
+	IUINT64 retranssegs;
+	IUINT64 insegs;
+	IUINT64 reconsegs;
+
+	void encode(NetBuffer& buf) const;
+	void decode(const NetBuffer& buf);
+	void sync(ikcpcb* cb);
+};
 
 class NetGraphSink : public NetSink
 {
@@ -14,7 +30,10 @@ class NetGraphSink : public NetSink
 
 	static std::shared_ptr<NetGraphSink> instance();
 
-	std::unordered_map<NetContext, float> remoteFrameTimes;
+	std::shared_mutex remoteStatsMutex;
+	concurrency::concurrent_unordered_map<NetContext, NetStats> remoteStats;
+
+	NetStats localStat;
 
   private:
 	NetGraphSink();

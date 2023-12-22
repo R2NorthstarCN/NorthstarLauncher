@@ -12,7 +12,7 @@ ON_DLL_LOAD("engine.dll", SERVERFPS, (CModule module))
 	AUTOHOOK_DISPATCH();
 }
 
-void sendThreadPayload(std::stop_token stoken)
+void sendThreadPayload(std::stop_token stoken, NetGraphSink* ng)
 {
 	auto manager = NetManager::instance();
 	while (!stoken.stop_requested())
@@ -21,8 +21,8 @@ void sendThreadPayload(std::stop_token stoken)
 		std::shared_lock lk(manager->routingTableMutex);
 		for (const auto& entry : manager->routingTable)
 		{
-			NetBuffer buf(sizeof(float), 0, 128);
-			memcpy(buf.data(), g_frameTime, sizeof(float));
+			NetBuffer buf(128, 0, 128);
+			ng->localStat.encode(buf);
 			entry.second.first.second->sendto(std::move(buf), entry.first, NetGraphSink::instance().get());
 		}
 	}
@@ -30,17 +30,22 @@ void sendThreadPayload(std::stop_token stoken)
 
 NetGraphSink::NetGraphSink()
 {
-	sendThread = std::jthread(sendThreadPayload);
+	sendThread = std::jthread(sendThreadPayload, this);
 }
 
-NetGraphSink::~NetGraphSink() {}
+NetGraphSink::~NetGraphSink()
+{
+	sendThread.request_stop();
+	sendThread.join();
+}
 
 int NetGraphSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
 {
-	float tmp = 0.0f;
-	memcpy(&tmp, buf.data(), sizeof(float));
-	remoteFrameTimes.insert(std::make_pair(ctx, tmp));
-	NS::log::NEW_NET.get()->error("[FT] FrameTime {}: {} s | {} fps", ctx, tmp, 1.0 / tmp);
+	NetStats s {};
+	s.decode(buf);
+	std::shared_lock lk(remoteStatsMutex);
+	remoteStats.insert(std::make_pair(ctx, s));
+	NS::log::NEW_NET->error("[NG] {}: {} {}", ctx, s.frameTime, s.lostsegs);
 	return 0;
 }
 
@@ -53,4 +58,45 @@ std::shared_ptr<NetGraphSink> NetGraphSink::instance()
 {
 	static std::shared_ptr<NetGraphSink> singleton = std::shared_ptr<NetGraphSink>(new NetGraphSink());
 	return singleton;
+}
+
+void NetStats::encode(NetBuffer& buf) const
+{
+	if (buf.size() < sizeof(float) + 5 * sizeof(IUINT64))
+	{
+		buf.resize(buf.size() + sizeof(float) + 5 * sizeof(IUINT64), 0);
+	}
+
+	memcpy(buf.data(), &frameTime, sizeof(float));
+	memcpy(buf.data() + sizeof(float), &outsegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 1 * sizeof(IUINT64), &lostsegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 2 * sizeof(IUINT64), &retranssegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 3 * sizeof(IUINT64), &insegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 4 * sizeof(IUINT64), &reconsegs, sizeof(IUINT64));
+}
+
+void NetStats::decode(const NetBuffer& buf)
+{
+	if (buf.size() < sizeof(float) + 5 * sizeof(IUINT64))
+	{
+		NS::log::NEW_NET->warn("[NG] Spurious input of NetStats::decode");
+		return;
+	}
+
+	memcpy(&frameTime, buf.data(), sizeof(float));
+	memcpy(&outsegs, buf.data() + sizeof(float), sizeof(IUINT64));
+	memcpy(&lostsegs, buf.data() + sizeof(float) + 1 * sizeof(IUINT64), sizeof(IUINT64));
+	memcpy(&retranssegs, buf.data() + sizeof(float) + 2 * sizeof(IUINT64), sizeof(IUINT64));
+	memcpy(&insegs, buf.data() + sizeof(float) + 3 * sizeof(IUINT64), sizeof(IUINT64));
+	memcpy(&reconsegs, buf.data() + sizeof(float) + 4 * sizeof(IUINT64), sizeof(IUINT64));
+}
+
+void NetStats::sync(ikcpcb* cb)
+{
+	frameTime = *g_frameTime;
+	outsegs = cb->outsegs;
+	lostsegs = cb->lostsegs;
+	retranssegs = cb->retranssegs;
+	insegs = cb->insegs;
+	reconsegs = cb->reconsegs;
 }

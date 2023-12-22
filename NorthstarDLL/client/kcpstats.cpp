@@ -16,8 +16,8 @@ sliding_window sw_retrans_segs(10, false, true);
 sliding_window sw_lost_segs(10, false, true);
 sliding_window sw_out_segs(10, false, true);
 
-sliding_window sw_reconstruct_packets(10, false, true);
-sliding_window sw_in_packets(10, false, true);
+sliding_window sw_recon_segs(10, false, true);
+sliding_window sw_in_segs(10, false, true);
 
 sliding_window sw_srtt(50);
 sliding_window sw_rts(50);

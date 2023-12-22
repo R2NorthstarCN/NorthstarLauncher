@@ -224,6 +224,8 @@ void recycleThreadPayload(std::stop_token stoken)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		std::unique_lock routingTableLock(NetManager::instance()->routingTableMutex);
+		auto ng = NetGraphSink::instance();
+		std::unique_lock remoteStatsLock(ng->remoteStatsMutex);
 		std::vector<NetContext> removes;
 		auto current = iclock64();
 		for (const auto& entry : NetManager::instance()->routingTable)
@@ -237,6 +239,7 @@ void recycleThreadPayload(std::stop_token stoken)
 		{
 			NS::log::NEW_NET.get()->info("[NetManager] Disconnecting with {}", removal);
 			NetManager::instance()->routingTable.unsafe_erase(removal);
+			ng->remoteStats.unsafe_erase(removal);
 		}
 	}
 }
