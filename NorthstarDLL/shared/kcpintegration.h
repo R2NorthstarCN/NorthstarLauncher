@@ -5,6 +5,7 @@
 #include "shared/ikcp.h"
 #include <unordered_map>
 #include <shared_mutex>
+#include <map>
 
 #define RS_MALLOC _malloc_base
 #define RS_FREE _free_base
@@ -194,7 +195,7 @@ struct NetBuffer
 };
 
 //                      ┌────────┐
-//                      │ Sink   │
+//                      │  Game  │
 //                      └─▲───┬──┘
 //                        │   │     Outbound Flow
 //                      ┌─┴───▼──┐  Top of the stack
@@ -206,7 +207,7 @@ struct NetBuffer
 //                      └─▲───┬──┘
 //        Inbound Flow    │   │
 // Bottom of the stack  ┌─┴───▼──┐
-//                      │ Source │
+//                      │  UDP   │
 //                      └────────┘
 //
 // The "source" initiates the inbound flow, while the "sink" initiates the outbound flow.
@@ -229,17 +230,20 @@ const int FROM_CAL = -1;
 const int FROM_TOP = 1;
 const int FROM_BOT = 2;
 
+class NetSource;
+class NetSink;
+
 class NetSource
 {
   public:
-	virtual int sendto(const NetBuffer& buf, const NetContext& ctx) = 0;
+	virtual int sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top) = 0;
 	virtual bool initialized(int from) = 0;
 };
 
 class NetSink
 {
   public:
-	virtual int input(const NetBuffer& buf, const NetContext& ctx) = 0;
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom) = 0;
 	virtual bool initialized(int from) = 0;
 };
 
@@ -275,7 +279,7 @@ const int NET_HOOK_NOT_ALTERED = -114;
 class GameSink : public NetSink
 {
   public:
-	virtual int input(const NetBuffer& buf, const NetContext& ctx);
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
 	virtual bool initialized(int from);
 
 	int recvfrom(
@@ -309,7 +313,7 @@ class UdpSource : public NetSource
   public:
 	~UdpSource();
 
-	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
+	virtual int sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top);
 	virtual bool initialized(int from);
 
 	void bindSocket(const SOCKET& s);
@@ -337,8 +341,8 @@ class FecLayer : public NetSource, public NetSink
 	FecLayer(int encoderDataShards, int encoderParityShards, int decoderDataShards, int decoderParityShards);
 	~FecLayer();
 
-	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
-	virtual int input(const NetBuffer& buf, const NetContext& ctx);
+	virtual int sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top);
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
 	virtual bool initialized(int from);
 
 	void bindTop(std::shared_ptr<NetSink> top);
@@ -398,8 +402,8 @@ class KcpLayer : public NetSource, public NetSink
 	KcpLayer(const NetContext& ctx);
 	~KcpLayer();
 
-	virtual int sendto(const NetBuffer& buf, const NetContext& ctx);
-	virtual int input(const NetBuffer& buf, const NetContext& ctx);
+	virtual int sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top);
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
 	virtual bool initialized(int from);
 
 	void bindTop(std::shared_ptr<NetSink> top);
@@ -422,4 +426,34 @@ class KcpLayer : public NetSource, public NetSink
 
 	ikcpcb* cb;
 	std::mutex cbMutex;
+};
+
+class MuxLayer : public NetSource, public NetSink
+{
+  public:
+	MuxLayer();
+	~MuxLayer();
+
+	virtual int sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top);
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
+	virtual bool initialized(int from);
+
+	void bindTop(IUINT8 channelId, std::shared_ptr<NetSink> top);
+	void bindBottom(std::weak_ptr<NetSource> bottom);
+
+  private:
+	std::weak_ptr<NetSource> bottom;
+
+	std::map<IUINT8, std::shared_ptr<NetSink>> topMap;
+	std::map<uintptr_t, IUINT8> topInverseMap;
+};
+
+class DummySink : public NetSink
+{
+  public:
+	DummySink();
+	~DummySink();
+
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
+	virtual bool initialized(int from);
 };

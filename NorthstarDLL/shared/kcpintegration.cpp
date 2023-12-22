@@ -1,6 +1,7 @@
 #include "shared/kcpintegration.h"
 #include "core/hooks.h"
 #include <dedicated/dedicated.h>
+#include "kcpintegration.h"
 
 ConVar* Cvar_kcp_timer_resolution;
 ConVar* Cvar_kcp_select_timeout;
@@ -353,7 +354,7 @@ void selectThreadPayload(std::stop_token stoken)
 				NS::log::NEW_NET.get()->warn("[UdpSource] Routed {} to uninitalized NetSink*", ctx);
 				continue;
 			}
-			auto inputResult = route->first->input(NetBuffer(buf), ctx);
+			auto inputResult = route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
 			if (inputResult != 0)
 			{
 				NS::log::NEW_NET.get()->error("[UdpSource] NetSink*->input {} error: {}", ctx, inputResult);
@@ -371,7 +372,7 @@ void selectThreadPayload(std::stop_token stoken)
 			NS::log::NEW_NET.get()->warn("[UdpSource] Routed {} to uninitalized NetSink*", ctx);
 			continue;
 		}
-		auto inputResult = newRoute.first->input(NetBuffer(buf), ctx);
+		auto inputResult = newRoute.first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
 		if (inputResult != 0)
 		{
 			NS::log::NEW_NET.get()->error("[UdpSource] NetSink*->input {} error: {}", ctx, inputResult);
@@ -390,7 +391,7 @@ UdpSource::~UdpSource()
 	selectThread.join();
 }
 
-int UdpSource::sendto(const NetBuffer& buf, const NetContext& ctx)
+int UdpSource::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
 	if (ctx.socket != socket)
 	{
@@ -422,9 +423,9 @@ std::shared_ptr<UdpSource> UdpSource::instance()
 
 GameSink::GameSink() {}
 
-int GameSink::input(const NetBuffer& buf, const NetContext& ctx)
+int GameSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
 {
-	pendingData.push(std::make_pair(buf, ctx));
+	pendingData.push(std::make_pair(std::move(buf), ctx));
 	return 0;
 }
 
@@ -504,7 +505,7 @@ int GameSink::sendto(
 			NS::log::NEW_NET.get()->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
 			return NET_HOOK_NOT_ALTERED;
 		}
-		auto sendtoResult = route->second->sendto(NetBuffer(buf, len), ctx);
+		auto sendtoResult = route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
 		if (sendtoResult < 0)
 		{
 			NS::log::NEW_NET.get()->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
@@ -524,7 +525,7 @@ int GameSink::sendto(
 			NS::log::NEW_NET.get()->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
 			return NET_HOOK_NOT_ALTERED;
 		}
-		auto sendtoResult = newRoute.second->sendto(NetBuffer(buf, len), ctx);
+		auto sendtoResult = newRoute.second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
 		if (sendtoResult != 0)
 		{
 			NS::log::NEW_NET.get()->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
@@ -560,12 +561,12 @@ FecLayer::~FecLayer()
 	reed_solomon_release(encoderCodec);
 }
 
-int FecLayer::sendto(const NetBuffer& buf, const NetContext& ctx)
+int FecLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
 	auto encoded = encode(buf);
-	for (const auto& nBuf : encoded)
+	for (auto& nBuf : encoded)
 	{
-		auto sendtoResult = bottom.lock()->sendto(nBuf, ctx);
+		auto sendtoResult = bottom.lock()->sendto(std::move(nBuf), ctx, this);
 		if (sendtoResult == SOCKET_ERROR)
 		{
 			NS::log::NEW_NET.get()->error("[FEC] bottom->sendto {} error: {}", ctx, sendtoResult);
@@ -574,7 +575,7 @@ int FecLayer::sendto(const NetBuffer& buf, const NetContext& ctx)
 	return 0;
 }
 
-int FecLayer::input(const NetBuffer& buf, const NetContext& ctx)
+int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
 {
 	if (buf.size() < FEC_MIN_SIZE)
 	{
@@ -590,7 +591,7 @@ int FecLayer::input(const NetBuffer& buf, const NetContext& ctx)
 		auto reconstructed = reconstruct(buf, ctx);
 		if (flag == FEC_TYPE_DATA)
 		{
-			NetBuffer nBuf = buf;
+			NetBuffer nBuf = std::move(buf);
 			nBuf.getU32H(); // drop seqid
 			nBuf.getU16H(); // drop flag
 			auto fecSize = nBuf.getU16H(); // drop size
@@ -602,7 +603,7 @@ int FecLayer::input(const NetBuffer& buf, const NetContext& ctx)
 			{
 				nBuf.resize(fecSize - 2, 0);
 
-				auto inputResult = top->input(nBuf, ctx); 
+				auto inputResult = top->input(std::move(nBuf), ctx, this); 
 				if (inputResult == SOCKET_ERROR)
 				{
 					NS::log::NEW_NET.get()->error("[FEC] top->input {} error: {}", ctx, inputResult);
@@ -620,7 +621,7 @@ int FecLayer::input(const NetBuffer& buf, const NetContext& ctx)
 			}
 			rBuf.resize(fecSize - 2, 0);
 
-			auto inputResult = top->input(rBuf, ctx);
+			auto inputResult = top->input(std::move(rBuf), ctx, this);
 			if (inputResult == SOCKET_ERROR)
 			{
 				NS::log::NEW_NET.get()->error("[FEC] top->input {} error: {}", ctx, inputResult);
@@ -967,7 +968,7 @@ int kcpOutput(const char* buf, int len, ikcpcb* kcp, void* user)
 		NS::log::NEW_NET.get()->error("[KCP] kcpOutput: Uninitalized bottom");
 		return -1;
 	}
-	auto sendToResult = source->sendto(NetBuffer(buf, len), layer->remoteAddr);
+	auto sendToResult = source->sendto(NetBuffer(buf, len), layer->remoteAddr, layer);
 	if (sendToResult == SOCKET_ERROR)
 	{
 		NS::log::NEW_NET.get()->error("[KCP] kcpOutput: sendto error");
@@ -995,7 +996,7 @@ KcpLayer::~KcpLayer()
 	cb = nullptr;
 }
 
-int KcpLayer::sendto(const NetBuffer& buf, const NetContext& ctx)
+int KcpLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
 	int result;
 	{
@@ -1013,7 +1014,7 @@ int KcpLayer::sendto(const NetBuffer& buf, const NetContext& ctx)
 	return result;
 }
 
-int KcpLayer::input(const NetBuffer& buf, const NetContext& ctx)
+int KcpLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
 {
 	int result;
 	{
@@ -1031,7 +1032,7 @@ int KcpLayer::input(const NetBuffer& buf, const NetContext& ctx)
 				NetBuffer buf(std::move(std::vector<char>(peeksize)));
 				auto recvsize = ikcp_recv(cb, buf.data(), peeksize);
 				buf.resize(recvsize, 0);
-				top->input(buf, ctx);
+				top->input(std::move(buf), ctx, this);
 			}
 			peeksize = ikcp_peeksize(cb);
 		}
@@ -1068,4 +1069,102 @@ void KcpLayer::bindTop(std::shared_ptr<NetSink> top)
 void KcpLayer::bindBottom(std::weak_ptr<NetSource> bottom)
 {
 	this->bottom = bottom;
+}
+
+MuxLayer::MuxLayer() {}
+
+MuxLayer::~MuxLayer() {}
+
+int MuxLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
+{
+	if (!topInverseMap.contains((uintptr_t)top))
+	{
+		NS::log::NEW_NET.get()->error("[MUX] sendto {} silently dropping packets from unknown", ctx);
+		return SOCKET_ERROR;
+	}
+
+	buf.putU8H(topInverseMap[(uintptr_t)top]);
+	auto sendtoResult = bottom.lock()->sendto(std::move(buf), ctx, this);
+	if (sendtoResult == SOCKET_ERROR)
+	{
+		NS::log::NEW_NET.get()->error("[MUX] sendto {} error: {}", ctx, sendtoResult);
+	}
+	
+	return sendtoResult;
+}
+
+int MuxLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
+{
+	IUINT8 channelId = buf.getU8H();
+	if (!topMap.contains(channelId))
+	{
+		NS::log::NEW_NET.get()->error("[MUX] input {} silently dropping packets from unknown", ctx);
+		return SOCKET_ERROR;
+	}
+	auto inputResult = topMap[channelId]->input(std::move(buf), ctx, this);
+	if (inputResult == SOCKET_ERROR)
+	{
+		NS::log::NEW_NET.get()->error("[MUX] input {} error: {}", ctx, inputResult);
+	}
+	return inputResult;
+}
+
+bool MuxLayer::initialized(int from)
+{
+	if (from == FROM_TOP)
+	{
+		return bottom.lock()->initialized(FROM_TOP);
+	}
+	else if (from == FROM_BOT)
+	{
+		bool result = true;
+		for (const auto& entry : topMap)
+		{
+			if (!entry.second->initialized(FROM_BOT))
+			{
+				result = false;
+				break;
+			}
+		}
+		return result;
+	}
+	else if (from == FROM_CAL)
+	{
+		bool result = true;
+		for (const auto& entry : topMap)
+		{
+			if (!entry.second->initialized(FROM_BOT))
+			{
+				result = false;
+				break;
+			}
+		}
+		return result && bottom.lock()->initialized(FROM_TOP);
+	}
+}
+
+void MuxLayer::bindTop(IUINT8 channelId, std::shared_ptr<NetSink> top)
+{
+	topMap.insert(std::make_pair(channelId, top));
+	topInverseMap.insert(std::make_pair((uintptr_t)top.get(), channelId));
+}
+
+void MuxLayer::bindBottom(std::weak_ptr<NetSource> bottom)
+{
+	this->bottom = bottom;
+}
+
+DummySink::DummySink() {}
+
+DummySink::~DummySink() {} 
+
+int DummySink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
+{
+	NS::log::NEW_NET.get()->error("[DUMMY] input {}: {} {}", ctx, buf.data()[0], buf.data()[1]);
+	return 0;
+}
+
+bool DummySink::initialized(int from)
+{
+	return true;
 }

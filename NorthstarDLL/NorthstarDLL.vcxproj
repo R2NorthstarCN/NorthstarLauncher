@@ -209,6 +209,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClInclude Include="dedicated\dedicatedlogtoclient.h" />
     <ClInclude Include="dllmain.h" />
     <ClInclude Include="engine\hoststate.h" />
+    <ClInclude Include="engine\netgraph.h" />
     <ClInclude Include="engine\r2engine.h" />
     <ClInclude Include="exploit_fixes\ns_limits.h" />
     <ClInclude Include="hooks\hooks.h" />
@@ -296,6 +297,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     </ClCompile>
     <ClCompile Include="engine\host.cpp" />
     <ClCompile Include="engine\hoststate.cpp" />
+    <ClCompile Include="engine\netgraph.cpp" />
     <ClCompile Include="engine\r2engine.cpp" />
     <ClCompile Include="engine\runframe.cpp" />
     <ClCompile Include="logging\crashhandler.cpp" />

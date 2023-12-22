@@ -366,6 +366,9 @@
     <ClInclude Include="shared\rs.h">
       <Filter>Header Files\shared</Filter>
     </ClInclude>
+    <ClInclude Include="engine\netgraph.h">
+      <Filter>Header Files\engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">
@@ -670,6 +673,9 @@
     </ClCompile>
     <ClCompile Include="markdown.cpp">
       <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\netgraph.cpp">
+      <Filter>Source Files\engine</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
