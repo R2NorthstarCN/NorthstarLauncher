@@ -225,7 +225,7 @@ void recycleThreadPayload(std::stop_token stoken)
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		std::unique_lock routingTableLock(NetManager::instance()->routingTableMutex);
 		auto ng = NetGraphSink::instance();
-		std::unique_lock remoteStatsLock(ng->remoteStatsMutex);
+		std::unique_lock remoteStatsLock(ng->windowsMutex);
 		std::vector<NetContext> removes;
 		auto current = iclock64();
 		for (const auto& entry : NetManager::instance()->routingTable)
@@ -239,7 +239,7 @@ void recycleThreadPayload(std::stop_token stoken)
 		{
 			NS::log::NEW_NET.get()->info("[NetManager] Disconnecting with {}", removal);
 			NetManager::instance()->routingTable.unsafe_erase(removal);
-			ng->remoteStats.unsafe_erase(removal);
+			ng->windows.unsafe_erase(removal);
 		}
 	}
 }
@@ -961,7 +961,10 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 		{
 			std::unique_lock<std::mutex> lk1(layer->cbMutex);
 			ikcp_update(layer->cb, iclock());
-			NetGraphSink::instance()->localStat.sync(layer->cb);
+			auto ng = NetGraphSink::instance();
+			std::shared_lock lk2(ng->windowsMutex);
+			std::get<0>(ng->windows[layer->remoteAddr]).sync(layer->cb);
+			std::get<1>(ng->windows[layer->remoteAddr]).rotate(layer->cb->rx_srtt);
 			auto current = iclock();
 			auto next = ikcp_check(layer->cb, current);
 			duration = itimediff(next, current);
@@ -1018,7 +1021,6 @@ int KcpLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 	{
 		std::unique_lock<std::mutex> lk1(cbMutex);
 		result = ikcp_send(cb, buf.data(), buf.size());
-		NetGraphSink::instance()->localStat.sync(cb);
 	}
 
 	if (result < 0)
@@ -1053,7 +1055,6 @@ int KcpLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 			}
 			peeksize = ikcp_peeksize(cb);
 		}
-		NetGraphSink::instance()->localStat.sync(cb);
 	}
 
 	std::unique_lock<std::mutex> lk2(updateCvMutex);

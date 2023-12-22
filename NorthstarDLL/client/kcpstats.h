@@ -1,7 +1,6 @@
 #pragma once
 
 extern ConVar* Cvar_kcp_stats;
-extern ConVar* Cvar_kcp_stats_interval;
 
 class linear_regression
 {
@@ -25,7 +24,7 @@ class linear_regression
 };
 
 const int MAX_DEGREE = 10;
-std::vector<std::vector<std::vector<double>>> CORRECTION_DATA {
+inline std::vector<std::vector<std::vector<double>>> CORRECTION_DATA {
 	{}, // not defined for degree 0
 	{}, // no correction required for degree 2
 	{}, // no correction required for degree 4
@@ -65,6 +64,7 @@ struct sliding_window
 	double last_val = 0;
 	double sumed = 0;
 
+	inline sliding_window() : sliding_window(50, false, false) {};
 	sliding_window(size_t samples);
 	sliding_window(size_t samples, bool smooth, bool delta);
 	~sliding_window();

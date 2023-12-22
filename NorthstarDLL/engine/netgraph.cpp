@@ -22,7 +22,8 @@ void sendThreadPayload(std::stop_token stoken, NetGraphSink* ng)
 		for (const auto& entry : manager->routingTable)
 		{
 			NetBuffer buf(128, 0, 128);
-			ng->localStat.encode(buf);
+			std::shared_lock lk(ng->windowsMutex);
+			std::get<0>(ng->windows[entry.first]).encode(buf);
 			entry.second.first.second->sendto(std::move(buf), entry.first, NetGraphSink::instance().get());
 		}
 	}
@@ -43,9 +44,8 @@ int NetGraphSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource*
 {
 	NetStats s {};
 	s.decode(buf);
-	std::shared_lock lk(remoteStatsMutex);
-	remoteStats.insert(std::make_pair(ctx, s));
-	NS::log::NEW_NET->error("[NG] {}: {} {}", ctx, s.frameTime, s.lostsegs);
+	std::shared_lock lk(windowsMutex);
+	std::get<3>(windows[ctx]).rotate(s);
 	return 0;
 }
 
@@ -99,4 +99,13 @@ void NetStats::sync(ikcpcb* cb)
 	retranssegs = cb->retranssegs;
 	insegs = cb->insegs;
 	reconsegs = cb->reconsegs;
+}
+
+void NetSlidingWindows::rotate(const NetStats& s) {
+	sw_frameTime.rotate(s.frameTime);
+	sw_outsegs.rotate(s.outsegs);
+	sw_lostsegs.rotate(s.lostsegs);
+	sw_retranssegs.rotate(s.retranssegs);
+	sw_insegs.rotate(s.insegs);
+	sw_reconsegs.rotate(s.reconsegs);
 }

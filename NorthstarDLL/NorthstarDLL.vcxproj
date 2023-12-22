@@ -182,6 +182,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="client\audio.h" />
+    <ClInclude Include="client\fontawesome.h" />
     <ClInclude Include="client\imgui.h" />
     <ClInclude Include="client\kcpstats.h" />
     <ClInclude Include="client\localchatwriter.h" />

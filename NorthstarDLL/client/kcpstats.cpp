@@ -4,62 +4,20 @@
 #include "core/hooks.h"
 #include "shared/ikcp.h"
 #include "shared/kcpintegration.h"
+#include "engine/netgraph.h"
+#include "fontawesome.h"
 
 ConVar* Cvar_kcp_stats;
-ConVar* Cvar_kcp_stats_interval;
 
 AUTOHOOK_INIT()
 
-const char* KCP_NETGRAPH_LABELS[] = {" SRTT", "LOS%", "RTS%", "RCS%"};
-
-sliding_window sw_retrans_segs(10, false, true);
-sliding_window sw_lost_segs(10, false, true);
-sliding_window sw_out_segs(10, false, true);
-
-sliding_window sw_recon_segs(10, false, true);
-sliding_window sw_in_segs(10, false, true);
-
-sliding_window sw_srtt(50);
-sliding_window sw_rts(50);
-sliding_window sw_los(50);
-sliding_window sw_rcs(50);
-
-IUINT32 last_rotate = iclock();
-bool has_connection = false;
-
 void draw_kcp_stats(ID3D11Device* device)
-{
-	/*
-	if (Cvar_kcp_stats == nullptr || !Cvar_kcp_stats->GetBool() || !g_kcp_initialized())
+{	
+	if (Cvar_kcp_stats == nullptr || !Cvar_kcp_stats->GetBool())
 	{
 		return;
 	}
-
-	if (itimediff(iclock(), last_rotate) > Cvar_kcp_stats_interval->GetInt())
-	{
-		auto kcp_stats = g_kcp_manager->get_stats();
-
-		if (kcp_stats.size() > 0)
-		{
-			sw_srtt.rotate(kcp_stats[0].second.srtt);
-			sw_retrans_segs.rotate(kcp_stats[0].second.retrans_segs);
-			sw_lost_segs.rotate(kcp_stats[0].second.lost_segs);
-			sw_out_segs.rotate(kcp_stats[0].second.out_segs);
-			sw_in_packets.rotate(kcp_stats[0].second.in_packets);
-			sw_reconstruct_packets.rotate(kcp_stats[0].second.reconstruct_packets);
-			sw_rts.rotate(100.0 * sw_retrans_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
-			sw_los.rotate(100.0 * sw_lost_segs.sum() / (sw_out_segs.sum() == 0 ? 1 : sw_out_segs.sum()));
-			sw_rcs.rotate(100.0 * sw_reconstruct_packets.sum() / (sw_in_packets.sum() == 0 ? 1 : sw_in_packets.sum()));
-			has_connection = true;
-		}
-		else
-		{
-			has_connection = false;
-		}
-
-		last_rotate = iclock();
-	}
-
+	
 	ImGuiWindowFlags window_flags = 0;
 	window_flags |= ImGuiWindowFlags_NoDecoration;
 	window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
@@ -83,10 +41,17 @@ void draw_kcp_stats(ID3D11Device* device)
 	auto viewport_size = main_viewport->WorkSize;
 	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y));
 
-	if (!has_connection)
+	auto ng = NetGraphSink::instance();
+
+	if (ng->windows.empty())
 	{
-		ImGui::Text("No KCP connection");
-	}
+		//auto fa = 
+		ImGui::PushFont(FONT_FONTAWESOME);
+		ImGui::Text("\xef\x82\xabNo KCP connection\xef\x82\xaa");
+		
+		ImGui::PopFont();
+		ImGui::ShowMetricsWindow();
+	} /*
 	else
 	{
 		if (ImGui::BeginTable("kcp_stats", 8))
@@ -197,15 +162,14 @@ void draw_kcp_stats(ID3D11Device* device)
 
 		ImPlot::PopStyleColor(2);
 	}
-
+	*/
 	ImGui::End();
-*/
+
 }
 
 ON_DLL_LOAD("client.dll", KCPSTATS, (CModule module))
 {
 	Cvar_kcp_stats = new ConVar("kcp_stats", "0", FCVAR_NONE, "kcp stats window");
-	Cvar_kcp_stats_interval = new ConVar("kcp_stats_interval", "100", FCVAR_NONE, "kcp stats interval");
 	imgui_add_draw(draw_kcp_stats);
 }
 

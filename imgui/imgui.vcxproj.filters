@@ -51,6 +51,9 @@
     <ClCompile Include="implot_items.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="imgui_demo.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imconfig.h">

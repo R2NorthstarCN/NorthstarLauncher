@@ -369,6 +369,9 @@
     <ClInclude Include="engine\netgraph.h">
       <Filter>Header Files\engine</Filter>
     </ClInclude>
+    <ClInclude Include="client\fontawesome.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">

@@ -319,30 +319,7 @@ inline ImGui::MarkdownImageData ImageCallback(ImGui::MarkdownLinkCallbackData da
 	return imageData;
 }
 
-void LoadFonts(float fontSize_ = 15.0f)
-{
-	std::thread setfontthread(
-		[fontSize_]()
-		{
-			while (!imgui_ready())
-			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			}
-			// io.Fonts->AddFontFromFileTTF("c:/windows/fonts/simhei.ttf", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-			ImGuiIO& io = ImGui::GetIO();
-			// io.Fonts->Clear();
-			//  Base font
-			io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", fontSize_, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-			// Bold headings H2 and H3
-			H2 = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", fontSize_, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-			H3 = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", fontSize_, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-			// bold heading H1
-			// float fontSizeH1 = fontSize_ * 1.1f;
-			H1 = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 18.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-			spdlog::info("[IMGUI] Custom fonts loaded.");
-		});
-	setfontthread.detach();
-}
+
 
 void ExampleMarkdownFormatCallback(const ImGui::MarkdownFormatInfo& markdownFormatInfo_, bool start_)
 {
