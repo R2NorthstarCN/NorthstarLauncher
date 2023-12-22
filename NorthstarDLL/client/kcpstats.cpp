@@ -12,12 +12,12 @@ ConVar* Cvar_kcp_stats;
 AUTOHOOK_INIT()
 
 void draw_kcp_stats(ID3D11Device* device)
-{	
+{
 	if (Cvar_kcp_stats == nullptr || !Cvar_kcp_stats->GetBool())
 	{
 		return;
 	}
-	
+
 	ImGuiWindowFlags window_flags = 0;
 	window_flags |= ImGuiWindowFlags_NoDecoration;
 	window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
@@ -39,60 +39,64 @@ void draw_kcp_stats(ID3D11Device* device)
 	auto main_viewport = ImGui::GetMainViewport();
 	auto viewport_pos = main_viewport->WorkPos;
 	auto viewport_size = main_viewport->WorkSize;
-	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y));
+	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y + viewport_size.y - current_size.y));
 
 	auto ng = NetGraphSink::instance();
+	std::shared_lock lk(ng->windowsMutex);
 
 	if (ng->windows.empty())
 	{
-		//auto fa = 
-		ImGui::PushFont(FONT_FONTAWESOME);
-		ImGui::Text("\xef\x82\xabNo KCP connection\xef\x82\xaa");
-		
-		ImGui::PopFont();
-		ImGui::ShowMetricsWindow();
-	} /*
+		ImGui::Text("No connection");
+	}
 	else
 	{
-		if (ImGui::BeginTable("kcp_stats", 8))
+		if (ImGui::BeginTable("kcp_stats", 9))
 		{
+			auto& entry = *ng->windows.begin();
+			auto& localSildingWindows = std::get<2>(entry.second);
+			auto& remoteSlidingWindows = std::get<3>(entry.second);
+			auto localOutSegsAvg = localSildingWindows.sw_outsegs.avg() + 0.00001;
 			ImGui::TableNextRow();
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", KCP_NETGRAPH_LABELS[0]);
-
-			ImGui::TableNextColumn();
-			ImGui::TableCellValueBg();
-			ImGui::Text("%d", std::max((int)sw_srtt.latest_smoothed(), 0));
+			ImGui::Text("%s", "\xef\x8d\x9b");
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", KCP_NETGRAPH_LABELS[1]);
+			ImGui::Text("%s", "SRTT");
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", std::max(sw_los.latest_smoothed(), 0.0));
+			ImGui::Text("%d", std::get<1>(entry.second).last_val);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", KCP_NETGRAPH_LABELS[2]);
+			ImGui::Text("%s", "LOS%");
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", std::max(sw_rts.latest_smoothed(), 0.0));
+			ImGui::Text("%.2f", localSildingWindows.sw_lostsegs.avg() / localOutSegsAvg);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", KCP_NETGRAPH_LABELS[3]);
+			ImGui::Text("%s", "RTS%");
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f ", std::max(sw_rcs.latest_smoothed(), 0.0));
+			ImGui::Text("%.2f", localSildingWindows.sw_retranssegs.avg() / localOutSegsAvg);
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", "RCS%");
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%.2f ", 0.0);
 
 			ImGui::EndTable();
 		}
-
+		/*
 		ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
 		ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
 
@@ -160,11 +164,9 @@ void draw_kcp_stats(ID3D11Device* device)
 
 		ImGui::PopStyleVar();
 
-		ImPlot::PopStyleColor(2);
+		ImPlot::PopStyleColor(2);*/
 	}
-	*/
 	ImGui::End();
-
 }
 
 ON_DLL_LOAD("client.dll", KCPSTATS, (CModule module))

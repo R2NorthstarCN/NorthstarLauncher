@@ -35,14 +35,3 @@ extern std::vector<imgui_draw*> draw_functions;
 void imgui_setup();
 
 void imgui_add_draw(imgui_draw* func);
-
-extern ImFont* IMGUI_FONT_MSYH_13;
-extern ImFont* IMGUI_FONT_MSYH_16;
-extern ImFont* IMGUI_FONT_MSYH_22;
-extern ImFont* IMGUI_FONT_MSYH_36;
-extern ImFont* IMGUI_FONT_MSYHBD_13;
-extern ImFont* IMGUI_FONT_MSYHBD_16;
-extern ImFont* IMGUI_FONT_MSYHBD_22;
-extern ImFont* IMGUI_FONT_MSYHBD_28;
-extern ImFont* FONT_FONTAWESOME;
-

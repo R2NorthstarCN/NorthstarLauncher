@@ -671,14 +671,11 @@
     <ClCompile Include="shared\rs.cpp">
       <Filter>Source Files\shared</Filter>
     </ClCompile>
-    <ClCompile Include="scriptsvm.cpp">
-      <Filter>Source Files\scripts</Filter>
-    </ClCompile>
-    <ClCompile Include="markdown.cpp">
-      <Filter>Source Files\client</Filter>
-    </ClCompile>
     <ClCompile Include="engine\netgraph.cpp">
       <Filter>Source Files\engine</Filter>
+    </ClCompile>
+    <ClCompile Include="scripts\scriptsvm.cpp">
+      <Filter>Source Files\scripts</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

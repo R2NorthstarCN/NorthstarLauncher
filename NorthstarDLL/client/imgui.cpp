@@ -18,17 +18,6 @@ ID3D11Device* pDevice = NULL;
 ID3D11DeviceContext* pContext = NULL;
 ID3D11RenderTargetView* mainRenderTargetView;
 
-ImFont* IMGUI_FONT_MSYH_13 = NULL;
-ImFont* IMGUI_FONT_MSYH_16 = NULL;
-ImFont* IMGUI_FONT_MSYH_22 = NULL;
-ImFont* IMGUI_FONT_MSYH_36 = NULL;
-ImFont* IMGUI_FONT_MSYHBD_13 = NULL;
-ImFont* IMGUI_FONT_MSYHBD_16 = NULL;
-ImFont* IMGUI_FONT_MSYHBD_22 = NULL;
-ImFont* IMGUI_FONT_MSYHBD_28 = NULL;
-
-ImFont* FONT_FONTAWESOME = NULL;
-
 LRESULT __stdcall WndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	ImGuiIO& io = ImGui::GetIO();
@@ -39,10 +28,14 @@ LRESULT __stdcall WndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 	return CallWindowProc(oWndProc, hWnd, uMsg, wParam, lParam);
 }
 
-static const ImWchar GLYPH_FUCK_YOU[] = {
-	0xE005, 0xF8FF,
-	0,
-};
+const ImWchar* GetGlyphRangesFontAwesome()
+{
+	static const ImWchar ranges[] = {
+		0xE005, 0xF8FF, // Basic Latin + Latin Supplement
+		0,
+	};
+	return &ranges[0];
+}
 
 void InitImGui()
 {
@@ -53,37 +46,13 @@ void InitImGui()
 	ImGui_ImplWin32_Init(window);
 	ImGui_ImplDX11_Init(pDevice, pContext);
 	io.Fonts->AddFontDefault();
-	// Base font
-	//io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-	// Bold headings H2 and H3
-	//io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 22.0f, nullptr, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
-	//IMGUI_FONT_MSYHBD_22 =
-	//	io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 22.0f, nullptr, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
-	//IMGUI_FONT_MSYHBD_28 =
-	//	io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 28.0f, nullptr, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
-	/*IMGUI_FONT_MSYH_13 =
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-	IMGUI_FONT_MSYH_16 =
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 15.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-	
-	IMGUI_FONT_MSYH_36 =
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 36.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-	IMGUI_FONT_MSYHBD_13 =
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 13.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-	IMGUI_FONT_MSYHBD_16 =
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 15.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-	IMGUI_FONT_MSYHBD_22 =
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 22.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-	IMGUI_FONT_MSYHBD_36 =
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyhbd.ttc", 36.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());*/
 
 	ImFontConfig icons_config;
 	icons_config.MergeMode = true;
 	icons_config.PixelSnapH = true;
+	icons_config.OversampleH = 1;
 
-	FONT_FONTAWESOME =
-		io.Fonts->AddFontFromMemoryCompressedBase85TTF(FontAwesome_compressed_data_base85, 16.0f, &icons_config, &GLYPH_FUCK_YOU[0]);
-	io.Fonts->GetGlyphRangesDefault();
+	io.Fonts->AddFontFromMemoryCompressedBase85TTF(FontAwesome_compressed_data_base85, 13.0f, &icons_config, GetGlyphRangesFontAwesome());
 }
 
 

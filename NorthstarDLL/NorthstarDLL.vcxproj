@@ -305,7 +305,6 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="logging\logging.cpp" />
     <ClCompile Include="logging\loghooks.cpp" />
     <ClCompile Include="logging\sourceconsole.cpp" />
-    <ClCompile Include="markdown.cpp" />
     <ClCompile Include="masterserver\masterserver.cpp" />
     <ClCompile Include="mods\compiled\kb_act.cpp" />
     <ClCompile Include="mods\compiled\modkeyvalues.cpp" />
@@ -319,7 +318,6 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Dedicated|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="plugins\plugins.cpp" />
-    <ClCompile Include="scriptsvm.cpp" />
     <ClCompile Include="scripts\clantag.cpp" />
     <ClCompile Include="scripts\client\clientchathooks.cpp" />
     <ClCompile Include="scripts\client\cursorposition.cpp" />
@@ -335,6 +333,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="scripts\scriptmasterservermessages.cpp" />
     <ClCompile Include="scripts\scriptmatchmakingevents.cpp" />
     <ClCompile Include="scripts\scriptplayerinfo.cpp" />
+    <ClCompile Include="scripts\scriptsvm.cpp" />
     <ClCompile Include="scripts\scriptutility.cpp" />
     <ClCompile Include="scripts\server\miscserverfixes.cpp" />
     <ClCompile Include="scripts\server\miscserverscript.cpp" />
