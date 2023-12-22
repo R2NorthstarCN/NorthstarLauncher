@@ -961,6 +961,7 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 		{
 			std::unique_lock<std::mutex> lk1(layer->cbMutex);
 			ikcp_update(layer->cb, iclock());
+			NetGraphSink::instance()->localStat.sync(layer->cb);
 			auto current = iclock();
 			auto next = ikcp_check(layer->cb, current);
 			duration = itimediff(next, current);
@@ -1017,6 +1018,7 @@ int KcpLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 	{
 		std::unique_lock<std::mutex> lk1(cbMutex);
 		result = ikcp_send(cb, buf.data(), buf.size());
+		NetGraphSink::instance()->localStat.sync(cb);
 	}
 
 	if (result < 0)
@@ -1051,6 +1053,7 @@ int KcpLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 			}
 			peeksize = ikcp_peeksize(cb);
 		}
+		NetGraphSink::instance()->localStat.sync(cb);
 	}
 
 	std::unique_lock<std::mutex> lk2(updateCvMutex);
