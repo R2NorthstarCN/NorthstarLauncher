@@ -4,20 +4,20 @@
 
 extern float* g_frameTime;
 
-class FrameTimeSink : public NetSink
+class NetGraphSink : public NetSink
 {
   public:
-	~FrameTimeSink();
+	~NetGraphSink();
 
 	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
 	virtual bool initialized(int from);
 
-	static std::shared_ptr<FrameTimeSink> instance();
+	static std::shared_ptr<NetGraphSink> instance();
 
 	std::unordered_map<NetContext, float> remoteFrameTimes;
 
   private:
-	FrameTimeSink();
+	NetGraphSink();
 
 	std::jthread sendThread;
 };

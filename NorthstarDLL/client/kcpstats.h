@@ -76,7 +76,6 @@ struct sliding_window
 
 	double latest_smoothed();
 	double avg();
-	double avg_smoothed();
 	double sum();
 	double max();
 	double min();

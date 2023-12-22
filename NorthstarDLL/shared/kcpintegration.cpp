@@ -266,7 +266,7 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDe
 	std::shared_ptr<MuxLayer> mux = std::shared_ptr<MuxLayer>(new MuxLayer());
 
 	mux->bindTop(0, std::static_pointer_cast<NetSink>(GameSink::instance()));
-	mux->bindTop(1, std::static_pointer_cast<NetSink>(FrameTimeSink::instance()));
+	mux->bindTop(1, std::static_pointer_cast<NetSink>(NetGraphSink::instance()));
 	mux->bindBottom(std::static_pointer_cast<NetSource>(kcp));
 	kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
 	kcp->bindBottom(std::static_pointer_cast<NetSource>(fec));
@@ -633,7 +633,7 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 			}
 			rBuf.resize(fecSize - 2, 0);
 
-			auto inputResult = top->input(std::move(rBuf), ctx, this);
+			auto inputResult = top->input(std::move(rBuf), {ctx.socket, ctx.addr, true}, this);
 			if (inputResult == SOCKET_ERROR)
 			{
 				NS::log::NEW_NET.get()->error("[FEC] top->input {} error: {}", ctx, inputResult);
@@ -1031,7 +1031,7 @@ int KcpLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 	int result;
 	{
 		std::unique_lock<std::mutex> lk1(cbMutex);
-		result = ikcp_input(cb, buf.data(), buf.size());
+		result = ikcp_input(cb, buf.data(), buf.size(), ctx.recon);
 		if (result < 0)
 		{
 			NS::log::NEW_NET.get()->error("[KCP] input {}: error {}", ctx, result);
@@ -1153,6 +1153,7 @@ bool MuxLayer::initialized(int from)
 		}
 		return result && bottom.lock()->initialized(FROM_TOP);
 	}
+	return false;
 }
 
 void MuxLayer::bindTop(IUINT8 channelId, std::shared_ptr<NetSink> top)

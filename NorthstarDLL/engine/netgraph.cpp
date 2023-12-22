@@ -23,19 +23,19 @@ void sendThreadPayload(std::stop_token stoken)
 		{
 			NetBuffer buf(sizeof(float), 0, 128);
 			memcpy(buf.data(), g_frameTime, sizeof(float));
-			entry.second.first.second->sendto(std::move(buf), entry.first, FrameTimeSink::instance().get());
+			entry.second.first.second->sendto(std::move(buf), entry.first, NetGraphSink::instance().get());
 		}
 	}
 }
 
-FrameTimeSink::FrameTimeSink()
+NetGraphSink::NetGraphSink()
 {
 	sendThread = std::jthread(sendThreadPayload);
 }
 
-FrameTimeSink::~FrameTimeSink() {}
+NetGraphSink::~NetGraphSink() {}
 
-int FrameTimeSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
+int NetGraphSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
 {
 	float tmp = 0.0f;
 	memcpy(&tmp, buf.data(), sizeof(float));
@@ -44,13 +44,13 @@ int FrameTimeSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource
 	return 0;
 }
 
-bool FrameTimeSink::initialized(int from)
+bool NetGraphSink::initialized(int from)
 {
 	return true;
 }
 
-std::shared_ptr<FrameTimeSink> FrameTimeSink::instance()
+std::shared_ptr<NetGraphSink> NetGraphSink::instance()
 {
-	static std::shared_ptr<FrameTimeSink> singleton = std::shared_ptr<FrameTimeSink>(new FrameTimeSink());
+	static std::shared_ptr<NetGraphSink> singleton = std::shared_ptr<NetGraphSink>(new NetGraphSink());
 	return singleton;
 }

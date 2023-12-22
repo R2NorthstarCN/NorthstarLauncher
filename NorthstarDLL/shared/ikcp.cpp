@@ -291,6 +291,13 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	kcp->output = NULL;
 	kcp->writelog = NULL;
 
+	kcp->outsegs = 0;
+	kcp->lostsegs = 0;
+	kcp->retranssegs = 0;
+
+	kcp->insegs = 0;
+	kcp->reconsegs = 0;
+
 	return kcp;
 }
 
@@ -753,7 +760,7 @@ void ikcp_parse_data(ikcpcb *kcp, IKCPSEG *newseg)
 //---------------------------------------------------------------------
 // input data
 //---------------------------------------------------------------------
-int ikcp_input(ikcpcb *kcp, const char *data, long size)
+int ikcp_input(ikcpcb *kcp, const char *data, long size, bool recon)
 {
 	IUINT32 prev_una = kcp->snd_una;
 	IUINT32 maxack = 0, latest_ts = 0;
@@ -871,6 +878,12 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 			return -3;
 		}
 
+		kcp->insegs += 1;
+		if (recon)
+		{
+			kcp->reconsegs += 1;
+		}
+
 		data += len;
 		size -= len;
 	}
@@ -910,7 +923,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 //---------------------------------------------------------------------
 // ikcp_encode_seg
 //---------------------------------------------------------------------
-static char *ikcp_encode_seg(char *ptr, const IKCPSEG *seg)
+static char *ikcp_encode_seg(ikcpcb* kcp, char *ptr, const IKCPSEG *seg)
 {
 	ptr = ikcp_encode32u(ptr, seg->conv);
 	ptr = ikcp_encode8u(ptr, (IUINT8)seg->cmd);
@@ -920,6 +933,9 @@ static char *ikcp_encode_seg(char *ptr, const IKCPSEG *seg)
 	ptr = ikcp_encode32u(ptr, seg->sn);
 	ptr = ikcp_encode32u(ptr, seg->una);
 	ptr = ikcp_encode32u(ptr, seg->len);
+
+	kcp->outsegs += 1;
+
 	return ptr;
 }
 
@@ -969,7 +985,7 @@ void ikcp_flush(ikcpcb *kcp)
 			ptr = buffer;
 		}
 		ikcp_ack_get(kcp, i, &seg.sn, &seg.ts);
-		ptr = ikcp_encode_seg(ptr, &seg);
+		ptr = ikcp_encode_seg(kcp, ptr, &seg);
 	}
 
 	kcp->ackcount = 0;
@@ -1004,7 +1020,7 @@ void ikcp_flush(ikcpcb *kcp)
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
-		ptr = ikcp_encode_seg(ptr, &seg);
+		ptr = ikcp_encode_seg(kcp, ptr, &seg);
 	}
 
 	// flush window probing commands
@@ -1015,7 +1031,7 @@ void ikcp_flush(ikcpcb *kcp)
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
-		ptr = ikcp_encode_seg(ptr, &seg);
+		ptr = ikcp_encode_seg(kcp, ptr, &seg);
 	}
 
 	kcp->probe = 0;
@@ -1075,6 +1091,9 @@ void ikcp_flush(ikcpcb *kcp)
 			}
 			segment->resendts = current + segment->rto;
 			lost = 1;
+
+			kcp->lostsegs += 1;
+			kcp->retranssegs += 1;
 		}
 		else if (segment->fastack >= resent) {
 			if ((int)segment->xmit <= kcp->fastlimit || 
@@ -1084,6 +1103,8 @@ void ikcp_flush(ikcpcb *kcp)
 				segment->fastack = 0;
 				segment->resendts = current + segment->rto;
 				change++;
+
+				kcp->retranssegs += 1;
 			}
 		}
 
@@ -1101,7 +1122,7 @@ void ikcp_flush(ikcpcb *kcp)
 				ptr = buffer;
 			}
 
-			ptr = ikcp_encode_seg(ptr, segment);
+			ptr = ikcp_encode_seg(kcp, ptr, segment);
 
 			if (segment->len > 0) {
 				memcpy(ptr, segment->data, segment->len);

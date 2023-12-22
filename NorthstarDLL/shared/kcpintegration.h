@@ -16,6 +16,7 @@ struct NetContext
 {
 	SOCKET socket;
 	sockaddr_in6 addr;
+	bool recon = false;
 };
 
 template <> struct fmt::formatter<NetContext>

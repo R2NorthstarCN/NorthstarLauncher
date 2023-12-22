@@ -314,6 +314,13 @@ struct IKCPCB
 	int logmask;
 	int (*output)(const char *buf, int len, struct IKCPCB *kcp, void *user);
 	void (*writelog)(const char *log, struct IKCPCB *kcp, void *user);
+
+	IUINT64 outsegs;
+	IUINT64 lostsegs;
+	IUINT64 retranssegs;
+
+	IUINT64 insegs;
+	IUINT64 reconsegs;
 };
 
 
@@ -369,7 +376,7 @@ void ikcp_update(ikcpcb *kcp, IUINT32 current);
 IUINT32 ikcp_check(const ikcpcb *kcp, IUINT32 current);
 
 // when you received a low level packet (eg. UDP packet), call it
-int ikcp_input(ikcpcb *kcp, const char *data, long size);
+int ikcp_input(ikcpcb *kcp, const char *data, long size, bool recon);
 
 // flush pending data
 void ikcp_flush(ikcpcb *kcp);
