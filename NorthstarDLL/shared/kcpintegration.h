@@ -179,6 +179,7 @@ struct NetBuffer
 	inline NetBuffer(const std::vector<char>& buf) : NetBuffer(buf.data(), buf.size()) {}
 	inline NetBuffer(const char* buf, const int len) : NetBuffer(buf, len, NET_BUFFER_DEFAULT_HEADER_EXTRA_LEN) {}
 	NetBuffer(const char* buf, const int len, const int headerExtraLen);
+	NetBuffer(const size_t len, char def, const int headerExtraLen);
 
 	char* data() const;
 	size_t size() const;
@@ -262,12 +263,12 @@ class NetManager
 
 	friend void recycleThreadPayload(std::stop_token stoken);
 
-  private:
 	// Only locked exclusively when disconnecting.
 	std::shared_mutex routingTableMutex;
 	Concurrency::concurrent_unordered_map<NetContext, std::pair<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>, IINT64>>
 		routingTable;
 
+  private:
 	std::jthread recycleThread;
 
 	NetManager();
@@ -444,8 +445,8 @@ class MuxLayer : public NetSource, public NetSink
   private:
 	std::weak_ptr<NetSource> bottom;
 
-	std::map<IUINT8, std::shared_ptr<NetSink>> topMap;
-	std::map<uintptr_t, IUINT8> topInverseMap;
+	std::unordered_map<IUINT8, std::shared_ptr<NetSink>> topMap;
+	std::unordered_map<uintptr_t, IUINT8> topInverseMap;
 };
 
 class DummySink : public NetSink

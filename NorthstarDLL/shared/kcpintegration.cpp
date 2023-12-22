@@ -2,6 +2,7 @@
 #include "core/hooks.h"
 #include <dedicated/dedicated.h>
 #include "kcpintegration.h"
+#include "engine/netgraph.h"
 
 ConVar* Cvar_kcp_timer_resolution;
 ConVar* Cvar_kcp_select_timeout;
@@ -156,6 +157,11 @@ NetBuffer::NetBuffer(const char* buf, int len, int headerExtraLen)
 	memcpy(inner.data() + headerExtraLen, buf, len);
 }
 
+NetBuffer::NetBuffer(const size_t len, char def, const int headerExtraLen) {
+	inner = std::vector<char>(len + headerExtraLen, def);
+	currentOffset = headerExtraLen;
+}
+
 char* NetBuffer::data() const
 {
 	return (char*)inner.data() + currentOffset;
@@ -257,11 +263,17 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDe
 	std::shared_ptr<FecLayer> fec =
 		std::shared_ptr<FecLayer>(new FecLayer(Cvar_kcp_fec_send_data_shards->GetInt(), Cvar_kcp_fec_send_parity_shards->GetInt(), 1, 1));
 	std::shared_ptr<KcpLayer> kcp = std::shared_ptr<KcpLayer>(new KcpLayer({s, addr}));
-	kcp->bindTop(std::static_pointer_cast<NetSink>(GameSink::instance()));
+	std::shared_ptr<MuxLayer> mux = std::shared_ptr<MuxLayer>(new MuxLayer());
+
+	mux->bindTop(0, std::static_pointer_cast<NetSink>(GameSink::instance()));
+	mux->bindTop(1, std::static_pointer_cast<NetSink>(FrameTimeSink::instance()));
+	mux->bindBottom(std::static_pointer_cast<NetSource>(kcp));
+	kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
 	kcp->bindBottom(std::static_pointer_cast<NetSource>(fec));
 	fec->bindTop(std::static_pointer_cast<NetSink>(kcp));
 	fec->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
-	return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(kcp));
+
+	return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
 }
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(const NetContext& ctx)
