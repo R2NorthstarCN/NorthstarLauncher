@@ -309,8 +309,17 @@ std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>> N
 	{
 		return std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>>();
 	}
-	(*it).second.second = iclock64();
 	return std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>>((*it).second.first);
+}
+
+void NetManager::updateLastSeen(const NetContext& ctx)
+{
+	std::shared_lock routingTableLock(routingTableMutex);
+	auto it = routingTable.find(ctx);
+	if (it != routingTable.end())
+	{
+		(*it).second.second = iclock64();
+	}
 }
 
 void selectThreadPayload(std::stop_token stoken)
@@ -472,6 +481,9 @@ int GameSink::recvfrom(
 			return SOCKET_ERROR;
 		}
 		memcpy_s(from, *fromlen, &data.second.addr, sizeof(sockaddr_in6));
+
+		NetManager::instance()->updateLastSeen(data.second);
+
 		if (len < data.first.size())
 		{
 			memcpy(buf, data.first.data(), len);
@@ -518,13 +530,17 @@ int GameSink::sendto(
 	{
 		if (!route->second->initialized(FROM_CAL))
 		{
-			NS::log::NEW_NET.get()->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
+			NS::log::NEW_NET->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
 			return NET_HOOK_NOT_ALTERED;
 		}
 		auto sendtoResult = route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
 		if (sendtoResult < 0)
 		{
-			NS::log::NEW_NET.get()->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
+			NS::log::NEW_NET->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
+		}
+		else
+		{
+			NetManager::instance()->updateLastSeen(ctx);
 		}
 		return sendtoResult;
 	}

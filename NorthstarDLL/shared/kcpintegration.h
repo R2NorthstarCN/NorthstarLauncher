@@ -261,6 +261,7 @@ class NetManager
 		std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> (*connectionInitFunc)(const SOCKET& s, const sockaddr_in6& addr));
 	void bind(const NetContext& ctx, std::shared_ptr<NetSink> inboundDst, std::shared_ptr<NetSource> outboundDst);
 	std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>> route(const NetContext& ctx);
+	void updateLastSeen(const NetContext& ctx);
 
 	friend void recycleThreadPayload(std::stop_token stoken);
 
