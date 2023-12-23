@@ -95,6 +95,7 @@ typedef int ImPlotBarGroupsFlags;     // -> ImPlotBarGroupsFlags_
 typedef int ImPlotErrorBarsFlags;     // -> ImPlotErrorBarsFlags_
 typedef int ImPlotStemsFlags;         // -> ImPlotStemsFlags_
 typedef int ImPlotInfLinesFlags;      // -> ImPlotInfLinesFlags_
+typedef int ImPlotInfLinesExFlags;    // -> ImPlotInfLinesExFlags_
 typedef int ImPlotPieChartFlags;      // -> ImPlotPieChartFlags_
 typedef int ImPlotHeatmapFlags;       // -> ImPlotHeatmapFlags_
 typedef int ImPlotHistogramFlags;     // -> ImPlotHistogramFlags_
@@ -282,6 +283,15 @@ enum ImPlotStemsFlags_ {
 enum ImPlotInfLinesFlags_ {
     ImPlotInfLinesFlags_None       = 0,      // default
     ImPlotInfLinesFlags_Horizontal = 1 << 10 // lines will be rendered horizontally on the current y-axis
+};
+
+// Flags for PlotInfLinesEx
+enum ImPlotInfLinesExFlags_
+{
+	ImPlotInfLinesExFlags_None       = 0,       // default
+	ImPlotInfLinesExFlags_Horizontal = 1 << 10, // lines will be rendered horizontally on the current y-axis
+	ImPlotInfLinesExFlags_FirstHalf  = 1 << 11, // lines will be rendered left or lower half
+	ImPlotInfLinesExFlags_SecondHalf = 1 << 12, // lines will be rendered right or upper half
 };
 
 // Flags for PlotPieChart
@@ -891,6 +901,7 @@ IMPLOT_TMP void PlotStems(const char* label_id, const T* xs, const T* ys, int co
 
 // Plots infinite vertical or horizontal lines (e.g. for references or asymptotes).
 IMPLOT_TMP void PlotInfLines(const char* label_id, const T* values, int count, ImPlotInfLinesFlags flags=0, int offset=0, int stride=sizeof(T));
+IMPLOT_TMP void PlotInfLinesEx(const char* label_id, const T* values, int count, ImPlotInfLinesExFlags flags = 0, int offset = 0, int stride = sizeof(T));
 
 // Plots a pie chart. Center and radius are in plot units. #label_fmt can be set to nullptr for no labels.
 IMPLOT_TMP void PlotPieChart(const char* const label_ids[], const T* values, int count, double x, double y, double radius, ImPlotFormatter fmt, void* fmt_data=nullptr, double angle0=90, ImPlotPieChartFlags flags=0);

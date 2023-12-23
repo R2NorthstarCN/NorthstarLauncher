@@ -101,8 +101,20 @@ void NetStats::sync(ikcpcb* cb)
 	reconsegs = cb->reconsegs;
 }
 
+static double getSV(float ft)
+{
+	if (ft < 0.001f)
+	{
+		return 999.0;
+	}
+	else
+	{
+		return 1.0 / ft;
+	}
+}
+
 void NetSlidingWindows::rotate(const NetStats& s) {
-	sw_frameTime.rotate(s.frameTime);
+	sw_sv.rotate(getSV(s.frameTime));
 	sw_outsegs.rotate(s.outsegs);
 	sw_lostsegs.rotate(s.lostsegs);
 	sw_retranssegs.rotate(s.retranssegs);

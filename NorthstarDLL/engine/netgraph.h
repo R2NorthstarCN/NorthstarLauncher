@@ -23,7 +23,7 @@ struct NetStats
 
 struct NetSlidingWindows
 {
-	sliding_window sw_frameTime = sliding_window(50, false);
+	sliding_window sw_sv = sliding_window(50, false);
 
 	sliding_window sw_outsegs = sliding_window(50, true);
 	sliding_window sw_lostsegs = sliding_window(50, true);

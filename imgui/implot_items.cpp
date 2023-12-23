@@ -2193,6 +2193,68 @@ void PlotInfLines(const char* label_id, const T* values, int count, ImPlotInfLin
 CALL_INSTANTIATE_FOR_NUMERIC_TYPES()
 #undef INSTANTIATE_MACRO
 
+template <typename T>
+void PlotInfLinesEx(const char* label_id, const T* values, int count, ImPlotInfLinesExFlags flags, int offset, int stride) {
+    const ImPlotRect lims = GetPlotLimits(IMPLOT_AUTO,IMPLOT_AUTO);
+    if (ImHasFlag(flags, ImPlotInfLinesExFlags_Horizontal)) {
+		double x_min = 0.0;
+        double x_max = 0.0;
+		if (ImHasFlag(flags, ImPlotInfLinesExFlags_FirstHalf)) {
+            x_min = lims.X.Min;
+            x_max = lims.X.Max / 2 + lims.X.Min / 2;
+		} else if (ImHasFlag(flags, ImPlotInfLinesExFlags_SecondHalf)) {
+            x_min = lims.X.Max / 2 + lims.X.Min / 2;
+            x_max = lims.X.Max;
+        } else {
+            x_min = lims.X.Min;
+            x_max = lims.X.Max;
+        }
+        GetterXY<IndexerConst,IndexerIdx<T>> getter_min(IndexerConst(x_min),IndexerIdx<T>(values,count,offset,stride),count);
+        GetterXY<IndexerConst,IndexerIdx<T>> getter_max(IndexerConst(x_max),IndexerIdx<T>(values,count,offset,stride),count);
+        if (BeginItemEx(label_id, FitterY<GetterXY<IndexerConst,IndexerIdx<T>>>(getter_min), flags, ImPlotCol_Line)) {
+            if (count <= 0) {
+                EndItem();
+                return;
+            }
+            const ImPlotNextItemData& s = GetItemData();
+            const ImU32 col_line = ImGui::GetColorU32(s.Colors[ImPlotCol_Line]);
+            if (s.RenderLine)
+                RenderPrimitives2<RendererLineSegments2>(getter_min, getter_max, col_line, s.LineWeight);
+            EndItem();
+        }
+    }
+    else {
+        double y_min = 0.0;
+        double y_max = 0.0;
+		if (ImHasFlag(flags, ImPlotInfLinesExFlags_FirstHalf)) {
+            y_min = lims.Y.Min;
+            y_max = lims.Y.Max / 2 + lims.Y.Min / 2;
+		} else if (ImHasFlag(flags, ImPlotInfLinesExFlags_SecondHalf)) {
+            y_min = lims.Y.Max / 2 + lims.Y.Min / 2;
+            y_max = lims.Y.Max;
+        } else {
+            y_min = lims.Y.Min;
+            y_max = lims.Y.Max;
+        }
+        GetterXY<IndexerIdx<T>,IndexerConst> get_min(IndexerIdx<T>(values,count,offset,stride),IndexerConst(y_min),count);
+        GetterXY<IndexerIdx<T>,IndexerConst> get_max(IndexerIdx<T>(values,count,offset,stride),IndexerConst(y_max),count);
+        if (BeginItemEx(label_id, FitterX<GetterXY<IndexerIdx<T>,IndexerConst>>(get_min), flags, ImPlotCol_Line)) {
+            if (count <= 0) {
+                EndItem();
+                return;
+            }
+            const ImPlotNextItemData& s = GetItemData();
+            const ImU32 col_line = ImGui::GetColorU32(s.Colors[ImPlotCol_Line]);
+            if (s.RenderLine)
+                RenderPrimitives2<RendererLineSegments2>(get_min, get_max, col_line, s.LineWeight);
+            EndItem();
+        }
+    }
+}
+#define INSTANTIATE_MACRO(T) template IMPLOT_API void PlotInfLinesEx<T>(const char* label_id, const T* xs, int count, ImPlotInfLinesExFlags flags, int offset, int stride);
+CALL_INSTANTIATE_FOR_NUMERIC_TYPES()
+#undef INSTANTIATE_MACRO
+
 //-----------------------------------------------------------------------------
 // [SECTION] PlotPieChart
 //-----------------------------------------------------------------------------

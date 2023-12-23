@@ -950,7 +950,7 @@ std::pair<int, int> FecLayer::AutoTuner::findPeriods()
 
 void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 {
-	IUINT32 lastStatsSync = 0;
+	IUINT32 lastStatsSync = iclock();
 	while (!stoken.stop_requested())
 	{
 		if (!layer->initialized(FROM_CAL))
@@ -970,6 +970,8 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 				std::get<0>(ng->windows[layer->remoteAddr]).sync(layer->cb);
 				std::get<1>(ng->windows[layer->remoteAddr]).rotate(layer->cb->rx_srtt);
 				std::get<2>(ng->windows[layer->remoteAddr]).rotate(std::get<0>(ng->windows[layer->remoteAddr]));
+
+				lastStatsSync = current;
 			}
 			auto next = ikcp_check(layer->cb, current);
 			duration = itimediff(next, current);
