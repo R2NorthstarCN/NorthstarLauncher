@@ -5,7 +5,6 @@
 #include <span>
 #include "fontawesome.h"
 
-
 std::vector<imgui_draw*> draw_functions;
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -31,7 +30,8 @@ LRESULT __stdcall WndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 const ImWchar* GetGlyphRangesFontAwesome()
 {
 	static const ImWchar ranges[] = {
-		0xE005, 0xF8FF, // Basic Latin + Latin Supplement
+		0xE005,
+		0xF8FF,
 		0,
 	};
 	return &ranges[0];
@@ -41,20 +41,20 @@ void InitImGui()
 {
 	ImGui::CreateContext();
 	ImPlot::CreateContext();
+
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags = ImGuiConfigFlags_NoMouseCursorChange;
 	ImGui_ImplWin32_Init(window);
 	ImGui_ImplDX11_Init(pDevice, pContext);
+
 	io.Fonts->AddFontDefault();
 
-	ImFontConfig icons_config;
+	ImFontConfig icons_config; 
 	icons_config.MergeMode = true;
 	icons_config.PixelSnapH = true;
 	icons_config.OversampleH = 1;
-
 	io.Fonts->AddFontFromMemoryCompressedBase85TTF(FontAwesome_compressed_data_base85, 13.0f, &icons_config, GetGlyphRangesFontAwesome());
 }
-
 
 HRESULT __stdcall hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
 {
@@ -111,7 +111,7 @@ void setup_thread_func()
 		}
 		if (kiero::bind(8, (void**)&oPresent, hkPresent) != kiero::Status::Success)
 		{
-			spdlog::error("[ImGui] bind failed");
+			spdlog::error("[ImGui] Kiero bind failed, disabling ImGui");
 			break;
 		}
 	}
@@ -127,41 +127,6 @@ void ImGui::TableCellValueBg()
 	ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140));
 }
 
-void ImPlot::PushAvgLineColor()
-{
-	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 255, 160));
-}
-
-void ImPlot::PushPurpleLineColor()
-{
-	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(127, 0, 255, 255));
-}
-
-void ImPlot::PushRedLineColor()
-{
-	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 0, 0, 255));
-}
-
-void ImPlot::PushOrangeLineColor()
-{
-	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 128, 0, 255));
-}
-
-void ImPlot::PushYellowLineColor()
-{
-	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(255, 255, 0, 255));
-}
-
-void ImPlot::PushLimeLineColor()
-{
-	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(128, 255, 0, 255));
-}
-
-void ImPlot::PushGreenLineColor()
-{
-	ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(0, 255, 0, 255));
-}
-
 void imgui_add_draw(imgui_draw* func)
 {
 	draw_functions.push_back(func);
@@ -169,15 +134,11 @@ void imgui_add_draw(imgui_draw* func)
 
 void imgui_setup()
 {
-	// ImGui::GetAllocatorFunctions(imgui_malloc, (ImGuiMemFreeFunc*)imgui_free, nullptr);
 	if (strstr(GetCommandLineA(), "-disableimgui"))
 	{
-		spdlog::info("[IMGUI] IMGUI is disabled!");
 		return;
 	}
-	spdlog::info("[IMGUI] IMGUI is enabled! use argument -disableimgui if you find any compatibility issues!");
+
 	std::jthread setup_thread(setup_thread_func);
 	setup_thread.detach();
 }
-
-

@@ -23,14 +23,14 @@ struct NetStats
 
 struct NetSlidingWindows
 {
-	sliding_window sw_frameTime = sliding_window(50, false, false);
+	sliding_window sw_frameTime = sliding_window(50, false);
 
-	sliding_window sw_outsegs = sliding_window(50, false, true);
-	sliding_window sw_lostsegs = sliding_window(50, false, true);
-	sliding_window sw_retranssegs = sliding_window(50, false, true);
+	sliding_window sw_outsegs = sliding_window(50, true);
+	sliding_window sw_lostsegs = sliding_window(50, true);
+	sliding_window sw_retranssegs = sliding_window(50, true);
 
-	sliding_window sw_insegs = sliding_window(50, false, true);
-	sliding_window sw_reconsegs = sliding_window(50, false, true);
+	sliding_window sw_insegs = sliding_window(50, true);
+	sliding_window sw_reconsegs = sliding_window(50, true);
 
 	void rotate(const NetStats& s);
 };

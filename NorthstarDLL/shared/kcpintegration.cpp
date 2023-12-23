@@ -157,7 +157,8 @@ NetBuffer::NetBuffer(const char* buf, int len, int headerExtraLen)
 	memcpy(inner.data() + headerExtraLen, buf, len);
 }
 
-NetBuffer::NetBuffer(const size_t len, char def, const int headerExtraLen) {
+NetBuffer::NetBuffer(const size_t len, char def, const int headerExtraLen)
+{
 	inner = std::vector<char>(len + headerExtraLen, def);
 	currentOffset = headerExtraLen;
 }
@@ -618,7 +619,7 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 			{
 				nBuf.resize(fecSize - 2, 0);
 
-				auto inputResult = top->input(std::move(nBuf), ctx, this); 
+				auto inputResult = top->input(std::move(nBuf), ctx, this);
 				if (inputResult == SOCKET_ERROR)
 				{
 					NS::log::NEW_NET.get()->error("[FEC] top->input {} error: {}", ctx, inputResult);
@@ -628,7 +629,7 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 		for (auto& rBuf : reconstructed)
 		{
 			auto fecSize = rBuf.getU16H();
-			
+
 			if (fecSize < 2)
 			{
 				NS::log::NEW_NET.get()->warn("[FEC] top->input {} spurious reconstructed with fecSize < 2", ctx);
@@ -653,7 +654,7 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 
 bool FecLayer::initialized(int from)
 {
-	bool current = top && !bottom.expired() && decoderCodec != nullptr && encoderCodec != nullptr; 
+	bool current = top && !bottom.expired() && decoderCodec != nullptr && encoderCodec != nullptr;
 	if (from == FROM_TOP)
 	{
 		return current && bottom.lock()->initialized(FROM_TOP);
@@ -961,15 +962,18 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 		{
 			std::unique_lock<std::mutex> lk1(layer->cbMutex);
 			ikcp_update(layer->cb, iclock());
-			auto ng = NetGraphSink::instance();
-			std::shared_lock lk2(ng->windowsMutex);
-			std::get<0>(ng->windows[layer->remoteAddr]).sync(layer->cb);
-			std::get<1>(ng->windows[layer->remoteAddr]).rotate(layer->cb->rx_srtt);
+			{
+				auto ng = NetGraphSink::instance();
+				std::shared_lock lk2(ng->windowsMutex);
+				std::get<0>(ng->windows[layer->remoteAddr]).sync(layer->cb);
+				std::get<1>(ng->windows[layer->remoteAddr]).rotate(layer->cb->rx_srtt);
+				std::get<2>(ng->windows[layer->remoteAddr]).rotate(std::get<0>(ng->windows[layer->remoteAddr]));
+			}
 			auto current = iclock();
 			auto next = ikcp_check(layer->cb, current);
 			duration = itimediff(next, current);
 		}
-		
+
 		if (duration > 0)
 		{
 			std::unique_lock<std::mutex> lk2(layer->updateCvMutex);
@@ -999,7 +1003,7 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 {
 	cb = ikcp_create(0, this);
 	cb->output = kcpOutput;
-	
+
 	ikcp_nodelay(cb, 1, Cvar_kcp_timer_resolution->GetInt(), 2, 1);
 
 	remoteAddr = ctx;
@@ -1108,7 +1112,7 @@ int MuxLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 	{
 		NS::log::NEW_NET.get()->error("[MUX] sendto {} error: {}", ctx, sendtoResult);
 	}
-	
+
 	return sendtoResult;
 }
 
@@ -1176,7 +1180,7 @@ void MuxLayer::bindBottom(std::weak_ptr<NetSource> bottom)
 
 DummySink::DummySink() {}
 
-DummySink::~DummySink() {} 
+DummySink::~DummySink() {}
 
 int DummySink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
 {

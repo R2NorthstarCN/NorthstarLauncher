@@ -17,17 +17,6 @@ namespace ImGui
 	void TableCellValueBg();
 } // namespace ImGui
 
-namespace ImPlot
-{
-	void PushAvgLineColor();
-	void PushPurpleLineColor();
-	void PushRedLineColor();
-	void PushOrangeLineColor();
-	void PushYellowLineColor();
-	void PushLimeLineColor();
-	void PushGreenLineColor();
-} // namespace ImPlot
-
 typedef void imgui_draw(ID3D11Device*  pDevice);
 
 extern std::vector<imgui_draw*> draw_functions;
