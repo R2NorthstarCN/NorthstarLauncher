@@ -28,7 +28,7 @@ static void draw_kcp_graph()
 	ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
 	ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
 
-	if (ImPlot::BeginPlot("##NetGraph", ImVec2(300, 100), ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs))
+	if (ImPlot::BeginPlot("##NetGraph", ImVec2(300, 100), ImPlotFlags_CanvasOnly))
 	{
 		auto ng = NetGraphSink::instance();
 		auto& entry = *ng->windows.begin();
@@ -50,7 +50,7 @@ static void draw_kcp_graph()
 		ImPlot::PlotLine("SV", sv.first.data(), sv.second.data(), sv.first.size());
 
 		// RECON
-		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(0, 255, 0, 255));
+		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(0, 1, 0, 1));
 		auto outbound_recon = convert_to_inflines(localSlidingWindows.sw_reconsegs.get_axes().second);
 		ImPlot::PlotInfLinesEx("OUT_RECON", outbound_recon.data(), outbound_recon.size(), ImPlotInfLinesExFlags_FirstHalf);
 		auto inbound_recon = convert_to_inflines(remoteSlidingWindows.sw_reconsegs.get_axes().second);
@@ -58,7 +58,7 @@ static void draw_kcp_graph()
 		ImPlot::PopStyleColor();
 
 		// LOST
-		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(255, 0, 0, 255));
+		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(1, 0, 0, 1));
 		auto outbound_lost = convert_to_inflines(localSlidingWindows.sw_lostsegs.get_axes().second);
 		ImPlot::PlotInfLinesEx("OUT_LOST", outbound_lost.data(), outbound_lost.size(), ImPlotInfLinesExFlags_FirstHalf);
 		auto inbound_lost = convert_to_inflines(remoteSlidingWindows.sw_lostsegs.get_axes().second);
@@ -66,7 +66,7 @@ static void draw_kcp_graph()
 		ImPlot::PopStyleColor();
 
 		// RETRANS
-		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(255, 165, 0, 255));
+		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(1, 0.65, 0, 1));
 		auto outbound_retrans = convert_to_inflines(localSlidingWindows.sw_retranssegs.get_axes().second);
 		ImPlot::PlotInfLinesEx("OUT_RETRANS", outbound_retrans.data(), outbound_retrans.size(), ImPlotInfLinesExFlags_FirstHalf);
 		auto inbound_retrans = convert_to_inflines(remoteSlidingWindows.sw_retranssegs.get_axes().second);
@@ -198,6 +198,16 @@ static void draw_kcp_stats(ID3D11Device* device)
 	auto viewport_size = main_viewport->WorkSize;
 	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y + viewport_size.y - current_size.y));
 
+	auto lvl = Cvar_kcp_stats->GetInt();
+	if (lvl == 5)
+	{
+		ImGui::ShowMetricsWindow();
+	}
+	else if (lvl == 6)
+	{
+		ImPlot::ShowMetricsWindow();
+	}
+
 	auto ng = NetGraphSink::instance();
 	std::shared_lock lk(ng->windowsMutex);
 
@@ -207,11 +217,11 @@ static void draw_kcp_stats(ID3D11Device* device)
 	}
 	else
 	{
-		if (Cvar_kcp_stats->GetInt() >= 2)
+		if (lvl >= 2)
 		{
 			draw_kcp_graph();
 		}
-		if (Cvar_kcp_stats->GetInt() >= 1)
+		if (lvl >= 1)
 		{
 			draw_kcp_table();
 		}
