@@ -15,12 +15,17 @@ ON_DLL_LOAD("engine.dll", SERVERFPS, (CModule module))
 void sendThreadPayload(std::stop_token stoken, NetGraphSink* ng)
 {
 	auto manager = NetManager::instance();
+	auto lastSeenInterval = Cvar_kcp_conn_timeout->GetInt() / 2;
 	while (!stoken.stop_requested())
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		std::shared_lock lk(manager->routingTableMutex);
 		for (const auto& entry : manager->routingTable)
 		{
+			if (itimediff(iclock(), entry.second.second) > lastSeenInterval)
+			{
+				continue;
+			}
 			NetBuffer buf(128, 0, 128);
 			std::shared_lock lk(ng->windowsMutex);
 			std::get<0>(ng->windows[entry.first]).encode(buf);
