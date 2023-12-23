@@ -45,43 +45,37 @@ void draw_kcp_stats(ID3D11Device* device)
 	auto ng = NetGraphSink::instance();
 	std::shared_lock lk(ng->windowsMutex);
 
-	ImGui::ShowDemoWindow();
-
 	if (ng->windows.empty())
 	{
 		ImGui::Text("No connection");
 	}
 	else
 	{
-		if (ImGui::BeginTable("kcp_stats", 5))
+		if (ImGui::BeginTable("kcp_stats", 7))
 		{
 			auto& entry = *ng->windows.begin();
 			auto& localSlidingWindows = std::get<2>(entry.second);
 			auto& remoteSlidingWindows = std::get<3>(entry.second);
-			auto localOutSegsAvg = localSlidingWindows.sw_outsegs.avg() + 0.00001;
-			auto localInSegsAvg = localSlidingWindows.sw_insegs.avg() + 0.00001;
-			auto remoteOutSegsAvg = remoteSlidingWindows.sw_outsegs.avg() + 0.00001;
-			auto remoteInSegsAvg = remoteSlidingWindows.sw_insegs.avg() + 0.00001;
+			auto localOutSegsSum = localSlidingWindows.sw_outsegs.sum() + 0.00001;
+			auto localInSegsSum = localSlidingWindows.sw_insegs.sum() + 0.00001;
+			auto remoteOutSegsSum = remoteSlidingWindows.sw_outsegs.sum() + 0.00001;
+			auto remoteInSegsSum = remoteSlidingWindows.sw_insegs.sum() + 0.00001;
 
 			ImGui::TableNextRow();
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", "SRTT");
+			ImGui::Text("%s", " SRTT");
 
 			// Outbound
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", "\xef\x8d\x9b");
-
-			ImGui::TableNextColumn();
-			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", "LOS%");
+			ImGui::Text("%s", "\xef\x8d\x9bLOS%");
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", localSlidingWindows.sw_lostsegs.avg() / localOutSegsAvg);
+			ImGui::Text("%.2f", localSlidingWindows.sw_lostsegs.sum() / localOutSegsSum);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
@@ -89,7 +83,7 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", localSlidingWindows.sw_retranssegs.avg() / localOutSegsAvg);
+			ImGui::Text("%.2f", localSlidingWindows.sw_retranssegs.sum() / localOutSegsSum);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
@@ -97,7 +91,7 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f ", remoteSlidingWindows.sw_reconsegs.avg() / remoteInSegsAvg);
+			ImGui::Text("%.2f ", remoteSlidingWindows.sw_reconsegs.sum() / remoteInSegsSum);
 
 			// ------------------------------------------------------------------------------
 
@@ -105,21 +99,17 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%d", std::get<1>(entry.second).last_val);
+			ImGui::Text("%.2f", std::get<1>(entry.second).last());
 
 			// Inbound
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", "\xef\x8d\x98");
-
-			ImGui::TableNextColumn();
-			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", "LOS%");
+			ImGui::Text("%s", "\xef\x8d\x98LOS%");
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", remoteSlidingWindows.sw_lostsegs.avg() / remoteOutSegsAvg);
+			ImGui::Text("%.2f", remoteSlidingWindows.sw_lostsegs.sum() / remoteOutSegsSum);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
@@ -127,7 +117,7 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", remoteSlidingWindows.sw_retranssegs.avg() / remoteOutSegsAvg);
+			ImGui::Text("%.2f", remoteSlidingWindows.sw_retranssegs.sum() / remoteOutSegsSum);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
@@ -135,7 +125,7 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f ", localSlidingWindows.sw_reconsegs.avg() / localInSegsAvg);
+			ImGui::Text("%.2f ", localSlidingWindows.sw_reconsegs.sum() / localInSegsSum);
 
 			ImGui::EndTable();
 		}
@@ -256,6 +246,11 @@ void sliding_window::rotate(double new_val)
 std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_axes()
 {
 	return std::make_pair(std::ref(axis_x), std::ref(raw));
+}
+
+double sliding_window::last() const
+{
+	return raw[0];
 }
 
 double sliding_window::avg() const
