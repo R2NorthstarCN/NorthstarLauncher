@@ -6,6 +6,7 @@
 #include "shared/kcpintegration.h"
 #include "engine/netgraph.h"
 #include "fontawesome.h"
+#include "imgui/imgui_internal.h"
 
 ConVar* Cvar_kcp_stats;
 
@@ -44,19 +45,31 @@ void draw_kcp_stats(ID3D11Device* device)
 	auto ng = NetGraphSink::instance();
 	std::shared_lock lk(ng->windowsMutex);
 
+	ImGui::ShowDemoWindow();
+
 	if (ng->windows.empty())
 	{
 		ImGui::Text("No connection");
 	}
 	else
 	{
-		if (ImGui::BeginTable("kcp_stats", 9))
+		if (ImGui::BeginTable("kcp_stats", 5))
 		{
 			auto& entry = *ng->windows.begin();
-			auto& localSildingWindows = std::get<2>(entry.second);
+			auto& localSlidingWindows = std::get<2>(entry.second);
 			auto& remoteSlidingWindows = std::get<3>(entry.second);
-			auto localOutSegsAvg = localSildingWindows.sw_outsegs.avg() + 0.00001;
+			auto localOutSegsAvg = localSlidingWindows.sw_outsegs.avg() + 0.00001;
+			auto localInSegsAvg = localSlidingWindows.sw_insegs.avg() + 0.00001;
+			auto remoteOutSegsAvg = remoteSlidingWindows.sw_outsegs.avg() + 0.00001;
+			auto remoteInSegsAvg = remoteSlidingWindows.sw_insegs.avg() + 0.00001;
+
 			ImGui::TableNextRow();
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", "SRTT");
+
+			// Outbound
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
@@ -64,19 +77,11 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
-			ImGui::Text("%s", "SRTT");
-
-			ImGui::TableNextColumn();
-			ImGui::TableCellValueBg();
-			ImGui::Text("%d", std::get<1>(entry.second).last_val);
-
-			ImGui::TableNextColumn();
-			ImGui::TableCellHeaderBg();
 			ImGui::Text("%s", "LOS%");
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", localSildingWindows.sw_lostsegs.avg() / localOutSegsAvg);
+			ImGui::Text("%.2f", localSlidingWindows.sw_lostsegs.avg() / localOutSegsAvg);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
@@ -84,7 +89,7 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f", localSildingWindows.sw_retranssegs.avg() / localOutSegsAvg);
+			ImGui::Text("%.2f", localSlidingWindows.sw_retranssegs.avg() / localOutSegsAvg);
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellHeaderBg();
@@ -92,7 +97,45 @@ void draw_kcp_stats(ID3D11Device* device)
 
 			ImGui::TableNextColumn();
 			ImGui::TableCellValueBg();
-			ImGui::Text("%.2f ", 0.0);
+			ImGui::Text("%.2f ", remoteSlidingWindows.sw_reconsegs.avg() / remoteInSegsAvg);
+
+			// ------------------------------------------------------------------------------
+
+			ImGui::TableNextRow();
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%d", std::get<1>(entry.second).last_val);
+
+			// Inbound
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", "\xef\x8d\x98");
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", "LOS%");
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%.2f", remoteSlidingWindows.sw_lostsegs.avg() / remoteOutSegsAvg);
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", "RTS%");
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%.2f", remoteSlidingWindows.sw_retranssegs.avg() / remoteOutSegsAvg);
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellHeaderBg();
+			ImGui::Text("%s", "RCS%");
+
+			ImGui::TableNextColumn();
+			ImGui::TableCellValueBg();
+			ImGui::Text("%.2f ", localSlidingWindows.sw_reconsegs.avg() / localInSegsAvg);
 
 			ImGui::EndTable();
 		}
@@ -215,22 +258,22 @@ std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_axes()
 	return std::make_pair(std::ref(axis_x), std::ref(raw));
 }
 
-double sliding_window::avg()
+double sliding_window::avg() const
 {
 	return sumed / raw.size();
 }
 
-double sliding_window::sum()
+double sliding_window::sum() const
 {
 	return sumed;
 }
 
-double sliding_window::max()
+double sliding_window::max() const
 {
 	return *std::max_element(raw.begin(), raw.end());
 }
 
-double sliding_window::min()
+double sliding_window::min() const
 {
 	return *std::min_element(raw.begin(), raw.end());
 }

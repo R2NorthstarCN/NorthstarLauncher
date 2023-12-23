@@ -19,11 +19,14 @@ ID3D11RenderTargetView* mainRenderTargetView;
 
 LRESULT __stdcall WndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	ImGuiIO& io = ImGui::GetIO();
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam))
+	{
 		return true;
-	if (io.WantCaptureMouse)
+	}
+	if (ImGui::GetIO().WantCaptureMouse)
+	{
 		return true;
+	}
 	return CallWindowProc(oWndProc, hWnd, uMsg, wParam, lParam);
 }
 
@@ -44,6 +47,7 @@ void InitImGui()
 
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags = ImGuiConfigFlags_NoMouseCursorChange;
+
 	ImGui_ImplWin32_Init(window);
 	ImGui_ImplDX11_Init(pDevice, pContext);
 

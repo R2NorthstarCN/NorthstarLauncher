@@ -19,8 +19,8 @@ struct sliding_window
 
 	std::pair<std::vector<double>&, std::vector<double>&> get_axes();
 
-	double avg();
-	double sum();
-	double max();
-	double min();
+	double avg() const;
+	double sum() const;
+	double max() const;
+	double min() const;
 };
