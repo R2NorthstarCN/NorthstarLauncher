@@ -61,9 +61,6 @@
     <Filter Include="Header Files\masterserver">
       <UniqueIdentifier>{0075910c-80c9-490f-a0d4-f9e410e4a918}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\mods">
-      <UniqueIdentifier>{31143dec-abe6-477a-9cae-045c5b57380b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\plugins">
       <UniqueIdentifier>{c6c4746d-d6e1-4dba-a3fc-e645b28ac83f}</UniqueIdentifier>
     </Filter>
@@ -142,6 +139,9 @@
     <Filter Include="Header Files\config">
       <UniqueIdentifier>{0b8b4a41-6131-4388-85d2-f5754a304610}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\masterserver\mods">
+      <UniqueIdentifier>{31143dec-abe6-477a-9cae-045c5b57380b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client\audio.h">
@@ -169,7 +169,7 @@
       <Filter>Header Files\masterserver</Filter>
     </ClInclude>
     <ClInclude Include="mods\modmanager.h">
-      <Filter>Header Files\mods</Filter>
+      <Filter>Header Files\masterserver\mods</Filter>
     </ClInclude>
     <ClInclude Include="plugins\plugin_abi.h">
       <Filter>Header Files\plugins</Filter>
@@ -355,7 +355,7 @@
       <Filter>Header Files\client</Filter>
     </ClInclude>
     <ClInclude Include="mods\modsavefiles.h">
-      <Filter>Header Files\mods</Filter>
+      <Filter>Header Files\masterserver\mods</Filter>
     </ClInclude>
     <ClInclude Include="scripts\scriptjson.h">
       <Filter>Header Files\scripts</Filter>
@@ -676,6 +676,9 @@
     </ClCompile>
     <ClCompile Include="scripts\scriptsvm.cpp">
       <Filter>Source Files\scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="client\ultralight.cpp">
+      <Filter>Source Files\client</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

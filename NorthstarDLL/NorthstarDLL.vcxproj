@@ -131,7 +131,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;libsvm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MinHook.x64.lib;zlibstatic.lib;libcrypto_static.lib;libssl_static.lib;imgui.lib;libcurl\lib\libcurl_a.lib;dbghelp.lib;Wldap32.lib;Normaliz.lib;version.lib;crypt32.lib;imm32.lib;libsvm.lib;AppCore.lib;Ultralight.lib;UltralightCore.lib;WebCore.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceSymbolReferences>
       </ForceSymbolReferences>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -275,6 +275,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="client\localchatwriter.cpp" />
     <ClCompile Include="client\modlocalisation.cpp" />
     <ClCompile Include="client\r2client.cpp" />
+    <ClCompile Include="client\ultralight.cpp" />
     <ClCompile Include="client\vguihooks.cpp" />
     <ClCompile Include="config\profile.cpp" />
     <ClCompile Include="core\anticheat.cpp" />
