@@ -158,7 +158,6 @@ static inline IINT64 itimediff64(IINT64 later, IINT64 earlier)
 // Convars
 
 extern ConVar* Cvar_kcp_timer_resolution;
-extern ConVar* Cvar_kcp_select_timeout;
 extern ConVar* Cvar_kcp_conn_timeout;
 extern ConVar* Cvar_kcp_fec;
 extern ConVar* Cvar_kcp_fec_timeout;

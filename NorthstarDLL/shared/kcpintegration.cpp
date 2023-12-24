@@ -676,7 +676,12 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 	}
 	else
 	{
-		NS::log::NEW_NET.get()->warn("[FEC] top->input {} sliently dropping non-FEC packet: invalid flag", ctx);
+		auto inputResult = top->input(std::move(buf), ctx, this);
+		if (inputResult == SOCKET_ERROR)
+		{
+			NS::log::NEW_NET.get()->error("[FEC] top->input {} error: {}", ctx, inputResult);
+		}
+		return inputResult;
 	}
 
 	return 0;
