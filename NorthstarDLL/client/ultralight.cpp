@@ -84,7 +84,7 @@ static void draw_ul(ID3D11Device* device)
 	auto pixels = bitmap->LockPixelsSafe();
 
 	D3D11_TEXTURE2D_DESC desc;
-	ZeroMemory(&desc, sizeof(&desc));
+	ZeroMemory(&desc, sizeof(desc));
 	desc.Width = bitmap->width();
 	desc.Height = bitmap->height();
 	desc.MipLevels = 1;
@@ -100,18 +100,25 @@ static void draw_ul(ID3D11Device* device)
 	subResource.pSysMem = pixels.data();
 	subResource.SysMemPitch = desc.Width * 4;
 	subResource.SysMemSlicePitch = 0;
-	device->CreateTexture2D(&desc, &subResource, &pTexture);
+	auto textureResult = device->CreateTexture2D(&desc, &subResource, &pTexture);
+
+	if (textureResult != S_OK || pTexture == NULL)
+	{
+		spdlog::error("[UL] CreateTexture2D failed: 0x{:X}", (unsigned long long)textureResult);
+		
+		return;
+	}
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	ZeroMemory(&srvDesc, sizeof(srvDesc));
-	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = desc.MipLevels;
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	device->CreateShaderResourceView(pTexture, &srvDesc, &srv);
 	pTexture->Release();
 
-	ImGui::Image((void*)srv, ImVec2(bitmap->width(), bitmap->height()));
+	ImGui::Image((void*)srv, ImVec2(desc.Width, desc.Height));
 
 	ImGui::End();
 }
