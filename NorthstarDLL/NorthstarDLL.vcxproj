@@ -120,7 +120,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -183,6 +183,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
   <ItemGroup>
     <ClInclude Include="client\audio.h" />
     <ClInclude Include="client\fontawesome.h" />
+    <ClInclude Include="client\igig\igig.h" />
     <ClInclude Include="client\imgui.h" />
     <ClInclude Include="client\kcpstats.h" />
     <ClInclude Include="client\localchatwriter.h" />
@@ -264,6 +265,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="client\clientauthhooks.cpp" />
     <ClCompile Include="client\clientruihooks.cpp" />
     <ClCompile Include="client\clientvideooverrides.cpp" />
+    <ClCompile Include="client\igig\igig.cpp" />
     <ClCompile Include="client\imgui.cpp" />
     <ClCompile Include="client\kcpstats.cpp" />
     <ClCompile Include="client\rejectconnectionfixes.cpp" />

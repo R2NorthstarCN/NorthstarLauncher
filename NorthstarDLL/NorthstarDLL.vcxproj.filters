@@ -142,6 +142,12 @@
     <Filter Include="Header Files\masterserver\mods">
       <UniqueIdentifier>{31143dec-abe6-477a-9cae-045c5b57380b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\client\igig">
+      <UniqueIdentifier>{eb93e2aa-d4b3-4625-9b52-c9b69c1d337a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\client\igig">
+      <UniqueIdentifier>{c013ba3f-d49b-4fe0-a2b6-be6f94ccb774}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client\audio.h">
@@ -371,6 +377,9 @@
     </ClInclude>
     <ClInclude Include="client\fontawesome.h">
       <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="client\igig\igig.h">
+      <Filter>Header Files\client\igig</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -679,6 +688,9 @@
     </ClCompile>
     <ClCompile Include="client\ultralight.cpp">
       <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="client\igig\igig.cpp">
+      <Filter>Source Files\client\igig</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
