@@ -13,23 +13,15 @@ static bool ul_inited = false;
 
 AUTOHOOK_INIT()
 
+RefPtr<Renderer> renderer;
+
 void Init() {
 	Config config;
-	config.user_stylesheet = "body { background: purple; }";
-
 	Platform::instance().set_config(config);
-}
-
-void InitPlatform() {
 	Platform::instance().set_font_loader(GetPlatformFontLoader());
 	Platform::instance().set_file_system(GetPlatformFileSystem("."));
 	Platform::instance().set_logger(GetDefaultLogger("ultralight.log"));
-}
 
-RefPtr<Renderer> renderer;
-
-void CreateRenderer()
-{
 	renderer = Renderer::Create();
 }
 
@@ -42,7 +34,7 @@ void CreateView()
 
 	view = renderer->CreateView(500, 500, view_config, nullptr);
 
-	view->LoadHTML("<h1>Hello World!</h1>");
+	view->LoadURL("https://www.baidu.com");
 }
 
 ID3D11ShaderResourceView* srv;
@@ -57,8 +49,6 @@ static void draw_ul(ID3D11Device* device)
 	if (!ul_inited)
 	{
 		Init();
-		InitPlatform();
-		CreateRenderer();
 		CreateView();
 
 		ul_inited = true;
@@ -89,7 +79,7 @@ static void draw_ul(ID3D11Device* device)
 	desc.Height = bitmap->height();
 	desc.MipLevels = 1;
 	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
 	desc.SampleDesc.Count = 1;
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -111,7 +101,7 @@ static void draw_ul(ID3D11Device* device)
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	ZeroMemory(&srvDesc, sizeof(srvDesc));
-	srvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	srvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
 	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = desc.MipLevels;
 	srvDesc.Texture2D.MostDetailedMip = 0;
