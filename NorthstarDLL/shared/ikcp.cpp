@@ -1093,7 +1093,6 @@ void ikcp_flush(ikcpcb *kcp)
 			lost = 1;
 
 			kcp->lostsegs += 1;
-			kcp->retranssegs += 1;
 		}
 		else if (segment->fastack >= resent) {
 			if ((int)segment->xmit <= kcp->fastlimit || 
