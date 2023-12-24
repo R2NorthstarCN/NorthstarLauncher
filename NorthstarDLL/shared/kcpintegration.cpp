@@ -7,6 +7,7 @@
 ConVar* Cvar_kcp_timer_resolution;
 ConVar* Cvar_kcp_select_timeout;
 ConVar* Cvar_kcp_conn_timeout;
+ConVar* Cvar_kcp_fec;
 ConVar* Cvar_kcp_fec_timeout;
 ConVar* Cvar_kcp_fec_rx_multi;
 ConVar* Cvar_kcp_fec_autotune;
@@ -130,6 +131,8 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 		new ConVar("kcp_select_timeout", "5", FCVAR_NONE, "miliseconds select has to wait, lower is better but consumes more CPU.");
 
 	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "5000", FCVAR_NONE, "miliseconds before a connection is dropped.");
+
+	Cvar_kcp_fec = new ConVar("kcp_fec", "1", FCVAR_NONE, "whether to enable FEC or not.");
 
 	Cvar_kcp_fec_timeout = new ConVar(
 		"kcp_fec_timeout", "5000", FCVAR_NONE, "miliseconds before FEC drops unused packets, higher is better but consumes more memory.");
@@ -264,20 +267,31 @@ NetManager* NetManager::instance()
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDefault(const SOCKET& s, const sockaddr_in6& addr)
 {
-	std::shared_ptr<FecLayer> fec =
-		std::shared_ptr<FecLayer>(new FecLayer(Cvar_kcp_fec_send_data_shards->GetInt(), Cvar_kcp_fec_send_parity_shards->GetInt(), 1, 1));
 	std::shared_ptr<KcpLayer> kcp = std::shared_ptr<KcpLayer>(new KcpLayer({s, addr}));
 	std::shared_ptr<MuxLayer> mux = std::shared_ptr<MuxLayer>(new MuxLayer());
 
 	mux->bindTop(0, std::static_pointer_cast<NetSink>(GameSink::instance()));
 	mux->bindTop(1, std::static_pointer_cast<NetSink>(NetGraphSink::instance()));
 	mux->bindBottom(std::static_pointer_cast<NetSource>(kcp));
-	kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
-	kcp->bindBottom(std::static_pointer_cast<NetSource>(fec));
-	fec->bindTop(std::static_pointer_cast<NetSink>(kcp));
-	fec->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
+	if (Cvar_kcp_fec->GetBool())
+	{
+		std::shared_ptr<FecLayer> fec = std::shared_ptr<FecLayer>(
+			new FecLayer(Cvar_kcp_fec_send_data_shards->GetInt(), Cvar_kcp_fec_send_parity_shards->GetInt(), 3, 2));
 
-	return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
+		kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
+		kcp->bindBottom(std::static_pointer_cast<NetSource>(fec));
+		fec->bindTop(std::static_pointer_cast<NetSink>(kcp));
+		fec->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
+
+		return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
+	}
+	else
+	{
+		kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
+		kcp->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
+
+		return std::make_pair(std::static_pointer_cast<NetSink>(kcp), std::static_pointer_cast<NetSource>(mux));
+	}
 }
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(const NetContext& ctx)
