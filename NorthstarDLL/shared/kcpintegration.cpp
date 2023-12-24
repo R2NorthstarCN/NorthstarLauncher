@@ -273,25 +273,15 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDe
 	mux->bindTop(0, std::static_pointer_cast<NetSink>(GameSink::instance()));
 	mux->bindTop(1, std::static_pointer_cast<NetSink>(NetGraphSink::instance()));
 	mux->bindBottom(std::static_pointer_cast<NetSource>(kcp));
-	if (Cvar_kcp_fec->GetBool())
-	{
-		std::shared_ptr<FecLayer> fec = std::shared_ptr<FecLayer>(
-			new FecLayer(Cvar_kcp_fec_send_data_shards->GetInt(), Cvar_kcp_fec_send_parity_shards->GetInt(), 3, 2));
+	std::shared_ptr<FecLayer> fec =
+		std::shared_ptr<FecLayer>(new FecLayer(Cvar_kcp_fec_send_data_shards->GetInt(), Cvar_kcp_fec_send_parity_shards->GetInt(), 3, 2));
 
-		kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
-		kcp->bindBottom(std::static_pointer_cast<NetSource>(fec));
-		fec->bindTop(std::static_pointer_cast<NetSink>(kcp));
-		fec->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
+	kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
+	kcp->bindBottom(std::static_pointer_cast<NetSource>(fec));
+	fec->bindTop(std::static_pointer_cast<NetSink>(kcp));
+	fec->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
 
-		return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
-	}
-	else
-	{
-		kcp->bindTop(std::static_pointer_cast<NetSink>(mux));
-		kcp->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
-
-		return std::make_pair(std::static_pointer_cast<NetSink>(kcp), std::static_pointer_cast<NetSource>(mux));
-	}
+	return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
 }
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(const NetContext& ctx)
@@ -609,6 +599,11 @@ FecLayer::~FecLayer()
 
 int FecLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
+	if (!Cvar_kcp_fec->GetBool())
+	{
+		return bottom.lock()->sendto(std::move(buf), ctx, this);
+	}
+
 	auto encoded = encode(buf);
 	for (auto& nBuf : encoded)
 	{
@@ -999,7 +994,8 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 			std::unique_lock<std::mutex> lk1(layer->cbMutex);
 			ikcp_update(layer->cb, iclock());
 			auto current = iclock();
-			if (itimediff(current, lastStatsSync) >= 100) {
+			if (itimediff(current, lastStatsSync) >= 100)
+			{
 				auto ng = NetGraphSink::instance();
 				std::shared_lock lk2(ng->windowsMutex);
 				std::get<0>(ng->windows[layer->remoteAddr]).sync(layer->cb);
