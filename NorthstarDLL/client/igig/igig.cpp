@@ -108,7 +108,6 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 	ImGui::Render();
 
 	auto pMainRenderTargetView = igig.mainRenderTargetView.get();
-
 	igig.pContext->OMSetRenderTargets(1, &pMainRenderTargetView, NULL);
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 	

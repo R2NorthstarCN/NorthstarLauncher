@@ -2,9 +2,7 @@
 
 #include <d3d11.h>
 #include <winrt/base.h>
-#include <Ultralight/platform/GPUDriver.h>
 
-// This stands for ImGui = iPhone in Titanfall2.
 class ImGuiManager
 {
   public:
