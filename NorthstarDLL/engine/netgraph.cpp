@@ -126,3 +126,68 @@ void NetSlidingWindows::rotate(const NetStats& s) {
 	sw_insegs.rotate(s.insegs);
 	sw_reconsegs.rotate(s.reconsegs);
 }
+
+sliding_window::sliding_window(size_t samples)
+{
+	raw = std::vector<double>(samples);
+	for (int i = raw.size() - 1; i >= 0; i--)
+	{
+		axis_x.push_back(i);
+	}
+}
+
+sliding_window::sliding_window(size_t samples, bool delta)
+{
+	this->delta = delta;
+	raw = std::vector<double>(samples);
+	for (int i = raw.size() - 1; i >= 0; i--)
+	{
+		axis_x.push_back(i);
+	}
+}
+
+void sliding_window::rotate(double new_val)
+{
+	sumed -= *(raw.end() - 1);
+	std::rotate(raw.rbegin(), raw.rbegin() + 1, raw.rend());
+	if (delta)
+	{
+		raw[0] = new_val - last_val;
+		last_val = new_val;
+	}
+	else
+	{
+		raw[0] = new_val;
+	}
+	sumed += raw[0];
+}
+
+std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_axes()
+{
+	return std::make_pair(std::ref(axis_x), std::ref(raw));
+}
+
+double sliding_window::last() const
+{
+	return raw[0];
+}
+
+double sliding_window::avg() const
+{
+	return sumed / raw.size();
+}
+
+double sliding_window::sum() const
+{
+	return sumed;
+}
+
+double sliding_window::max() const
+{
+	return *std::max_element(raw.begin(), raw.end());
+}
+
+double sliding_window::min() const
+{
+	return *std::min_element(raw.begin(), raw.end());
+}

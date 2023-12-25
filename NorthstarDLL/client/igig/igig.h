@@ -1,29 +1,25 @@
 #pragma once
 
 #include <d3d11.h>
+#include <winrt/base.h>
+#include <Ultralight/platform/GPUDriver.h>
 
-#include "imgui/imgui.h"
-#include "imgui/backends/imgui_impl_win32.h"
-#include "imgui/backends/imgui_impl_dx11.h"
-
-class IgIg
+// This stands for ImGui = iPhone in Titanfall2.
+class ImGuiManager
 {
   public:
 	HWND window = NULL;
-	ID3D11Device* pDevice = NULL;
-	ID3D11DeviceContext* pContext = NULL;
-	ID3D11RenderTargetView* mainRenderTargetView = NULL;
+	winrt::com_ptr<ID3D11Device> pDevice;
+	winrt::com_ptr<ID3D11DeviceContext> pContext;
+	winrt::com_ptr<ID3D11RenderTargetView> mainRenderTargetView;
 	bool init = false;
+	std::vector<std::function<void()>> drawFunctions;
 
-	static IgIg& instance();
-
-	~IgIg();
+	static ImGuiManager& instance();
 
 	void startInitThread();
 	void addDrawFunction(std::function<void()>&& f);
 
   private:
-	std::vector<std::function<void()>> drawFunctions;
-
-	IgIg();
+	ImGuiManager();
 };

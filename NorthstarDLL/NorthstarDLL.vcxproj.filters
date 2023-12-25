@@ -354,12 +354,6 @@
     <ClInclude Include="shared\kcpintegration.h">
       <Filter>Header Files\shared</Filter>
     </ClInclude>
-    <ClInclude Include="client\imgui.h">
-      <Filter>Header Files\client</Filter>
-    </ClInclude>
-    <ClInclude Include="client\kcpstats.h">
-      <Filter>Header Files\client</Filter>
-    </ClInclude>
     <ClInclude Include="mods\modsavefiles.h">
       <Filter>Header Files\masterserver\mods</Filter>
     </ClInclude>
@@ -662,12 +656,6 @@
     <ClCompile Include="shared\kcpintegration.cpp">
       <Filter>Source Files\shared</Filter>
     </ClCompile>
-    <ClCompile Include="client\imgui.cpp">
-      <Filter>Source Files\client</Filter>
-    </ClCompile>
-    <ClCompile Include="client\kcpstats.cpp">
-      <Filter>Source Files\client</Filter>
-    </ClCompile>
     <ClCompile Include="server\alltalk.cpp">
       <Filter>Source Files\server</Filter>
     </ClCompile>
@@ -686,10 +674,13 @@
     <ClCompile Include="scripts\scriptsvm.cpp">
       <Filter>Source Files\scripts</Filter>
     </ClCompile>
-    <ClCompile Include="client\ultralight.cpp">
-      <Filter>Source Files\client</Filter>
-    </ClCompile>
     <ClCompile Include="client\igig\igig.cpp">
+      <Filter>Source Files\client\igig</Filter>
+    </ClCompile>
+    <ClCompile Include="client\igig\kcpstats.cpp">
+      <Filter>Source Files\client\igig</Filter>
+    </ClCompile>
+    <ClCompile Include="client\igig\ultralight.cpp">
       <Filter>Source Files\client\igig</Filter>
     </ClCompile>
   </ItemGroup>

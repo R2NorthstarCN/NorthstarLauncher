@@ -1,11 +1,11 @@
-#include "kcpstats.h"
-#include "client/imgui.h"
+#include "client/igig/igig.h"
+#include "imgui/imgui.h"
 #include "imgui/implot.h"
 #include "core/hooks.h"
 #include "shared/ikcp.h"
 #include "shared/kcpintegration.h"
 #include "engine/netgraph.h"
-#include "fontawesome.h"
+#include "client/fontawesome.h"
 
 ConVar* Cvar_kcp_stats;
 
@@ -74,6 +74,19 @@ static void draw_kcp_graph()
 		ImPlot::PopStyleColor();
 
 		ImPlot::EndPlot();
+	}
+}
+
+namespace ImGui
+{
+	void TableCellHeaderBg()
+	{
+		ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(60, 60, 60, 140));
+	}
+
+	void TableCellValueBg()
+	{
+		ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(0, 0, 0, 140));
 	}
 }
 
@@ -168,7 +181,7 @@ static void draw_kcp_table()
 	}
 }
 
-static void draw_kcp_stats(ID3D11Device* device)
+static void draw_kcp_stats()
 {
 	if (Cvar_kcp_stats == nullptr || Cvar_kcp_stats->GetInt() <= 0)
 	{
@@ -232,70 +245,5 @@ static void draw_kcp_stats(ID3D11Device* device)
 ON_DLL_LOAD("client.dll", KCPSTATS, (CModule module))
 {
 	Cvar_kcp_stats = new ConVar("kcp_stats", "0", FCVAR_NONE, "kcp stats window");
-	imgui_add_draw(draw_kcp_stats);
-}
-
-sliding_window::sliding_window(size_t samples)
-{
-	raw = std::vector<double>(samples);
-	for (int i = raw.size() - 1; i >= 0; i--)
-	{
-		axis_x.push_back(i);
-	}
-}
-
-sliding_window::sliding_window(size_t samples, bool delta)
-{
-	this->delta = delta;
-	raw = std::vector<double>(samples);
-	for (int i = raw.size() - 1; i >= 0; i--)
-	{
-		axis_x.push_back(i);
-	}
-}
-
-void sliding_window::rotate(double new_val)
-{
-	sumed -= *(raw.end() - 1);
-	std::rotate(raw.rbegin(), raw.rbegin() + 1, raw.rend());
-	if (delta)
-	{
-		raw[0] = new_val - last_val;
-		last_val = new_val;
-	}
-	else
-	{
-		raw[0] = new_val;
-	}
-	sumed += raw[0];
-}
-
-std::pair<std::vector<double>&, std::vector<double>&> sliding_window::get_axes()
-{
-	return std::make_pair(std::ref(axis_x), std::ref(raw));
-}
-
-double sliding_window::last() const
-{
-	return raw[0];
-}
-
-double sliding_window::avg() const
-{
-	return sumed / raw.size();
-}
-
-double sliding_window::sum() const
-{
-	return sumed;
-}
-
-double sliding_window::max() const
-{
-	return *std::max_element(raw.begin(), raw.end());
-}
-
-double sliding_window::min() const
-{
-	return *std::min_element(raw.begin(), raw.end());
+	ImGuiManager::instance().addDrawFunction(draw_kcp_stats);
 }

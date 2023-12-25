@@ -7,7 +7,7 @@
 #include "plugins/plugins.h"
 #include "util/version.h"
 #include "squirrel/squirrel.h"
-#include "client/imgui.h"
+#include "client/igig/igig.h"
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
@@ -170,7 +170,7 @@ bool InitialiseNorthstar()
 	// run callbacks for any libraries that are already loaded by now
 	CallAllPendingDLLLoadCallbacks();
 
-	imgui_setup();
+	ImGuiManager::instance().startInitThread();
 
 	return true;
 }
