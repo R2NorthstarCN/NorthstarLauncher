@@ -44,7 +44,8 @@ void CreateView()
 
 	view = renderer->CreateView(1024, 768, view_config, nullptr);
 
-	view->LoadURL("https://www.oschina.net");
+	view->LoadURL("file:///inspector/Main.html");
+	//view->LoadURL("https://www.oschina.net/");
 }
 
 winrt::com_ptr<ID3D11ShaderResourceView> srv;
