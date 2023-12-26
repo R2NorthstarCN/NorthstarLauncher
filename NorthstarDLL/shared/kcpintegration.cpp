@@ -267,6 +267,8 @@ NetManager* NetManager::instance()
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDefault(const SOCKET& s, const sockaddr_in6& addr)
 {
+	return std::make_pair(
+		std::static_pointer_cast<NetSink>(GameSink::instance()), std::static_pointer_cast<NetSource>(UdpSource::instance()));
 	std::shared_ptr<KcpLayer> kcp = std::shared_ptr<KcpLayer>(new KcpLayer({s, addr}));
 	std::shared_ptr<MuxLayer> mux = std::shared_ptr<MuxLayer>(new MuxLayer());
 
@@ -282,6 +284,7 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDe
 	fec->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
 
 	return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
+
 }
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(const NetContext& ctx)
@@ -471,6 +474,11 @@ int GameSink::recvfrom(
 	_Out_writes_bytes_to_opt_(*fromlen, *fromlen) struct sockaddr FAR* from,
 	_Inout_opt_ int FAR* fromlen)
 {
+	if (UdpSource::instance()->initialized(FROM_CAL) && UdpSource::instance()->socket != s)
+	{
+		return NET_HOOK_NOT_ALTERED;
+	}
+
 	std::pair<NetBuffer, NetContext> data;
 	if (pendingData.try_pop(data))
 	{
@@ -501,15 +509,8 @@ int GameSink::recvfrom(
 		}
 	}
 
-	if (UdpSource::instance()->initialized(FROM_CAL) && UdpSource::instance()->socket == s)
-	{
-		WSASetLastError(WSAEWOULDBLOCK);
-		return SOCKET_ERROR;
-	}
-	else
-	{
-		return NET_HOOK_NOT_ALTERED;
-	}
+	WSASetLastError(WSAEWOULDBLOCK);
+	return SOCKET_ERROR;
 }
 
 int GameSink::sendto(
