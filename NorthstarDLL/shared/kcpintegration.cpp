@@ -471,7 +471,7 @@ int GameSink::recvfrom(
 	_Out_writes_bytes_to_opt_(*fromlen, *fromlen) struct sockaddr FAR* from,
 	_Inout_opt_ int FAR* fromlen)
 {
-	if (UdpSource::instance()->initialized(FROM_CAL) && UdpSource::instance()->socket != s)
+	if (!UdpSource::instance()->initialized(FROM_CAL) || UdpSource::instance()->socket != s)
 	{
 		return NET_HOOK_NOT_ALTERED;
 	}
