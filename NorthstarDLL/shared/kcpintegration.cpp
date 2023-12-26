@@ -1039,7 +1039,7 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 	cb->output = kcpOutput;
 
 	ikcp_wndsize(cb, 128, 256);
-	ikcp_nodelay(cb, 1, Cvar_kcp_timer_resolution->GetInt(), 1, 1);
+	ikcp_nodelay(cb, 0, Cvar_kcp_timer_resolution->GetInt(), 1, 1);
 
 	remoteAddr = ctx;
 	updateThread = std::jthread(updateThreadPayload, this);
