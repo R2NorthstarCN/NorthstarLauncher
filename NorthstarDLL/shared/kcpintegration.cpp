@@ -267,8 +267,6 @@ NetManager* NetManager::instance()
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDefault(const SOCKET& s, const sockaddr_in6& addr)
 {
-	return std::make_pair(
-		std::static_pointer_cast<NetSink>(GameSink::instance()), std::static_pointer_cast<NetSource>(UdpSource::instance()));
 	std::shared_ptr<KcpLayer> kcp = std::shared_ptr<KcpLayer>(new KcpLayer({s, addr}));
 	std::shared_ptr<MuxLayer> mux = std::shared_ptr<MuxLayer>(new MuxLayer());
 
@@ -284,7 +282,6 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDe
 	fec->bindBottom(std::static_pointer_cast<NetSource>(UdpSource::instance()));
 
 	return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
-
 }
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(const NetContext& ctx)
@@ -1041,7 +1038,6 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 
 	ikcp_wndsize(cb, 512, 512);
 	ikcp_nodelay(cb, 1, 10, 2, 1);
-	cb->rx_minrto = 10;
 	cb->interval = Cvar_kcp_timer_resolution->GetInt();
 
 	remoteAddr = ctx;
