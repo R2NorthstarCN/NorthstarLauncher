@@ -17,7 +17,6 @@ class FontLoader;
 class FileSystem;
 class Clipboard;
 class SurfaceFactory;
-class ThreadFactory;
 
 ///
 /// Global platform singleton, manages user-defined platform handlers and global config.
@@ -142,10 +141,6 @@ class UExport Platform {
   ///        to BitmapSurface if you don't define your own.
   ///
   virtual SurfaceFactory* surface_factory() const = 0;
-
-  virtual void set_thread_factory(ThreadFactory* thread_factory) = 0;
- 
-  virtual ThreadFactory* thread_factory() const = 0;
 };
 
 } // namespace ultralight

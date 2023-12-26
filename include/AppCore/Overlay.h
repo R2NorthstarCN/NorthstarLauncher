@@ -126,7 +126,6 @@ public:
 
 protected:
   virtual ~Overlay();
-  virtual void Render() = 0;
   virtual void Paint() = 0;
   friend class OverlayManager;
 };
