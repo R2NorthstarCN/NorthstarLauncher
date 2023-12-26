@@ -1,6 +1,10 @@
+#ifdef NSCN_ENABLE_UL
+#pragma comment(lib,"AppCore.lib")
+#pragma comment(lib, "Ultralight.lib")
+#pragma comment(lib, "UltralightCore.lib")
+#pragma comment(lib, "WebCore.lib")
 #include "core/hooks.h"
 #include "client/igig/igig.h"
-
 #include <Ultralight/Ultralight.h>
 #include <AppCore/Platform.h>
 #include <d3d11.h>
@@ -177,3 +181,5 @@ ON_DLL_LOAD("client.dll", ULTRALIGHT, (CModule module))
 
 	ImGuiManager::instance().addDrawFunction(draw_ul);
 }
+
+#endif // NSCN_ENABLE_UL
