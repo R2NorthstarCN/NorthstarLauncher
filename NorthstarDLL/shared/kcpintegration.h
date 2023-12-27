@@ -1,8 +1,11 @@
 #pragma once
 
+#include <concurrent_unordered_map.h>
 #include <concurrent_queue.h>
 #include "shared/ikcp.h"
 #include <unordered_map>
+#include <shared_mutex>
+#include <map>
 
 #define RS_MALLOC _malloc_base
 #define RS_FREE _free_base
@@ -11,6 +14,7 @@
 
 struct NetContext
 {
+	SOCKET socket;
 	sockaddr_in6 addr;
 	bool recon = false;
 };
@@ -26,7 +30,7 @@ template <> struct fmt::formatter<NetContext>
 	{
 		char addrStr[47] {'\0'};
 		inet_ntop(p.addr.sin6_family, &p.addr.sin6_addr, addrStr, 47);
-		return fmt::format_to(ctx.out(), "[{}]:{}", addrStr, ntohs(p.addr.sin6_port));
+		return fmt::format_to(ctx.out(), "[{}]:{}@{}", addrStr, ntohs(p.addr.sin6_port), p.socket);
 	}
 };
 
@@ -85,7 +89,7 @@ namespace std
 	{
 		bool operator()(const NetContext& l, const NetContext& r) const
 		{
-			return equal_to<sockaddr_in6>()(l.addr, r.addr);
+			return equal_to<SOCKET>()(l.socket, r.socket) && equal_to<sockaddr_in6>()(l.addr, r.addr);
 		}
 	};
 
@@ -93,7 +97,10 @@ namespace std
 	{
 		size_t operator()(const NetContext& k) const
 		{
-			return hash<sockaddr_in6>()(k.addr);
+			size_t res = 17;
+			res = res * 31 + hash<SOCKET>()(k.socket);
+			res = res * 31 + hash<sockaddr_in6>()(k.addr);
+			return res;
 		}
 	};
 } // namespace std
@@ -251,17 +258,17 @@ class NetManager
 	std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> initAndBind(const NetContext& ctx);
 	std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> initAndBind(
 		const NetContext& ctx,
-		std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> (*connectionInitFunc)(const NetContext& ctx));
+		std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> (*connectionInitFunc)(const SOCKET& s, const sockaddr_in6& addr));
 	void bind(const NetContext& ctx, std::shared_ptr<NetSink> inboundDst, std::shared_ptr<NetSource> outboundDst);
 	std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>> route(const NetContext& ctx);
 	void updateLastSeen(const NetContext& ctx);
 
 	friend void recycleThreadPayload(std::stop_token stoken);
 
-	std::mutex routingTableMutex;
-	std::unordered_map<NetContext, std::tuple<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>, IUINT32>> routingTable;
-
-	SOCKET localSocket = NULL;
+	// Only locked exclusively when disconnecting.
+	std::shared_mutex routingTableMutex;
+	Concurrency::concurrent_unordered_map<NetContext, std::pair<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>, IINT64>>
+		routingTable;
 
   private:
 	std::jthread recycleThread;
@@ -312,12 +319,15 @@ class UdpSource : public NetSource
 	virtual int sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top);
 	virtual bool initialized(int from);
 
+	void bindSocket(const SOCKET& s);
+
 	static std::shared_ptr<UdpSource> instance();
 
 	friend GameSink;
 	friend void selectThreadPayload(std::stop_token stoken);
 
   private:
+	SOCKET socket = NULL;
 	std::jthread selectThread;
 
 	UdpSource();
@@ -367,7 +377,7 @@ class FecLayer : public NetSource, public NetSink
 		Pulse pulses[FEC_MAX_AUTO_TUNE_SAMPLE] {};
 
 		void sample(bool bit, IUINT32 seq);
-		std::pair<int, int> findPeriods() const;
+		std::pair<int, int> findPeriods();
 	};
 
 	// Decoder part
@@ -439,4 +449,14 @@ class MuxLayer : public NetSource, public NetSink
 
 	std::unordered_map<IUINT8, std::shared_ptr<NetSink>> topMap;
 	std::unordered_map<uintptr_t, IUINT8> topInverseMap;
+};
+
+class DummySink : public NetSink
+{
+  public:
+	DummySink();
+	~DummySink();
+
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
+	virtual bool initialized(int from);
 };

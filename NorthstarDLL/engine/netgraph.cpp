@@ -19,17 +19,17 @@ void sendThreadPayload(std::stop_token stoken, NetGraphSink* ng)
 	while (!stoken.stop_requested())
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		std::unique_lock lk1(manager->routingTableMutex);
-		std::unique_lock lk2(ng->windowsMutex);
+		std::shared_lock lk(manager->routingTableMutex);
 		for (const auto& entry : manager->routingTable)
 		{
-			if (itimediff(iclock(), std::get<2>(entry.second)) > lastSeenInterval)
+			if (itimediff(iclock(), entry.second.second) > lastSeenInterval)
 			{
 				continue;
 			}
 			NetBuffer buf(128, 0, 128);
+			std::shared_lock lk(ng->windowsMutex);
 			std::get<0>(ng->windows[entry.first]).encode(buf);
-			std::get<1>(entry.second)->sendto(std::move(buf), entry.first, NetGraphSink::instance().get());
+			entry.second.first.second->sendto(std::move(buf), entry.first, NetGraphSink::instance().get());
 		}
 	}
 }
@@ -49,7 +49,7 @@ int NetGraphSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource*
 {
 	NetStats s {};
 	s.decode(buf);
-	std::unique_lock lk(windowsMutex);
+	std::shared_lock lk(windowsMutex);
 	std::get<3>(windows[ctx]).rotate(s);
 	return 0;
 }
@@ -67,23 +67,33 @@ std::shared_ptr<NetGraphSink> NetGraphSink::instance()
 
 void NetStats::encode(NetBuffer& buf) const
 {
-	if (buf.size() < sizeof(NetStats))
+	if (buf.size() < sizeof(float) + 5 * sizeof(IUINT64))
 	{
-		buf.resize(buf.size() + sizeof(NetStats), 0);
+		buf.resize(buf.size() + sizeof(float) + 5 * sizeof(IUINT64), 0);
 	}
 
-	memcpy(buf.data(), this, sizeof(NetStats));
+	memcpy(buf.data(), &frameTime, sizeof(float));
+	memcpy(buf.data() + sizeof(float), &outsegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 1 * sizeof(IUINT64), &lostsegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 2 * sizeof(IUINT64), &retranssegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 3 * sizeof(IUINT64), &insegs, sizeof(IUINT64));
+	memcpy(buf.data() + sizeof(float) + 4 * sizeof(IUINT64), &reconsegs, sizeof(IUINT64));
 }
 
 void NetStats::decode(const NetBuffer& buf)
 {
-	if (buf.size() < sizeof(NetStats))
+	if (buf.size() < sizeof(float) + 5 * sizeof(IUINT64))
 	{
 		NS::log::NEW_NET->warn("[NG] Spurious input of NetStats::decode");
 		return;
 	}
 
-	memcpy(this, buf.data(), sizeof(NetStats));
+	memcpy(&frameTime, buf.data(), sizeof(float));
+	memcpy(&outsegs, buf.data() + sizeof(float), sizeof(IUINT64));
+	memcpy(&lostsegs, buf.data() + sizeof(float) + 1 * sizeof(IUINT64), sizeof(IUINT64));
+	memcpy(&retranssegs, buf.data() + sizeof(float) + 2 * sizeof(IUINT64), sizeof(IUINT64));
+	memcpy(&insegs, buf.data() + sizeof(float) + 3 * sizeof(IUINT64), sizeof(IUINT64));
+	memcpy(&reconsegs, buf.data() + sizeof(float) + 4 * sizeof(IUINT64), sizeof(IUINT64));
 }
 
 void NetStats::sync(ikcpcb* cb)
