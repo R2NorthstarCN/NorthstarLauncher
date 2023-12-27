@@ -383,15 +383,15 @@ void selectThreadPayload(std::stop_token stoken)
 		buf.resize(recvfromResult);
 
 		NetContext ctx {from};
-		auto route = NetManager::instance()->route(ctx).value_or(NetManager::instance()->initAndBind(ctx));
+		auto route = NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
 
-		if (!route.first->initialized(FROM_CAL))
+		if (!route->first->initialized(FROM_CAL))
 		{
 			NS::log::NEW_NET->warn("[UdpSource] Discarding data from {} cause uninitalized NetSink", ctx);
 		}
 		else
 		{
-			route.first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
+			route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
 		}
 	}
 }
@@ -496,9 +496,9 @@ int GameSink::sendto(
 	auto nm = NetManager::instance();
 
 	NetContext ctx {*(sockaddr_in6*)to};
-	auto route = nm->route(ctx).value_or(nm->initAndBind(ctx));
+	auto route = nm->route(ctx).or_else([&nm, &ctx]() { return std::optional(nm->initAndBind(ctx)); });
 
-	if (!route.second->initialized(FROM_CAL))
+	if (!route->second->initialized(FROM_CAL))
 	{
 		NS::log::NEW_NET->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
 		WSASetLastError(WSAENETDOWN);
@@ -507,7 +507,7 @@ int GameSink::sendto(
 	else
 	{
 		NetManager::instance()->updateLastSeen(ctx);
-		return route.second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
+		return route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
 	}
 }
 
