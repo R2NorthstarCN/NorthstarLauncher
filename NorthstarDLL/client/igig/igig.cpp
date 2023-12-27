@@ -6,6 +6,7 @@
 #include "imgui/backends/imgui_impl_dx11.h"
 #include "imgui/implot.h"
 #include "client/fontawesome.h"
+#include "dedicated/dedicated.h"
 
 typedef HRESULT(__stdcall* fpPresent)(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags);
 typedef LRESULT(CALLBACK* fpWndProc)(HWND, UINT, WPARAM, LPARAM);
@@ -119,7 +120,7 @@ void ImGuiManager::startInitThread()
 	std::jthread initThread(
 		[]()
 		{
-			while (true)
+			while (!IsDedicatedServer())
 			{
 				if (kiero::init(kiero::RenderType::D3D11) != kiero::Status::Success)
 				{
