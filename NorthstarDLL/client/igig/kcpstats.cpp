@@ -222,7 +222,7 @@ static void draw_kcp_stats()
 	}
 
 	auto ng = NetGraphSink::instance();
-	std::shared_lock lk(ng->windowsMutex);
+	std::unique_lock lk(ng->windowsMutex);
 
 	if (ng->windows.empty())
 	{

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "shared/kcpintegration.h"
-#include <shared_mutex>
-#include <concurrent_unordered_map.h>
 
 extern float* g_frameTime;
 
@@ -68,8 +66,8 @@ class NetGraphSink : public NetSink
 
 	static std::shared_ptr<NetGraphSink> instance();
 
-	std::shared_mutex windowsMutex;
-	concurrency::concurrent_unordered_map<NetContext, std::tuple<NetStats, sliding_window, NetSlidingWindows, NetSlidingWindows>> windows;
+	std::mutex windowsMutex;
+	std::unordered_map<NetContext, std::tuple<NetStats, sliding_window, NetSlidingWindows, NetSlidingWindows>> windows;
 
   private:
 	NetGraphSink();
