@@ -23,12 +23,12 @@ static std::vector<double> convert_to_inflines(const std::vector<double>& ys) {
 	return result;
 }
 
-static void draw_kcp_graph()
+static void draw_kcp_graph(float horizontal)
 {
-	ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 102));
+	ImPlot::PushStyleColor(ImPlotCol_FrameBg, IM_COL32(120, 120, 120, 0));
 	ImPlot::PushStyleColor(ImPlotCol_PlotBg, IM_COL32(0, 0, 0, 160));
 
-	if (ImPlot::BeginPlot("##NetGraph", ImVec2(300, 100), ImPlotFlags_CanvasOnly))
+	if (ImPlot::BeginPlot("##NetGraph", ImVec2(horizontal, horizontal / 3), ImPlotFlags_CanvasOnly))
 	{
 		auto ng = NetGraphSink::instance();
 		auto& entry = *ng->windows.begin();
@@ -81,7 +81,7 @@ namespace ImGui
 {
 	void TableCellHeaderBg()
 	{
-		ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(60, 60, 60, 140));
+		ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, IM_COL32(30, 30, 30, 160));
 	}
 
 	void TableCellValueBg()
@@ -107,17 +107,17 @@ static void draw_kcp_table()
 
 		ImGui::TableNextColumn();
 		ImGui::TableCellHeaderBg();
-		ImGui::Text("%s", "  SV");
+		ImGui::Text("%s", "   SV");
 
 		ImGui::TableNextColumn();
-		ImGui::TableCellHeaderBg();
-		ImGui::Text("%s", "SRTT");
+		ImGui::TableCellValueBg();
+		ImGui::Text("%.2f", remoteSlidingWindows.sw_sv.last());
 
 		// Outbound
 
 		ImGui::TableNextColumn();
 		ImGui::TableCellHeaderBg();
-		ImGui::Text("%s", "\xef\x8d\x9bLOS%");
+		ImGui::Text("%s", "\xef\x8d\x9b LOS%");
 
 		ImGui::TableNextColumn();
 		ImGui::TableCellValueBg();
@@ -144,8 +144,8 @@ static void draw_kcp_table()
 		ImGui::TableNextRow();
 
 		ImGui::TableNextColumn();
-		ImGui::TableCellValueBg();
-		ImGui::Text(" %.2f", remoteSlidingWindows.sw_sv.last());
+		ImGui::TableCellHeaderBg();
+		ImGui::Text("%s", " SRTT");
 
 		ImGui::TableNextColumn();
 		ImGui::TableCellValueBg();
@@ -155,7 +155,7 @@ static void draw_kcp_table()
 
 		ImGui::TableNextColumn();
 		ImGui::TableCellHeaderBg();
-		ImGui::Text("%s", "\xef\x8d\x98LOS%");
+		ImGui::Text("%s", "\xef\x8d\x98 LOS%");
 
 		ImGui::TableNextColumn();
 		ImGui::TableCellValueBg();
@@ -183,7 +183,9 @@ static void draw_kcp_table()
 
 static void draw_kcp_stats()
 {
-	if (Cvar_kcp_stats == nullptr || Cvar_kcp_stats->GetInt() <= 0)
+	auto lvl = Cvar_kcp_stats->GetInt();
+
+	if (Cvar_kcp_stats == nullptr || lvl <= 0)
 	{
 		return;
 	}
@@ -203,23 +205,16 @@ static void draw_kcp_stats()
 	ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0);
 	ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.0);
 
-	ImGui::Begin("KCP Stats", NULL, window_flags);
+	if (!ImGui::Begin("KCP Stats", NULL, window_flags))
+	{
+		ImGui::End();
+	}
 
 	auto current_size = ImGui::GetWindowSize();
 	auto main_viewport = ImGui::GetMainViewport();
 	auto viewport_pos = main_viewport->WorkPos;
 	auto viewport_size = main_viewport->WorkSize;
 	ImGui::SetWindowPos(ImVec2(viewport_pos.x + viewport_size.x - current_size.x, viewport_pos.y + viewport_size.y - current_size.y));
-
-	auto lvl = Cvar_kcp_stats->GetInt();
-	if (lvl == 5)
-	{
-		ImGui::ShowMetricsWindow();
-	}
-	else if (lvl == 6)
-	{
-		ImPlot::ShowMetricsWindow();
-	}
 
 	auto ng = NetGraphSink::instance();
 	std::shared_lock lk(ng->windowsMutex);
@@ -232,14 +227,26 @@ static void draw_kcp_stats()
 	{
 		if (lvl >= 2)
 		{
-			draw_kcp_graph();
+			draw_kcp_graph(current_size.x * 0.95);
 		}
 		if (lvl >= 1)
 		{
 			draw_kcp_table();
 		}
 	}
+
 	ImGui::End();
+
+	ImGui::PopStyleVar(6);
+
+	if (lvl == 5)
+	{
+		ImGui::ShowMetricsWindow();
+	}
+	else if (lvl == 6)
+	{
+		ImPlot::ShowMetricsWindow();
+	}
 }
 
 ON_DLL_LOAD("client.dll", KCPSTATS, (CModule module))

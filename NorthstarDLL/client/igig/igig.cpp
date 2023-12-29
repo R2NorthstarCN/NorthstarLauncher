@@ -77,6 +77,8 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 			io.Fonts->AddFontDefault();
 
 			ImFontConfig icons_config;
+			strcpy_s(icons_config.Name, "FontAwesome");
+			icons_config.GlyphOffset = ImVec2(0.0, 2.0);
 			icons_config.MergeMode = true;
 			icons_config.PixelSnapH = true;
 			icons_config.OversampleH = 1;

@@ -6,6 +6,9 @@
 
 extern float* g_frameTime;
 
+const int NETGRAPH_UPDATE_INTERVAL = 50;
+const int NETGRAPH_DATA_POINTS = 100;
+
 struct sliding_window
 {
 	std::vector<double> raw;
@@ -15,7 +18,7 @@ struct sliding_window
 	double last_val = 0;
 	double sumed = 0;
 
-	inline sliding_window() : sliding_window(50, false) {};
+	inline sliding_window() : sliding_window(NETGRAPH_DATA_POINTS, false) {};
 	sliding_window(size_t samples);
 	sliding_window(size_t samples, bool delta);
 
@@ -46,14 +49,14 @@ struct NetStats
 
 struct NetSlidingWindows
 {
-	sliding_window sw_sv = sliding_window(50, false);
+	sliding_window sw_sv = sliding_window(NETGRAPH_DATA_POINTS, false);
 
-	sliding_window sw_outsegs = sliding_window(50, true);
-	sliding_window sw_lostsegs = sliding_window(50, true);
-	sliding_window sw_retranssegs = sliding_window(50, true);
+	sliding_window sw_outsegs = sliding_window(NETGRAPH_DATA_POINTS, true);
+	sliding_window sw_lostsegs = sliding_window(NETGRAPH_DATA_POINTS, true);
+	sliding_window sw_retranssegs = sliding_window(NETGRAPH_DATA_POINTS, true);
 
-	sliding_window sw_insegs = sliding_window(50, true);
-	sliding_window sw_reconsegs = sliding_window(50, true);
+	sliding_window sw_insegs = sliding_window(NETGRAPH_DATA_POINTS, true);
+	sliding_window sw_reconsegs = sliding_window(NETGRAPH_DATA_POINTS, true);
 
 	void rotate(const NetStats& s);
 };

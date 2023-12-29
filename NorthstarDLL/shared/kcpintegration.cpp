@@ -52,8 +52,12 @@ int WSAAPI de_bind(_In_ SOCKET s, _In_reads_bytes_(namelen) const struct sockadd
 
 		if (ntohs(bindAddr->sin6_port) == localPort)
 		{
-			UdpSource::instance()->bindSocket(s);
-			NS::log::NEW_NET->info("[UdpSource] Bind on localhost:{}@{}", localPort, s);
+			NetManager::instance()->socket = s;
+			if (UdpSource::instance()->initialized(FROM_CAL))
+			{
+				NS::log::NEW_NET->info("[NetManager] Triggered UdpSource thread");
+			} 
+			NS::log::NEW_NET->info("[NetManager] Bind on localhost:{}@{}", localPort, s);
 		}
 	}
 	return result;
@@ -67,13 +71,11 @@ int WSAAPI de_sendto(
 	_In_reads_bytes_(tolen) const struct sockaddr FAR* to,
 	_In_ int tolen)
 {
-	auto gsResult = GameSink::instance()->sendto(s, buf, len, flags, to, tolen);
-	if (gsResult != NET_HOOK_NOT_ALTERED)
+	if (NetManager::instance()->socket == s)
 	{
-		return gsResult;
+		return GameSink::instance()->sendto(s, buf, len, flags, to, tolen);
 	}
-	auto result = orig_sendto(s, buf, len, flags, to, tolen);
-	return result;
+	return orig_sendto(s, buf, len, flags, to, tolen);
 }
 
 int WSAAPI de_recvfrom(
@@ -84,13 +86,11 @@ int WSAAPI de_recvfrom(
 	_Out_writes_bytes_to_opt_(*fromlen, *fromlen) struct sockaddr FAR* from,
 	_Inout_opt_ int FAR* fromlen)
 {
-	auto gsResult = GameSink::instance()->recvfrom(s, buf, len, flags, from, fromlen);
-	if (gsResult != NET_HOOK_NOT_ALTERED)
+	if (NetManager::instance()->socket == s)
 	{
-		return gsResult;
+		return GameSink::instance()->recvfrom(s, buf, len, flags, from, fromlen);
 	}
-	auto result = orig_recvfrom(s, buf, len, flags, from, fromlen);
-	return result;
+	return orig_recvfrom(s, buf, len, flags, from, fromlen);
 }
 
 bool createAndEnableHook(LPCWSTR pszModule, LPCSTR pszProcName, LPVOID pDetour, LPVOID* ppOriginal)
@@ -140,7 +140,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_fec_autotune = new ConVar("kcp_fec_autotune", "1", FCVAR_NONE, "controls the FEC autotune.");
 
 	Cvar_kcp_fec_rx_multi =
-		new ConVar("kcp_fec_rx_multi", "3", FCVAR_NONE, "multiplier of FEC receive queue, higher is better but consumes more memory.");
+		new ConVar("kcp_fec_rx_multi", "5", FCVAR_NONE, "multiplier of FEC receive queue, higher is better but consumes more memory.");
 
 	Cvar_kcp_fec_send_data_shards = new ConVar("kcp_fec_send_data_shards", "3", FCVAR_NONE, "number of FEC data shards.");
 
@@ -231,10 +231,10 @@ void recycleThreadPayload(std::stop_token stoken)
 		auto ng = NetGraphSink::instance();
 		std::unique_lock remoteStatsLock(ng->windowsMutex);
 		std::vector<NetContext> removes;
-		auto current = iclock64();
+		auto current = iclock();
 		for (const auto& entry : NetManager::instance()->routingTable)
 		{
-			if (itimediff64(current, entry.second.second) > Cvar_kcp_conn_timeout->GetInt())
+			if (itimediff(current, entry.second.second) > Cvar_kcp_conn_timeout->GetInt())
 			{
 				removes.push_back(entry.first);
 			}
@@ -265,9 +265,9 @@ NetManager* NetManager::instance()
 	return singleton;
 }
 
-std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDefault(const SOCKET& s, const sockaddr_in6& addr)
+std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDefault(const sockaddr_in6& addr)
 {
-	std::shared_ptr<KcpLayer> kcp = std::shared_ptr<KcpLayer>(new KcpLayer({s, addr}));
+	std::shared_ptr<KcpLayer> kcp = std::shared_ptr<KcpLayer>(new KcpLayer({addr}));
 	std::shared_ptr<MuxLayer> mux = std::shared_ptr<MuxLayer>(new MuxLayer());
 
 	mux->bindTop(0, std::static_pointer_cast<NetSink>(GameSink::instance()));
@@ -291,18 +291,18 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::init
 
 std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(
 	const NetContext& ctx,
-	std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> (*connectionInitFunc)(const SOCKET& s, const sockaddr_in6& addr))
+	std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> (*connectionInitFunc)(const sockaddr_in6& addr))
 {
-	std::shared_lock routingTableLock(routingTableMutex);
-	auto result = connectionInitFunc(ctx.socket, ctx.addr);
-	routingTable.insert(std::make_pair(ctx, std::make_pair(result, iclock64())));
+	auto result = connectionInitFunc(ctx.addr);
+	bind(ctx, result.first, result.second);
 	return result;
 }
 
 void NetManager::bind(const NetContext& ctx, std::shared_ptr<NetSink> inboundDst, std::shared_ptr<NetSource> outboundDst)
 {
+	NS::log::NEW_NET->info("[NetManager] Accepting new connection with {}", ctx);
 	std::shared_lock routingTableLock(routingTableMutex);
-	routingTable.insert(std::make_pair(ctx, std::make_pair(std::make_pair(inboundDst, outboundDst), iclock64())));
+	routingTable.insert(std::make_pair(ctx, std::make_pair(std::make_pair(inboundDst, outboundDst), iclock())));
 }
 
 std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>> NetManager::route(const NetContext& ctx)
@@ -322,15 +322,16 @@ void NetManager::updateLastSeen(const NetContext& ctx)
 	auto it = routingTable.find(ctx);
 	if (it != routingTable.end())
 	{
-		(*it).second.second = iclock64();
+		(*it).second.second = iclock();
 	}
 }
 
 void selectThreadPayload(std::stop_token stoken)
 {
+	auto nm = NetManager::instance();
 	while (!stoken.stop_requested())
 	{
-		if (!UdpSource::instance()->initialized(FROM_CAL))
+		if (nm->socket == NULL)
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
@@ -340,17 +341,17 @@ void selectThreadPayload(std::stop_token stoken)
 		timeval timeout {0, Cvar_kcp_select_timeout->GetInt() * 1000};
 
 		FD_ZERO(&sockets);
-		FD_SET(UdpSource::instance()->socket, &sockets);
+		FD_SET(nm->socket, &sockets);
 
 		auto selectResult = select(NULL, &sockets, NULL, NULL, &timeout);
 
 		if (selectResult == SOCKET_ERROR)
 		{
-			NS::log::NEW_NET->error("[UdpSource] select error @ {}: {}", UdpSource::instance()->socket, WSAGetLastError());
+			NS::log::NEW_NET->error("[UdpSource] select: error {}", WSAGetLastError());
 			continue;
 		}
 
-		if (!FD_ISSET(UdpSource::instance()->socket, &sockets))
+		if (!FD_ISSET(nm->socket, &sockets))
 		{
 			continue;
 		}
@@ -359,33 +360,31 @@ void selectThreadPayload(std::stop_token stoken)
 		sockaddr_in6 from {};
 		int fromlen = sizeof(sockaddr_in6);
 
-		auto recvfromResult = orig_recvfrom(UdpSource::instance()->socket, buf.data(), buf.size(), 0, (sockaddr*)&from, &fromlen);
+		auto recvfromResult = orig_recvfrom(nm->socket, buf.data(), buf.size(), 0, (sockaddr*)&from, &fromlen);
 
 		if (recvfromResult == SOCKET_ERROR)
 		{
 			auto lastError = WSAGetLastError();
 			if (lastError != WSAEWOULDBLOCK)
 			{
-				NS::log::NEW_NET->error("[UdpSource] recvfrom error @ {} : {}", UdpSource::instance()->socket, lastError);
+				NS::log::NEW_NET->error("[UdpSource] recvfrom: error {}", lastError);
 			}
 			continue;
 		}
 
 		buf.resize(recvfromResult);
 
-		NetContext ctx {UdpSource::instance()->socket, from};
+		NetContext ctx {from};
 		auto route =
 			NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
 
-		if (!route->first->initialized(FROM_CAL))
+		if (route->first->initialized(FROM_CAL))
 		{
-			NS::log::NEW_NET->warn("[UdpSource] Routed {} to uninitalized NetSink*", ctx);
-			continue;
+			route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
 		}
-		auto inputResult = route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
-		if (inputResult != 0)
+		else
 		{
-			NS::log::NEW_NET->error("[UdpSource] NetSink*->input {} error: {}", ctx, inputResult);
+			NS::log::NEW_NET->warn("[UdpSource] Routed {} to uninitialized NetSink", ctx);
 		}
 	}
 }
@@ -403,26 +402,17 @@ UdpSource::~UdpSource()
 
 int UdpSource::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
-	if (ctx.socket != socket)
-	{
-		return NET_HOOK_NOT_ALTERED;
-	}
-	auto sendtoResult = orig_sendto(socket, buf.data(), buf.size(), 0, (const sockaddr*)&ctx.addr, sizeof(sockaddr_in6));
+	auto sendtoResult = orig_sendto(NetManager::instance()->socket, buf.data(), buf.size(), 0, (const sockaddr*)&ctx.addr, sizeof(sockaddr_in6));
 	if (sendtoResult == SOCKET_ERROR)
 	{
-		NS::log::NEW_NET->error("[UdpSource] sendto {} error: {}", ctx, WSAGetLastError());
+		NS::log::NEW_NET->error("[UdpSource] sendto {}: error {}", ctx, WSAGetLastError());
 	}
 	return sendtoResult;
 }
 
 bool UdpSource::initialized(int from)
 {
-	return socket != NULL;
-}
-
-void UdpSource::bindSocket(const SOCKET& s)
-{
-	socket = s;
+	return NetManager::instance()->socket != NULL;
 }
 
 std::shared_ptr<UdpSource> UdpSource::instance()
@@ -452,24 +442,15 @@ int GameSink::recvfrom(
 	_Out_writes_bytes_to_opt_(*fromlen, *fromlen) struct sockaddr FAR* from,
 	_Inout_opt_ int FAR* fromlen)
 {
-	if (!UdpSource::instance()->initialized(FROM_CAL) || UdpSource::instance()->socket != s)
-	{
-		return NET_HOOK_NOT_ALTERED;
-	}
-
 	std::pair<NetBuffer, NetContext> data;
 	if (pendingData.try_pop(data))
 	{
-		if (data.second.socket != s)
-		{
-			pendingData.push(data);
-			return NET_HOOK_NOT_ALTERED;
-		}
 		if (from == nullptr || fromlen == nullptr || *fromlen < sizeof(sockaddr_in6))
 		{
 			WSASetLastError(WSAEFAULT);
 			return SOCKET_ERROR;
 		}
+
 		memcpy_s(from, *fromlen, &data.second.addr, sizeof(sockaddr_in6));
 
 		NetManager::instance()->updateLastSeen(data.second);
@@ -499,37 +480,27 @@ int GameSink::sendto(
 	_In_reads_bytes_(tolen) const struct sockaddr FAR* to,
 	_In_ int tolen)
 {
-	if (!UdpSource::instance()->initialized(FROM_CAL) || UdpSource::instance()->socket != s)
-	{
-		return NET_HOOK_NOT_ALTERED;
-	}
-
 	if (to == nullptr || tolen < sizeof(sockaddr_in6))
 	{
 		WSASetLastError(WSAEFAULT);
 		return SOCKET_ERROR;
 	}
 
-	auto converted = *(sockaddr_in6*)to;
-	NetContext ctx {s, converted};
-	auto route = NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
-	
+	NetContext ctx {*(sockaddr_in6*)to};
 
-	if (!route->second->initialized(FROM_CAL))
+	auto route = NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
+
+	if (route->second->initialized(FROM_CAL))
 	{
-		NS::log::NEW_NET->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
-		return NET_HOOK_NOT_ALTERED;
-	}
-	auto sendtoResult = route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
-	if (sendtoResult < 0)
-	{
-		NS::log::NEW_NET->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
+		NetManager::instance()->updateLastSeen(ctx);
+		return route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
 	}
 	else
 	{
-		NetManager::instance()->updateLastSeen(ctx);
+		NS::log::NEW_NET->warn("[GameSink] Routed {} to uninitalized NetSource", ctx);
+		WSASetLastError(WSAENETDOWN);
+		return SOCKET_ERROR;
 	}
-	return sendtoResult;
 }
 
 std::shared_ptr<GameSink> GameSink::instance()
@@ -565,27 +536,30 @@ int FecLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 	}
 
 	auto encoded = encode(buf);
+	int result = 0;
+
 	for (auto& nBuf : encoded)
 	{
 		auto sendtoResult = bottom.lock()->sendto(std::move(nBuf), ctx, this);
 		if (sendtoResult == SOCKET_ERROR)
 		{
-			NS::log::NEW_NET->error("[FEC] bottom->sendto {} error: {}", ctx, sendtoResult);
+			result = SOCKET_ERROR;
 		}
 	}
-	return 0;
+
+	return result;
 }
 
 int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
 {
 	if (buf.size() < FEC_MIN_SIZE)
 	{
-		NS::log::NEW_NET->warn("[FEC] input {} sliently dropping non-FEC packet: insufficient length", ctx);
-		return 0;
+		return top->input(std::move(buf), ctx, this);
 	}
 
 	IUINT16 flag = 0;
 	ikcp_decode16u(buf.data() + 4, &flag);
+	int result = 0;
 
 	if (flag == FEC_TYPE_DATA || flag == FEC_TYPE_PARITY)
 	{
@@ -598,7 +572,7 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 			auto fecSize = nBuf.getU16H(); // drop size
 			if (fecSize < 2)
 			{
-				NS::log::NEW_NET->warn("[FEC] top->input {} spurious input with fecSize < 2", ctx);
+				NS::log::NEW_NET->warn("[FEC] input {}: spurious input with fecSize < 2", ctx);
 			}
 			else
 			{
@@ -607,7 +581,7 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 				auto inputResult = top->input(std::move(nBuf), ctx, this);
 				if (inputResult == SOCKET_ERROR)
 				{
-					NS::log::NEW_NET->error("[FEC] top->input {} error: {}", ctx, inputResult);
+					result = SOCKET_ERROR;
 				}
 			}
 		}
@@ -617,29 +591,24 @@ int FecLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 
 			if (fecSize < 2)
 			{
-				NS::log::NEW_NET->warn("[FEC] top->input {} spurious reconstructed with fecSize < 2", ctx);
+				NS::log::NEW_NET->warn("[FEC] input {}: spurious reconstructed with fecSize < 2", ctx);
 				continue;
 			}
 			rBuf.resize(fecSize - 2, 0);
 
-			auto inputResult = top->input(std::move(rBuf), {ctx.socket, ctx.addr, true}, this);
+			auto inputResult = top->input(std::move(rBuf), {ctx.addr, true}, this);
 			if (inputResult == SOCKET_ERROR)
 			{
-				NS::log::NEW_NET->error("[FEC] top->input {} error: {}", ctx, inputResult);
+				result = SOCKET_ERROR;
 			}
 		}
 	}
 	else
 	{
-		auto inputResult = top->input(std::move(buf), ctx, this);
-		if (inputResult == SOCKET_ERROR)
-		{
-			NS::log::NEW_NET->error("[FEC] top->input {} error: {}", ctx, inputResult);
-		}
-		return inputResult;
+		return top->input(std::move(buf), ctx, this);
 	}
 
-	return 0;
+	return result;
 }
 
 bool FecLayer::initialized(int from)
@@ -709,7 +678,7 @@ std::vector<NetBuffer> FecLayer::reconstruct(const NetBuffer& buf, const NetCont
 				reed_solomon_release(decoderCodec);
 				decoderCodec = reed_solomon_new(ps.first, ps.second);
 				rxlimit = Cvar_kcp_fec_rx_multi->GetInt() * decoderCodec->shards;
-				NS::log::NEW_NET->info("[FEC] {} autotuned to D:P = {}:{}", ctx, ps.first, ps.second);
+				NS::log::NEW_NET->info("[FEC] {}: autotuned to D:P = {}:{}", ctx, ps.first, ps.second);
 			}
 		}
 	}
@@ -954,7 +923,7 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 			std::unique_lock<std::mutex> lk1(layer->cbMutex);
 			ikcp_update(layer->cb, iclock());
 			auto current = iclock();
-			if (itimediff(current, lastStatsSync) >= 100)
+			if (itimediff(current, lastStatsSync) >= NETGRAPH_UPDATE_INTERVAL)
 			{
 				auto ng = NetGraphSink::instance();
 				std::shared_lock lk2(ng->windowsMutex);
@@ -982,15 +951,12 @@ int kcpOutput(const char* buf, int len, ikcpcb* kcp, void* user)
 	auto source = layer->bottom.lock();
 	if (!source->initialized(FROM_CAL))
 	{
-		NS::log::NEW_NET->error("[KCP] kcpOutput: Uninitalized bottom");
-		return -1;
+		NS::log::NEW_NET->error("[KCP] kcpOutput {}: uninitalized NetSource", layer->remoteAddr);
+
+		WSASetLastError(WSAENETDOWN);
+		return SOCKET_ERROR;
 	}
-	auto sendToResult = source->sendto(NetBuffer(buf, len), layer->remoteAddr, layer);
-	if (sendToResult == SOCKET_ERROR)
-	{
-		NS::log::NEW_NET->error("[KCP] kcpOutput: sendto error");
-	}
-	return sendToResult;
+	return source->sendto(NetBuffer(buf, len), layer->remoteAddr, layer);
 }
 
 KcpLayer::KcpLayer(const NetContext& ctx)
@@ -998,7 +964,7 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 	cb = ikcp_create(0, this);
 	cb->output = kcpOutput;
 
-	ikcp_wndsize(cb, 512, 512);
+	ikcp_wndsize(cb, 128, 256);
 	ikcp_nodelay(cb, 1, 10, 2, 1);
 	cb->interval = Cvar_kcp_timer_resolution->GetInt();
 
@@ -1026,6 +992,8 @@ int KcpLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 	if (result < 0)
 	{
 		NS::log::NEW_NET->error("[KCP] sendto {}: error {}", ctx, result);
+		result = SOCKET_ERROR;
+		WSASetLastError(WSAEFAULT);
 	}
 
 	std::unique_lock<std::mutex> lk2(updateCvMutex);
@@ -1042,7 +1010,10 @@ int KcpLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 		if (result < 0)
 		{
 			NS::log::NEW_NET->error("[KCP] input {}: error {}", ctx, result);
+			result = SOCKET_ERROR;
+			WSASetLastError(WSAEFAULT);
 		}
+
 		auto peeksize = ikcp_peeksize(cb);
 		while (peeksize >= 0)
 		{
@@ -1098,18 +1069,14 @@ int MuxLayer::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
 	if (!topInverseMap.contains((uintptr_t)top))
 	{
-		NS::log::NEW_NET->error("[MUX] sendto {} silently dropping packets from unknown", ctx);
+		NS::log::NEW_NET->error("[Mux] sendto {}: dropping packets from unknown", ctx);
+		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
 	}
 
 	buf.putU8H(topInverseMap[(uintptr_t)top]);
-	auto sendtoResult = bottom.lock()->sendto(std::move(buf), ctx, this);
-	if (sendtoResult == SOCKET_ERROR)
-	{
-		NS::log::NEW_NET->error("[MUX] sendto {} error: {}", ctx, sendtoResult);
-	}
 
-	return sendtoResult;
+	return bottom.lock()->sendto(std::move(buf), ctx, this);
 }
 
 int MuxLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
@@ -1117,15 +1084,10 @@ int MuxLayer::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bot
 	IUINT8 channelId = buf.getU8H();
 	if (!topMap.contains(channelId))
 	{
-		NS::log::NEW_NET->error("[MUX] input {} silently dropping packets from unknown", ctx);
+		NS::log::NEW_NET->error("[Mux] input {}: dropping packets from unknown", ctx);
 		return SOCKET_ERROR;
 	}
-	auto inputResult = topMap[channelId]->input(std::move(buf), ctx, this);
-	if (inputResult == SOCKET_ERROR)
-	{
-		NS::log::NEW_NET->error("[MUX] input {} error: {}", ctx, inputResult);
-	}
-	return inputResult;
+	return topMap[channelId]->input(std::move(buf), ctx, this);
 }
 
 bool MuxLayer::initialized(int from)
@@ -1172,19 +1134,4 @@ void MuxLayer::bindTop(IUINT8 channelId, std::shared_ptr<NetSink> top)
 void MuxLayer::bindBottom(std::weak_ptr<NetSource> bottom)
 {
 	this->bottom = bottom;
-}
-
-DummySink::DummySink() {}
-
-DummySink::~DummySink() {}
-
-int DummySink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
-{
-	NS::log::NEW_NET->error("[DUMMY] input {}: {} {}", ctx, buf.data()[0], buf.data()[1]);
-	return 0;
-}
-
-bool DummySink::initialized(int from)
-{
-	return true;
 }
