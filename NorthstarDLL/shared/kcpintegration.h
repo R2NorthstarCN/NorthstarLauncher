@@ -270,6 +270,8 @@ class NetManager
 	Concurrency::concurrent_unordered_map<NetContext, std::pair<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>, IINT64>>
 		routingTable;
 
+	SOCKET socket = NULL;
+
   private:
 	std::jthread recycleThread;
 

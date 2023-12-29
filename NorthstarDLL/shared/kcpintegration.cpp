@@ -374,34 +374,15 @@ void selectThreadPayload(std::stop_token stoken)
 		buf.resize(recvfromResult);
 
 		NetContext ctx {UdpSource::instance()->socket, from};
-		auto route = NetManager::instance()->route(ctx);
+		auto route =
+			NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
 
-		if (route.has_value())
-		{
-			if (!route->first->initialized(FROM_CAL))
-			{
-				NS::log::NEW_NET->warn("[UdpSource] Routed {} to uninitalized NetSink*", ctx);
-				continue;
-			}
-			auto inputResult = route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
-			if (inputResult != 0)
-			{
-				NS::log::NEW_NET->error("[UdpSource] NetSink*->input {} error: {}", ctx, inputResult);
-			}
-			continue;
-		}
-
-		// New connection
-
-		NS::log::NEW_NET->info("[UdpSource] Accepting new connection from {}", ctx);
-		auto newRoute = NetManager::instance()->initAndBind(ctx);
-
-		if (!newRoute.first->initialized(FROM_CAL))
+		if (!route->first->initialized(FROM_CAL))
 		{
 			NS::log::NEW_NET->warn("[UdpSource] Routed {} to uninitalized NetSink*", ctx);
 			continue;
 		}
-		auto inputResult = newRoute.first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
+		auto inputResult = route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
 		if (inputResult != 0)
 		{
 			NS::log::NEW_NET->error("[UdpSource] NetSink*->input {} error: {}", ctx, inputResult);
@@ -518,6 +499,11 @@ int GameSink::sendto(
 	_In_reads_bytes_(tolen) const struct sockaddr FAR* to,
 	_In_ int tolen)
 {
+	if (!UdpSource::instance()->initialized(FROM_CAL) || UdpSource::instance()->socket != s)
+	{
+		return NET_HOOK_NOT_ALTERED;
+	}
+
 	if (to == nullptr || tolen < sizeof(sockaddr_in6))
 	{
 		WSASetLastError(WSAEFAULT);
@@ -526,48 +512,24 @@ int GameSink::sendto(
 
 	auto converted = *(sockaddr_in6*)to;
 	NetContext ctx {s, converted};
-	auto route = NetManager::instance()->route(ctx);
+	auto route = NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
+	
 
-	if (route.has_value())
+	if (!route->second->initialized(FROM_CAL))
 	{
-		if (!route->second->initialized(FROM_CAL))
-		{
-			NS::log::NEW_NET->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
-			return NET_HOOK_NOT_ALTERED;
-		}
-		auto sendtoResult = route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
-		if (sendtoResult < 0)
-		{
-			NS::log::NEW_NET->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
-		}
-		else
-		{
-			NetManager::instance()->updateLastSeen(ctx);
-		}
-		return sendtoResult;
+		NS::log::NEW_NET->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
+		return NET_HOOK_NOT_ALTERED;
 	}
-
-	// New connection
-
-	if (s == UdpSource::instance()->socket)
+	auto sendtoResult = route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
+	if (sendtoResult < 0)
 	{
-		NS::log::NEW_NET->info("[GameSink] Initiating new connection to {}", ctx);
-		auto newRoute = NetManager::instance()->initAndBind(ctx);
-
-		if (!newRoute.first->initialized(FROM_CAL))
-		{
-			NS::log::NEW_NET->warn("[GameSink] Routed {} to uninitalized NetSource*", ctx);
-			return NET_HOOK_NOT_ALTERED;
-		}
-		auto sendtoResult = newRoute.second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
-		if (sendtoResult != 0)
-		{
-			NS::log::NEW_NET->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
-		}
-		return sendtoResult;
+		NS::log::NEW_NET->error("[GameSink] NetSource*->sendto {} error: {}", ctx, sendtoResult);
 	}
-
-	return NET_HOOK_NOT_ALTERED;
+	else
+	{
+		NetManager::instance()->updateLastSeen(ctx);
+	}
+	return sendtoResult;
 }
 
 std::shared_ptr<GameSink> GameSink::instance()
