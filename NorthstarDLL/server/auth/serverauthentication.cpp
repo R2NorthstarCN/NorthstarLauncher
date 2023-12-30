@@ -110,18 +110,9 @@ void ServerAuthenticationManager::StartPlayerAuthServer()
 					std::lock_guard<std::mutex> guard(m_AuthDataMutex);
 					m_RemoteAuthenticationData.insert(std::make_pair(request.get_param_value("authToken"), newAuthData));
 
-					/*
-					if (g_kcp_initialized())
-					{
-						response.set_content(
-							"{\"success\":true,\"conv\":" + std::to_string(g_kcp_manager->get_next_conv()) + "}", "application/json");
-					}
-					else
-					{
-						response.set_content(
-							"{\"success\":true}", "application/json");
-					}
-					*/
+					response.set_content(
+						"{\"success\":true}", "application/json");
+					
 				});
 
 			m_PlayerAuthServer.listen("0.0.0.0", Cvar_ns_player_auth_port->GetInt());
