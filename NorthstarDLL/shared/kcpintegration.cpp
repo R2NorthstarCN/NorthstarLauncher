@@ -130,7 +130,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_select_timeout =
 		new ConVar("kcp_select_timeout", "5", FCVAR_NONE, "miliseconds select has to wait, lower is better but consumes more CPU.");
 
-	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "5000", FCVAR_NONE, "miliseconds before a connection is dropped.");
+	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "7000", FCVAR_NONE, "miliseconds before a connection is dropped.");
 
 	Cvar_kcp_fec = new ConVar("kcp_fec", "1", FCVAR_NONE, "whether to enable FEC or not.");
 

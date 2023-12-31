@@ -275,7 +275,6 @@ class NetManager
 };
 
 const size_t NET_UDP_MAX_MESSAGE_SIZE = 65535;
-const int NET_HOOK_NOT_ALTERED = -114;
 
 class GameSink : public NetSink
 {

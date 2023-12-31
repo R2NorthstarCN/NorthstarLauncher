@@ -437,7 +437,7 @@ inline VoidFunction SQMessageBufferPushArg(Vector3& arg) {
 template <ScriptContext context>
 inline VoidFunction SQMessageBufferPushArg(SQObject* arg) {
 	return [arg]{ g_pSquirrel<context>->pushSQObject(g_pSquirrel<context>->m_pSQVM->sqvm, arg); };
-}
+}	
 // Ints
 template <ScriptContext context, typename T>
 requires std::convertible_to<T, int> && (!std::is_floating_point_v<T>)
