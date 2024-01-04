@@ -971,7 +971,7 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 	cb = ikcp_create(0, this);
 	cb->output = kcpOutput;
 
-	ikcp_nodelay(cb, 1, 10, 2, 0);
+	ikcp_nodelay(cb, 1, 10, 2, 1);
 	cb->interval = Cvar_kcp_timer_resolution->GetInt();
 
 	remoteAddr = ctx;
