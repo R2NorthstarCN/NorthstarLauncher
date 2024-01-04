@@ -82,6 +82,7 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 			io.Fonts->AddFontDefault();
 			ImFontConfig font_config_chs;
 			strcpy_s(font_config_chs.Name, "MicrosoftYaHei");
+			font_config_chs.GlyphOffset = ImVec2(0.0, 1.0);
 			font_config_chs.MergeMode = true;
 			font_config_chs.PixelSnapH = true;
 			font_config_chs.OversampleH = 2;
