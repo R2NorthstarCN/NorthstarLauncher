@@ -7,7 +7,7 @@
 #include "imgui/implot.h"
 #include "client/fontawesome.h"
 #include "dedicated/dedicated.h"
-
+#include "client/igig/ime.h"
 typedef HRESULT(__stdcall* fpPresent)(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags);
 typedef LRESULT(CALLBACK* fpWndProc)(HWND, UINT, WPARAM, LPARAM);
 
@@ -26,6 +26,11 @@ extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam
 
 static LRESULT __stdcall hookedWndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	
+	if (ImeWndProc(hWnd, uMsg, wParam, lParam))
+	{
+		return true;
+	}
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam))
 	{
 		return true;
@@ -75,6 +80,13 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 			ImGui_ImplDX11_Init(igig.pDevice.get(), igig.pContext.get());
 
 			io.Fonts->AddFontDefault();
+			ImFontConfig font_config_chs;
+			strcpy_s(font_config_chs.Name, "MicrosoftYaHei");
+			font_config_chs.MergeMode = true;
+			font_config_chs.PixelSnapH = true;
+			font_config_chs.OversampleH = 2;
+			font_config_chs.OversampleV = 1;
+			io.Fonts->AddFontFromFileTTF("c:\\windows\\fonts\\msyh.ttc", 15.0f, &font_config_chs, io.Fonts->GetGlyphRangesChineseFull());
 
 			ImFontConfig icons_config;
 			strcpy_s(icons_config.Name, "FontAwesome");

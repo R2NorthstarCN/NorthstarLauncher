@@ -187,6 +187,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClInclude Include="client\audio.h" />
     <ClInclude Include="client\fontawesome.h" />
     <ClInclude Include="client\igig\igig.h" />
+    <ClInclude Include="client\igig\ime.h" />
     <ClInclude Include="client\localchatwriter.h" />
     <ClInclude Include="client\r2client.h" />
     <ClInclude Include="client\vguihooks.h" />
@@ -304,6 +305,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="engine\netgraph.cpp" />
     <ClCompile Include="engine\r2engine.cpp" />
     <ClCompile Include="engine\runframe.cpp" />
+    <ClCompile Include="igig\ime.cpp" />
     <ClCompile Include="logging\crashhandler.cpp" />
     <ClCompile Include="logging\logging.cpp" />
     <ClCompile Include="logging\loghooks.cpp" />
