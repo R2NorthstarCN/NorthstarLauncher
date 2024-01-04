@@ -56,8 +56,15 @@ int WSAAPI de_bind(_In_ SOCKET s, _In_reads_bytes_(namelen) const struct sockadd
 			if (UdpSource::instance()->initialized(FROM_CAL))
 			{
 				NS::log::NEW_NET->info("[NetManager] Triggered UdpSource thread");
-			} 
-			NS::log::NEW_NET->info("[NetManager] Bind on localhost:{}@{}", localPort, s);
+			}
+			DWORD origSndbuf = 0;
+			int sndbufLen = sizeof(DWORD);
+			getsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&origSndbuf, &sndbufLen);
+			DWORD newSndbuf = 524288;
+			sndbufLen = sizeof(DWORD);
+			setsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&newSndbuf, sndbufLen);
+			getsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&newSndbuf, &sndbufLen);
+			NS::log::NEW_NET->info("[NetManager] Bind on localhost:{}@{} with sndbuf {} -> {}", localPort, s, origSndbuf, newSndbuf);
 		}
 	}
 	return result;
@@ -964,8 +971,7 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 	cb = ikcp_create(0, this);
 	cb->output = kcpOutput;
 
-	ikcp_wndsize(cb, 128, 256);
-	ikcp_nodelay(cb, 1, 10, 2, 1);
+	ikcp_nodelay(cb, 1, 10, 2, 0);
 	cb->interval = Cvar_kcp_timer_resolution->GetInt();
 
 	remoteAddr = ctx;
