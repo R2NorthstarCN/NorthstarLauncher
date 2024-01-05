@@ -4,6 +4,7 @@
 #include "client/fontawesome.h"
 #include "client/igig/ime.h"
 #include "core/memalloc.h"
+#include "shared/keyvalues.h"
 
 AUTOHOOK_INIT()
 
@@ -13,7 +14,7 @@ typedef void (*MessageFunc_t)(void);
 typedef __int64(__fastcall* CInputWin32__InternalKeyTyped_t)(__int64, unsigned __int16);
 typedef __int64(__fastcall* VGUI__FindOrAddPanelMessageMap_t)(const char*);
 typedef __int64(__fastcall* CUtlVector__MessageMapItem_t__AddToTail_t)(__int64, void*);
-typedef __int64(__fastcall* CInputWin32__PostKeyMessage_t)(__int64, __int64);
+typedef __int64(__fastcall* CInputWin32__PostKeyMessage_t)(__int64, KeyValues*);
 typedef __int64(__fastcall* Panel__LocalToScreen_t)(__int64, DWORD*, DWORD*);
 typedef __int64(__fastcall* Panel__GetSize_t)(__int64, DWORD*, DWORD*);
 typedef __int64(__fastcall* TextEntry__CursorToPixelSpace_t)(__int64, DWORD, DWORD*, DWORD*);
@@ -85,6 +86,21 @@ std::string convert_from_wstring(const std::wstring& wstr)
 		strTo.resize(real_nums);
 	}
 	return strTo;
+}
+
+void PostUpdateCandidateWindowPosMessage()
+{
+	CInputWin32__PostKeyMessage(CInputWin32__Instance, new KeyValues("DoIMEUpdateCandidateWindowPos"));
+	/*__int64 kv = KeyValuesSystem__Alloc(80);
+	if (kv)
+	{
+		kv = KeyValues__Constructor_0(kv, "DoIMEUpdateCandidateWindowPos");
+		CInputWin32__PostKeyMessage(CInputWin32__Instance, kv);
+	}
+	else
+	{
+		spdlog::warn("[IME] Failed to allocate memory for KeyValues!");
+	}*/
 }
 
 bool ImeWndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -192,16 +208,7 @@ bool ImeWndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			ImmReleaseContext(hWnd, hIMC);
 
-			__int64 kv = KeyValuesSystem__Alloc(80);
-			if (kv)
-			{
-				kv = KeyValues__Constructor_0(kv, "DoIMEUpdateCandidateWindowPos");
-				CInputWin32__PostKeyMessage(CInputWin32__Instance, kv);
-			}
-			else
-			{
-				CInputWin32__PostKeyMessage(CInputWin32__Instance, 0);
-			}
+			PostUpdateCandidateWindowPosMessage();
 
 			return true;
 		}
