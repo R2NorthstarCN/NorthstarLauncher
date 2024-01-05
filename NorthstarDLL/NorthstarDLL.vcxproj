@@ -268,6 +268,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="client\clientruihooks.cpp" />
     <ClCompile Include="client\clientvideooverrides.cpp" />
     <ClCompile Include="client\igig\igig.cpp" />
+    <ClCompile Include="client\igig\ime.cpp" />
     <ClCompile Include="client\igig\kcpstats.cpp" />
     <ClCompile Include="client\igig\ultralight.cpp" />
     <ClCompile Include="client\rejectconnectionfixes.cpp" />
@@ -305,7 +306,6 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="engine\netgraph.cpp" />
     <ClCompile Include="engine\r2engine.cpp" />
     <ClCompile Include="engine\runframe.cpp" />
-    <ClCompile Include="igig\ime.cpp" />
     <ClCompile Include="logging\crashhandler.cpp" />
     <ClCompile Include="logging\logging.cpp" />
     <ClCompile Include="logging\loghooks.cpp" />
