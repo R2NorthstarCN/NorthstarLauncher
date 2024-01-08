@@ -1,6 +1,6 @@
 #include "client/igig/igig.h"
-#include "imgui/imgui.h"
-#include "imgui/implot.h"
+#include "imgui.h"
+#include "implot.h"
 #include "core/hooks.h"
 #include "shared/ikcp.h"
 #include "shared/kcpintegration.h"
@@ -52,25 +52,25 @@ static void draw_kcp_graph(float horizontal)
 		// RECON
 		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(0, 1, 0, 1));
 		auto outbound_recon = convert_to_inflines(localSlidingWindows.sw_reconsegs.get_axes().second);
-		ImPlot::PlotInfLinesEx("OUT_RECON", outbound_recon.data(), outbound_recon.size(), ImPlotInfLinesExFlags_FirstHalf);
+		ImPlot::PlotInfLines("OUT_RECON", outbound_recon.data(), outbound_recon.size(), 0);
 		auto inbound_recon = convert_to_inflines(remoteSlidingWindows.sw_reconsegs.get_axes().second);
-		ImPlot::PlotInfLinesEx("IN_RECON", inbound_recon.data(), inbound_recon.size(), ImPlotInfLinesExFlags_SecondHalf);
+		ImPlot::PlotInfLines("IN_RECON", inbound_recon.data(), inbound_recon.size(), 0);
 		ImPlot::PopStyleColor();
 
 		// LOST
 		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(1, 0, 0, 1));
 		auto outbound_lost = convert_to_inflines(localSlidingWindows.sw_lostsegs.get_axes().second);
-		ImPlot::PlotInfLinesEx("OUT_LOST", outbound_lost.data(), outbound_lost.size(), ImPlotInfLinesExFlags_FirstHalf);
+		ImPlot::PlotInfLines("OUT_LOST", outbound_lost.data(), outbound_lost.size(), 0);
 		auto inbound_lost = convert_to_inflines(remoteSlidingWindows.sw_lostsegs.get_axes().second);
-		ImPlot::PlotInfLinesEx("IN_LOST", inbound_lost.data(), inbound_lost.size(), ImPlotInfLinesExFlags_SecondHalf);
+		ImPlot::PlotInfLines("IN_LOST", inbound_lost.data(), inbound_lost.size(), 0);
 		ImPlot::PopStyleColor();
 
 		// RETRANS
 		ImPlot::PushStyleColor(ImPlotCol_Line, ImVec4(1, 0.65, 0, 1));
 		auto outbound_retrans = convert_to_inflines(localSlidingWindows.sw_retranssegs.get_axes().second);
-		ImPlot::PlotInfLinesEx("OUT_RETRANS", outbound_retrans.data(), outbound_retrans.size(), ImPlotInfLinesExFlags_FirstHalf);
+		ImPlot::PlotInfLines("OUT_RETRANS", outbound_retrans.data(), outbound_retrans.size(), 0);
 		auto inbound_retrans = convert_to_inflines(remoteSlidingWindows.sw_retranssegs.get_axes().second);
-		ImPlot::PlotInfLinesEx("IN_RETRANS", inbound_retrans.data(), inbound_retrans.size(), ImPlotInfLinesExFlags_SecondHalf);
+		ImPlot::PlotInfLines("IN_RETRANS", inbound_retrans.data(), inbound_retrans.size(), 0);
 		ImPlot::PopStyleColor();
 
 		ImPlot::EndPlot();

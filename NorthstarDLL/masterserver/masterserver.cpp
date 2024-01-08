@@ -95,7 +95,6 @@ httplib::Client SetupHttpClient()
 	cli.set_decompress(true);
 	cli.set_read_timeout(10, 0);
 	cli.set_write_timeout(10, 0);
-	cli.enable_server_certificate_verification(false);
 	if (!strstr(GetCommandLineA(), "-disabledoh"))
 	{
 		std::string doh_result = g_DohWorker->GetDOHResolve(ms_addr);
@@ -120,7 +119,6 @@ httplib::Client SetupMatchmakerHttpClient()
 	cli.set_decompress(true);
 	cli.set_read_timeout(10, 0);
 	cli.set_write_timeout(10, 0);
-	cli.enable_server_certificate_verification(false);
 	if (!strstr(GetCommandLineA(), "-disabledoh"))
 	{
 		std::string doh_result = g_DohWorker->GetDOHResolve(ms_addr);

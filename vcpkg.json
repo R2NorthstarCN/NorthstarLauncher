@@ -1,0 +1,41 @@
+{
+  "dependencies": [
+    {
+      "name": "cpp-httplib",
+      "default-features": false,
+      "features": [
+        "openssl",
+        "zlib"
+      ]
+    },
+    {
+      "name": "curl",
+      "default-features": false,
+      "features": [
+        "openssl"
+      ]
+    },
+    {
+      "name": "fmt",
+      "version>=": "10.1.1"
+    },
+    {
+      "name": "imgui",
+      "features": [
+        "dx11-binding",
+        "win32-binding"
+      ]
+    },
+    "implot",
+    "libsvm",
+    "minhook",
+    "rapidjson",
+    {
+      "name": "spdlog",
+      "features": [
+        "wchar"
+      ]
+    },
+    "nlohmann-json"
+  ]
+}

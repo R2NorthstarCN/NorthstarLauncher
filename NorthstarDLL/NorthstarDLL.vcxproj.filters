@@ -378,6 +378,9 @@
     <ClInclude Include="client\igig\ime.h">
       <Filter>Header Files\client\igig</Filter>
     </ClInclude>
+    <ClInclude Include="client\igig\kiero.h">
+      <Filter>Header Files\client\igig</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">
@@ -686,7 +689,10 @@
     <ClCompile Include="client\igig\ultralight.cpp">
       <Filter>Source Files\client\igig</Filter>
     </ClCompile>
-    <ClCompile Include="igig\ime.cpp">
+    <ClCompile Include="client\igig\ime.cpp">
+      <Filter>Source Files\client\igig</Filter>
+    </ClCompile>
+    <ClCompile Include="client\igig\kiero.cpp">
       <Filter>Source Files\client\igig</Filter>
     </ClCompile>
   </ItemGroup>
