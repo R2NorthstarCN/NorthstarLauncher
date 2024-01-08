@@ -8,17 +8,18 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // temp because i'm very lazy and want to use inet_addr, remove later
 #define RAPIDJSON_HAS_STDSTRING 1
 
-// add headers that you want to pre-compile here
-#include "core/memalloc.h"
-
 #include <windows.h>
 #include <psapi.h>
 #include <set>
 #include <map>
 #include <filesystem>
 #include <sstream>
-
 namespace fs = std::filesystem;
+
+#include "core/memory.h"
+
+// add headers that you want to pre-compile here
+#include "core/memalloc.h"
 
 // clang-format off
 #define assert_msg(exp, msg) assert((exp, msg))
@@ -33,6 +34,5 @@ namespace fs = std::filesystem;
 #include "MinHook.h"
 #include "curl/curl.h"
 #include "core/hooks.h"
-#include "core/memory.h"
 
 #endif

@@ -1,4 +1,5 @@
 #include "tier0.h"
+#include "shared/cmimalloc.h"
 
 // use the Tier0 namespace for tier0 funcs
 namespace Tier0
@@ -14,6 +15,8 @@ namespace Tier0
 typedef Tier0::IMemAlloc* (*CreateGlobalMemAllocType)();
 CreateGlobalMemAllocType CreateGlobalMemAlloc;
 
+std::mutex mmMutex;
+
 // needs to be a seperate function, since memalloc.cpp calls it
 void TryCreateGlobalMemAlloc()
 {
@@ -23,8 +26,17 @@ void TryCreateGlobalMemAlloc()
 	Tier0::g_pMemAllocSingleton = CreateGlobalMemAlloc(); // if it already exists, this returns the preexisting IMemAlloc instance
 }
 
+AUTOHOOK_INIT()
+
+AUTOHOOK(CGMA, tier0.dll + 0x17B60, void*, __fastcall, ())
+{
+	return new CMiMalloc();
+}
+
 ON_DLL_LOAD("tier0.dll", Tier0GameFuncs, (CModule module))
 {
+	AUTOHOOK_DISPATCH();
+
 	// shouldn't be necessary, but do this just in case
 	TryCreateGlobalMemAlloc();
 
