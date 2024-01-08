@@ -18,8 +18,6 @@ typedef __int64(__fastcall* CInputWin32__PostKeyMessage_t)(__int64, KeyValues*);
 typedef __int64(__fastcall* Panel__LocalToScreen_t)(__int64, DWORD*, DWORD*);
 typedef __int64(__fastcall* Panel__GetSize_t)(__int64, DWORD*, DWORD*);
 typedef __int64(__fastcall* TextEntry__CursorToPixelSpace_t)(__int64, DWORD, DWORD*, DWORD*);
-typedef __int64(__fastcall* KeyValuesSystem__Alloc_t)(__int64);
-typedef __int64(__fastcall* KeyValues__Constructor_0_t)(__int64, const char*);
 
 bool bShouldDrawCandidateList = false;
 __int64 CInputWin32__Instance = 0;
@@ -31,8 +29,6 @@ CInputWin32__PostKeyMessage_t CInputWin32__PostKeyMessage;
 Panel__LocalToScreen_t Panel__LocalToScreen;
 Panel__GetSize_t Panel__GetSize;
 TextEntry__CursorToPixelSpace_t TextEntry__CursorToPixelSpace;
-KeyValuesSystem__Alloc_t KeyValuesSystem__Alloc;
-KeyValues__Constructor_0_t KeyValues__Constructor_0;
 
 std::vector<std::wstring> candidates;
 std::wstring composite;
@@ -91,16 +87,6 @@ std::string convert_from_wstring(const std::wstring& wstr)
 void PostUpdateCandidateWindowPosMessage()
 {
 	CInputWin32__PostKeyMessage(CInputWin32__Instance, new KeyValues("DoIMEUpdateCandidateWindowPos"));
-	/*__int64 kv = KeyValuesSystem__Alloc(80);
-	if (kv)
-	{
-		kv = KeyValues__Constructor_0(kv, "DoIMEUpdateCandidateWindowPos");
-		CInputWin32__PostKeyMessage(CInputWin32__Instance, kv);
-	}
-	else
-	{
-		spdlog::warn("[IME] Failed to allocate memory for KeyValues!");
-	}*/
 }
 
 bool ImeWndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -326,6 +312,4 @@ ON_DLL_LOAD("vgui2.dll", CHATBOX, (CModule module))
 	CInputWin32__Instance = (__int64)(module.m_nAddress + 0x121A10);
 	CInputWin32__PostKeyMessage = module.Offset(0xEDA0).As<CInputWin32__PostKeyMessage_t>();
 	CInputWin32__InternalKeyTyped = module.Offset(0xCFD0).As<CInputWin32__InternalKeyTyped_t>();
-	KeyValuesSystem__Alloc = module.Offset(0x3B6B0).As<KeyValuesSystem__Alloc_t>();
-	KeyValues__Constructor_0 = module.Offset(0x3B3C0).As<KeyValues__Constructor_0_t>();
 }
