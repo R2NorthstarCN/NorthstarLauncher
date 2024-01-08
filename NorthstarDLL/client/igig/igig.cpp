@@ -147,6 +147,7 @@ void ImGuiManager::startInitThread()
 					spdlog::error("[IGIG] Kiero bind failed");
 					break;
 				}
+				break;
 			}
 		});
 	initThread.detach();
