@@ -29,6 +29,7 @@
     "implot",
     "libsvm",
     "minhook",
+    "nlohmann-json",
     "rapidjson",
     {
       "name": "spdlog",
@@ -36,6 +37,6 @@
         "wchar"
       ]
     },
-    "nlohmann-json"
+    "mimalloc"
   ]
 }
