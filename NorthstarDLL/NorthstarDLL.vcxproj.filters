@@ -698,9 +698,6 @@
     <ClCompile Include="client\igig\kiero.cpp">
       <Filter>Source Files\client\igig</Filter>
     </ClCompile>
-    <ClCompile Include="shared\cmimalloc.cpp">
-      <Filter>Source Files\shared</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="audio_asm.asm">

@@ -366,7 +366,6 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="shared\kcpintegration.cpp" />
     <ClCompile Include="shared\keyvalues.cpp" />
     <ClCompile Include="shared\maxplayers.cpp" />
-    <ClCompile Include="shared\cmimalloc.cpp" />
     <ClCompile Include="shared\misccommands.cpp" />
     <ClCompile Include="shared\playlist.cpp" />
     <ClCompile Include="shared\rs.cpp" />
