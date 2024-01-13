@@ -6,6 +6,8 @@
 #include "core/memalloc.h"
 #include "shared/keyvalues.h"
 
+#include <concurrent_queue.h>
+
 AUTOHOOK_INIT()
 
 #define _QWORD __int64;
@@ -31,6 +33,8 @@ Panel__GetSize_t Panel__GetSize;
 TextEntry__CursorToPixelSpace_t TextEntry__CursorToPixelSpace;
 
 std::vector<std::wstring> candidates;
+concurrency::concurrent_queue<std::wstring> inputQueue;
+
 std::wstring composite;
 DWORD candiX, candiY;
 
@@ -86,6 +90,17 @@ std::string convert_from_wstring(const std::wstring& wstr)
 
 void PostUpdateCandidateWindowPosMessage()
 {
+	while (!inputQueue.empty())
+	{
+		std::wstring str;
+		if (inputQueue.try_pop(str))
+		{
+			for (const auto& wc : str)
+			{
+				CInputWin32__InternalKeyTyped(CInputWin32__Instance, wc);
+			}
+		}
+	}
 	CInputWin32__PostKeyMessage(CInputWin32__Instance, new KeyValues("DoIMEUpdateCandidateWindowPos"));
 }
 
@@ -123,10 +138,7 @@ bool ImeWndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			else
 			{
-				for (int i = 0; i < realSize; i++)
-				{
-					CInputWin32__InternalKeyTyped(CInputWin32__Instance, hStr[i]);
-				}
+				inputQueue.push(std::wstring(hStr,realSize));
 			}
 
 			delete[] hStr;
@@ -194,7 +206,7 @@ bool ImeWndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			ImmReleaseContext(hWnd, hIMC);
 
-			PostUpdateCandidateWindowPosMessage();
+			//PostUpdateCandidateWindowPosMessage();
 
 			return true;
 		}
@@ -267,7 +279,7 @@ static void draw_candidates()
 
 void DoIMEUpdateCandidateWindowPos(__int64 textEntry)
 {
-	DWORD cursorPos = *(DWORD*)(textEntry + 1128);
+	DWORD cursorPos = *(DWORD*)(textEntry + 1128); // magic
 	DWORD cursorX = 0, cursorY = 0;
 	TextEntry__CursorToPixelSpace(textEntry, cursorPos, &cursorX, &cursorY);
 
@@ -302,6 +314,17 @@ ON_DLL_LOAD("client.dll", IMETEXTENTRY, (CModule module))
 
 	auto map = VGUI__FindOrAddPanelMessageMap("TextEntry");
 	CUtlVector__MessageMapItem_t__AddToTail(map, &entry);
+}
+AUTOHOOK(CGame__DispatchInputEvent, engine.dll + 0x1CD6B0, __int64, __fastcall, (__int64 a1))
+{
+	PostUpdateCandidateWindowPosMessage();
+	//spdlog::info("[DispatchTHREAD]: {}", GetCurrentThreadId());
+	return CGame__DispatchInputEvent(a1);
+}
+
+ON_DLL_LOAD("engine.dll", CGAMEDISPATCHINPUTEVENTHOOK, (CModule module))
+{
+	AUTOHOOK_DISPATCH_MODULE(engine.dll)
 }
 
 ON_DLL_LOAD("vgui2.dll", CHATBOX, (CModule module))
