@@ -3,6 +3,8 @@
 #include <dedicated/dedicated.h>
 #include "kcpintegration.h"
 #include "engine/netgraph.h"
+#include "core/tier0.h"
+#include "engine/r2engine.h"
 
 ConVar* Cvar_kcp_timer_resolution;
 ConVar* Cvar_kcp_select_timeout;
@@ -60,7 +62,8 @@ int WSAAPI de_bind(_In_ SOCKET s, _In_reads_bytes_(namelen) const struct sockadd
 			DWORD origSndbuf = 0;
 			int sndbufLen = sizeof(DWORD);
 			getsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&origSndbuf, &sndbufLen);
-			DWORD newSndbuf = 524288;
+
+			DWORD newSndbuf = 16777216;
 			sndbufLen = sizeof(DWORD);
 			setsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&newSndbuf, sndbufLen);
 			getsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&newSndbuf, &sndbufLen);
@@ -137,7 +140,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_select_timeout =
 		new ConVar("kcp_select_timeout", "5", FCVAR_NONE, "miliseconds select has to wait, lower is better but consumes more CPU.");
 
-	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "7000", FCVAR_NONE, "miliseconds before a connection is dropped.");
+	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "15000", FCVAR_NONE, "miliseconds before a connection is dropped.");
 
 	Cvar_kcp_fec = new ConVar("kcp_fec", "1", FCVAR_NONE, "whether to enable FEC or not.");
 
@@ -152,6 +155,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_fec_send_data_shards = new ConVar("kcp_fec_send_data_shards", "3", FCVAR_NONE, "number of FEC data shards.");
 
 	Cvar_kcp_fec_send_parity_shards = new ConVar("kcp_fec_send_parity_shards", "2", FCVAR_NONE, "number of FEC parity shards.");
+
 }
 
 NetBuffer::NetBuffer(std::vector<char>&& buf)
@@ -234,6 +238,15 @@ void recycleThreadPayload(std::stop_token stoken)
 	while (!stoken.stop_requested())
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+		//NS::log::NEW_NET->info("[NetManager] ServerState: {}", (int)*R2::g_pServerState);
+		if (IsDedicatedServer() && *R2::g_pServerState == R2::server_state_t::ss_loading)
+		{
+			NS::log::NEW_NET->info("[NetManager] Delaying recycleThread execution while server is loading.");
+			continue; // delay the process of inactive connection removal when server is loading.
+		}
+			
+
 		std::unique_lock routingTableLock(NetManager::instance()->routingTableMutex);
 		auto ng = NetGraphSink::instance();
 		std::unique_lock remoteStatsLock(ng->windowsMutex);
@@ -263,7 +276,15 @@ NetManager::NetManager()
 NetManager::~NetManager()
 {
 	recycleThread.request_stop();
-	recycleThread.join();
+	if (recycleThread.joinable())
+	{
+		recycleThread.join();
+	}
+	else
+	{
+		NS::log::NEW_NET->error("[NetManager] NetManager::~NetManager() Tries to join a thread of id 0!");
+	}
+	
 }
 
 NetManager* NetManager::instance()
@@ -403,16 +424,38 @@ UdpSource::UdpSource()
 
 UdpSource::~UdpSource()
 {
-	selectThread.request_stop();
-	selectThread.join();
+
+	if (selectThread.joinable())
+	{
+		selectThread.join();
+	}
+	else
+	{
+		NS::log::NEW_NET->error("[UdpSource]UdpSource::~UdpSource() Tries to join a thread of id 0!");
+	}
 }
+
+int sendto_err_cnt = 0;
 
 int UdpSource::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
 	auto sendtoResult = orig_sendto(NetManager::instance()->socket, buf.data(), buf.size(), 0, (const sockaddr*)&ctx.addr, sizeof(sockaddr_in6));
 	if (sendtoResult == SOCKET_ERROR)
 	{
-		NS::log::NEW_NET->error("[UdpSource] sendto {}: error {}", ctx, WSAGetLastError());
+		int err = WSAGetLastError();
+		if (err == 10035)
+		{
+			sendto_err_cnt++;
+			if (sendto_err_cnt > 1000)
+			{
+				NS::log::NEW_NET->error("[UdpSource] sendto: Send buffer excceeded size limit. (clamped*1000)");
+				sendto_err_cnt = 0;
+			}
+		}
+		else
+		{
+			NS::log::NEW_NET->error("[UdpSource] sendto -> {} socket error {} ",ctx,err);
+		}
 	}
 	return sendtoResult;
 }
@@ -981,7 +1024,14 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 KcpLayer::~KcpLayer()
 {
 	updateThread.request_stop();
-	updateThread.join();
+	if (updateThread.joinable())
+	{
+		updateThread.join();
+	}
+	else
+	{
+		NS::log::NEW_NET->error("[KcpLayer] KcpLayer::~KcpLayer() Attempted to join a thread of id 0!");
+	}
 
 	ikcp_release(cb);
 	cb = nullptr;

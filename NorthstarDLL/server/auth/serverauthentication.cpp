@@ -428,8 +428,10 @@ void,, (R2::CBaseClient* self, uint32_t unknownButAlways1, const char* pReason, 
 		g_pServerLimits->RemovePlayer(self);
 	}
 
-	g_pServerPresence->SetPlayerCount(g_pServerAuthentication->m_PlayerAuthenticationData.size());
+	// disconnect kcp here
 
+	g_pServerPresence->SetPlayerCount(g_pServerAuthentication->m_PlayerAuthenticationData.size());
+	
 	_CBaseClient__Disconnect(self, unknownButAlways1, buf);
 }
 
