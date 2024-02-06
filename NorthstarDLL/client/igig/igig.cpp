@@ -54,7 +54,7 @@ const ImWchar* GetGlyphRangesFontAwesome()
 
 static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
 {
-	return originalPresent(pSwapChain, SyncInterval, Flags);
+	//return originalPresent(pSwapChain, SyncInterval, Flags);
 	auto& igig = ImGuiManager::instance();
 	if (!igig.init)
 	{
@@ -66,11 +66,7 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 			pSwapChain->GetDesc(&sd);
 			igig.window = sd.OutputWindow;
 
-			winrt::com_ptr<ID3D11Texture2D> pBackBuffer;
-			pBackBuffer.capture(pSwapChain, &IDXGISwapChain::GetBuffer, 0);
-			winrt::check_hresult(
-				igig.pDevice->CreateRenderTargetView(pBackBuffer.get(), NULL, igig.mainRenderTargetView.put()));
-
+			
 			ImGui::CreateContext();
 			ImPlot::CreateContext();
 
@@ -79,6 +75,7 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 
 			ImGui_ImplWin32_Init(igig.window);
 			ImGui_ImplDX11_Init(igig.pDevice.get(), igig.pContext.get());
+			ImGui_ImplDX11_CreateDeviceObjects();
 
 			io.Fonts->AddFontDefault();
 			ImFontConfig font_config_chs;
@@ -126,10 +123,7 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 
 	
 
-	auto pMainRenderTargetView = igig.mainRenderTargetView.get();
-	igig.pContext->OMSetRenderTargets(1, &pMainRenderTargetView, NULL);
-	//const float clearColor[] = {1.0f, 1.0f, 0.0f, 1.0f};
-	//igig.pContext->ClearRenderTargetView(pMainRenderTargetView, clearColor);
+	
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 	
 	return originalPresent(pSwapChain, SyncInterval, Flags);
