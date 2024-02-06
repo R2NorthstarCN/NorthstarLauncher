@@ -75,7 +75,7 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 
 			ImGui_ImplWin32_Init(igig.window);
 			ImGui_ImplDX11_Init(igig.pDevice.get(), igig.pContext.get());
-			ImGui_ImplDX11_CreateDeviceObjects();
+			
 
 			io.Fonts->AddFontDefault();
 			ImFontConfig font_config_chs;
@@ -95,7 +95,7 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 			icons_config.OversampleH = 1;
 			io.Fonts->AddFontFromMemoryCompressedBase85TTF(
 				FontAwesome_compressed_data_base85, 13.0f, &icons_config, GetGlyphRangesFontAwesome());
-
+			ImGui_ImplDX11_CreateDeviceObjects();
 			originalWndProc = (WNDPROC)SetWindowLongPtr(igig.window, GWLP_WNDPROC, (LONG_PTR)hookedWndProc);
 
 			igig.init = true;

@@ -140,7 +140,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_select_timeout =
 		new ConVar("kcp_select_timeout", "5", FCVAR_NONE, "miliseconds select has to wait, lower is better but consumes more CPU.");
 
-	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "7000", FCVAR_NONE, "miliseconds before a connection is dropped.");
+	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "10000", FCVAR_NONE, "miliseconds before a connection is dropped.");
 
 	Cvar_kcp_fec = new ConVar("kcp_fec", "1", FCVAR_NONE, "whether to enable FEC or not.");
 
@@ -235,20 +235,12 @@ void NetBuffer::putU32H(uint32_t c)
 
 void recycleThreadPayload(std::stop_token stoken)
 {
+	auto ng = NetGraphSink::instance();
 	while (!stoken.stop_requested())
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-		//NS::log::NEW_NET->info("[NetManager] ServerState: {}", (int)*R2::g_pServerState);
-		if (IsDedicatedServer() && *R2::g_pServerState == R2::server_state_t::ss_loading)
-		{
-			NS::log::NEW_NET->info("[NetManager] Delaying recycleThread execution while server is loading.");
-			continue; // delay the process of inactive connection removal when server is loading.
-		}
 			
-
 		std::unique_lock routingTableLock(NetManager::instance()->routingTableMutex);
-		auto ng = NetGraphSink::instance();
 		std::unique_lock remoteStatsLock(ng->windowsMutex);
 		std::vector<NetContext> removes;
 		auto current = iclock();
@@ -405,7 +397,7 @@ void selectThreadPayload(std::stop_token stoken)
 		NetContext ctx {from};
 		auto route =
 			NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
-
+		
 		if (route->first->initialized(FROM_CAL))
 		{
 			route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
@@ -969,12 +961,16 @@ void updateThreadPayload(std::stop_token stoken, KcpLayer* layer)
 			if (itimediff(current, lastStatsSync) >= NETGRAPH_UPDATE_INTERVAL)
 			{
 				auto ng = NetGraphSink::instance();
-				std::shared_lock lk2(ng->windowsMutex);
-				std::get<0>(ng->windows[layer->remoteAddr]).sync(layer->cb);
-				std::get<1>(ng->windows[layer->remoteAddr]).rotate(layer->cb->rx_srtt);
-				std::get<2>(ng->windows[layer->remoteAddr]).rotate(std::get<0>(ng->windows[layer->remoteAddr]));
 
-				lastStatsSync = current;
+				if (ng->windowsMutex.try_lock_shared())
+				{
+					std::get<0>(ng->windows[layer->remoteAddr]).sync(layer->cb);
+					std::get<1>(ng->windows[layer->remoteAddr]).rotate(layer->cb->rx_srtt);
+					std::get<2>(ng->windows[layer->remoteAddr]).rotate(std::get<0>(ng->windows[layer->remoteAddr]));
+
+					lastStatsSync = current;
+					ng->windowsMutex.unlock_shared();
+				}
 			}
 			auto next = ikcp_check(layer->cb, current);
 			duration = itimediff(next, current);
