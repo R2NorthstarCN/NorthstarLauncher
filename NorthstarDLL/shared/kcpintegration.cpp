@@ -140,12 +140,12 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_select_timeout =
 		new ConVar("kcp_select_timeout", "5", FCVAR_NONE, "miliseconds select has to wait, lower is better but consumes more CPU.");
 
-	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "15000", FCVAR_NONE, "miliseconds before a connection is dropped.");
+	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "7000", FCVAR_NONE, "miliseconds before a connection is dropped.");
 
 	Cvar_kcp_fec = new ConVar("kcp_fec", "1", FCVAR_NONE, "whether to enable FEC or not.");
 
 	Cvar_kcp_fec_timeout = new ConVar(
-		"kcp_fec_timeout", "7000", FCVAR_NONE, "miliseconds before FEC drops unused packets, higher is better but consumes more memory.");
+		"kcp_fec_timeout", "1000", FCVAR_NONE, "miliseconds before FEC drops unused packets, higher is better but consumes more memory.");
 
 	Cvar_kcp_fec_autotune = new ConVar("kcp_fec_autotune", "1", FCVAR_NONE, "controls the FEC autotune.");
 
@@ -435,27 +435,20 @@ UdpSource::~UdpSource()
 	}
 }
 
-int sendto_err_cnt = 0;
+
 
 int UdpSource::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
-	auto sendtoResult = orig_sendto(NetManager::instance()->socket, buf.data(), buf.size(), 0, (const sockaddr*)&ctx.addr, sizeof(sockaddr_in6));
+	int sendtoResult;
+	{
+		std::unique_lock lk(sendMutex);
+		sendtoResult =
+			orig_sendto(NetManager::instance()->socket, buf.data(), buf.size(), 0, (const sockaddr*)&ctx.addr, sizeof(sockaddr_in6));
+	}
 	if (sendtoResult == SOCKET_ERROR)
 	{
 		int err = WSAGetLastError();
-		if (err == 10035)
-		{
-			sendto_err_cnt++;
-			if (sendto_err_cnt > 1000)
-			{
-				NS::log::NEW_NET->error("[UdpSource] sendto: Send buffer excceeded size limit. (clamped*1000)");
-				sendto_err_cnt = 0;
-			}
-		}
-		else
-		{
-			NS::log::NEW_NET->error("[UdpSource] sendto -> {} socket error {} ",ctx,err);
-		}
+		NS::log::NEW_NET->error("[UdpSource] sendto -> {} socket error {} ",ctx,err);
 	}
 	return sendtoResult;
 }
@@ -1014,7 +1007,7 @@ KcpLayer::KcpLayer(const NetContext& ctx)
 	cb = ikcp_create(0, this);
 	cb->output = kcpOutput;
 
-	ikcp_nodelay(cb, 1, 10, 2, 1);
+	ikcp_nodelay(cb, 1, 10, 1, 1);
 	cb->interval = Cvar_kcp_timer_resolution->GetInt();
 
 	remoteAddr = ctx;
@@ -1027,10 +1020,6 @@ KcpLayer::~KcpLayer()
 	if (updateThread.joinable())
 	{
 		updateThread.join();
-	}
-	else
-	{
-		NS::log::NEW_NET->error("[KcpLayer] KcpLayer::~KcpLayer() Attempted to join a thread of id 0!");
 	}
 
 	ikcp_release(cb);

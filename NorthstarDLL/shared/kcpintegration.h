@@ -267,7 +267,6 @@ class NetManager
 		routingTable;
 
 	SOCKET socket = NULL;
-
   private:
 	std::jthread recycleThread;
 
@@ -323,6 +322,7 @@ class UdpSource : public NetSource
 
   private:
 	std::jthread selectThread;
+	std::mutex sendMutex;
 
 	UdpSource();
 };

@@ -54,6 +54,7 @@ const ImWchar* GetGlyphRangesFontAwesome()
 
 static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
 {
+	return originalPresent(pSwapChain, SyncInterval, Flags);
 	auto& igig = ImGuiManager::instance();
 	if (!igig.init)
 	{
@@ -123,8 +124,12 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 	ImGui::EndFrame();
 	ImGui::Render();
 
+	
+
 	auto pMainRenderTargetView = igig.mainRenderTargetView.get();
 	igig.pContext->OMSetRenderTargets(1, &pMainRenderTargetView, NULL);
+	//const float clearColor[] = {1.0f, 1.0f, 0.0f, 1.0f};
+	//igig.pContext->ClearRenderTargetView(pMainRenderTargetView, clearColor);
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 	
 	return originalPresent(pSwapChain, SyncInterval, Flags);
@@ -145,6 +150,11 @@ void ImGuiManager::startInitThread()
 				if (kiero::bind(8, (void**)&originalPresent, hookedPresent) != kiero::Status::Success)
 				{
 					spdlog::error("[IGIG] Kiero bind failed");
+					break;
+				}
+				else
+				{
+					spdlog::info("[IGIG] Kiero bind succeeded");
 					break;
 				}
 				break;
