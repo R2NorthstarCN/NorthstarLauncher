@@ -245,25 +245,32 @@ class NetSink
 	virtual bool initialized(int from) = 0;
 };
 
+struct NetConnection
+{
+	std::shared_ptr<NetSink> sink;
+	std::shared_ptr<NetSource> source;
+	IUINT32 lastSeen;
+	bool disconnected;
+};
+
 class NetManager
 {
   public:
 	~NetManager();
 	static NetManager* instance();
 
-	std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> initAndBind(const NetContext& ctx);
-	std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> initAndBind(
+	NetConnection initAndBind(const NetContext& ctx);
+	NetConnection initAndBind(
 		const NetContext& ctx,
 		std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> (*connectionInitFunc)(const sockaddr_in6& addr));
-	void bind(const NetContext& ctx, std::shared_ptr<NetSink> inboundDst, std::shared_ptr<NetSource> outboundDst);
-	std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>> route(const NetContext& ctx);
+	std::optional<NetConnection> route(const NetContext& ctx);
 	void updateLastSeen(const NetContext& ctx);
 
 	friend void recycleThreadPayload(std::stop_token stoken);
 
 	// Only locked exclusively when disconnecting.
 	std::shared_mutex routingTableMutex;
-	Concurrency::concurrent_unordered_map<NetContext, std::pair<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>, IUINT32>>
+	Concurrency::concurrent_unordered_map<NetContext, NetConnection>
 		routingTable;
 
 	SOCKET socket = NULL;
@@ -444,3 +451,31 @@ class MuxLayer : public NetSource, public NetSink
 	std::unordered_map<IUINT8, std::shared_ptr<NetSink>> topMap;
 	std::unordered_map<uintptr_t, IUINT8> topInverseMap;
 };
+
+typedef void (*MicroPacketProcessFunc)(NetBuffer&&, const NetContext&);
+
+class MicroPacketSink : public NetSink
+{
+  public:
+	MicroPacketSink();
+	~MicroPacketSink();
+
+	static std::shared_ptr<MicroPacketSink> instance();
+
+	virtual int input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom);
+	virtual bool initialized(int from);
+
+	void bindOpcode(uint32_t opcode, MicroPacketProcessFunc func);
+	void sendMicroPacket(uint32_t opcode, NetBuffer&& payload, const NetContext& ctx);
+
+private:
+	std::unordered_map<uint32_t, MicroPacketProcessFunc> funcMap;
+};
+
+enum MicroPacketOpcode
+{
+	RESERVED,
+	CLIENT_DISCONNECTING
+};
+
+void onClientDisconnecting(NetBuffer&& buf, const NetContext& ctx);

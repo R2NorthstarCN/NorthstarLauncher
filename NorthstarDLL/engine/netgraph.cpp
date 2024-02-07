@@ -23,14 +23,14 @@ void sendThreadPayload(std::stop_token stoken, NetGraphSink* ng)
 		std::shared_lock lk(manager->routingTableMutex);
 		for (const auto& entry : manager->routingTable)
 		{
-			if (itimediff(iclock(), entry.second.second) > lastSeenInterval)
+			if (entry.second.disconnected || itimediff(iclock(), entry.second.lastSeen) > lastSeenInterval)
 			{
 				continue;
 			}
 			NetBuffer buf(128, 0, 128);
 			std::shared_lock lk(ng->windowsMutex);
 			std::get<0>(ng->windows[entry.first]).encode(buf);
-			entry.second.first.second->sendto(std::move(buf), entry.first, NetGraphSink::instance().get());
+			entry.second.source->sendto(std::move(buf), entry.first, NetGraphSink::instance().get());
 		}
 	}
 }

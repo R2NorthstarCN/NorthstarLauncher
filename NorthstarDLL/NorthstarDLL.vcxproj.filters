@@ -381,6 +381,9 @@
     <ClInclude Include="client\igig\kiero.h">
       <Filter>Header Files\client\igig</Filter>
     </ClInclude>
+    <ClInclude Include="engine\disconnecthook.h">
+      <Filter>Header Files\engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">
@@ -694,6 +697,9 @@
     </ClCompile>
     <ClCompile Include="client\igig\kiero.cpp">
       <Filter>Source Files\client\igig</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\disconnecthook.cpp">
+      <Filter>Source Files\engine</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

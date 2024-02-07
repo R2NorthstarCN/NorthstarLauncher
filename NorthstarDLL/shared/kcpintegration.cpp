@@ -9,12 +9,14 @@
 ConVar* Cvar_kcp_timer_resolution;
 ConVar* Cvar_kcp_select_timeout;
 ConVar* Cvar_kcp_conn_timeout;
+ConVar* Cvar_kcp_conn_grace_period;
 ConVar* Cvar_kcp_fec;
 ConVar* Cvar_kcp_fec_timeout;
 ConVar* Cvar_kcp_fec_rx_multi;
 ConVar* Cvar_kcp_fec_autotune;
 ConVar* Cvar_kcp_fec_send_data_shards;
 ConVar* Cvar_kcp_fec_send_parity_shards;
+
 
 AUTOHOOK_INIT()
 
@@ -55,10 +57,12 @@ int WSAAPI de_bind(_In_ SOCKET s, _In_reads_bytes_(namelen) const struct sockadd
 		if (ntohs(bindAddr->sin6_port) == localPort)
 		{
 			NetManager::instance()->socket = s;
+
 			if (UdpSource::instance()->initialized(FROM_CAL))
 			{
 				NS::log::NEW_NET->info("[NetManager] Triggered UdpSource thread");
 			}
+
 			DWORD origSndbuf = 0;
 			int sndbufLen = sizeof(DWORD);
 			getsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&origSndbuf, &sndbufLen);
@@ -68,6 +72,8 @@ int WSAAPI de_bind(_In_ SOCKET s, _In_reads_bytes_(namelen) const struct sockadd
 			setsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&newSndbuf, sndbufLen);
 			getsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&newSndbuf, &sndbufLen);
 			NS::log::NEW_NET->info("[NetManager] Bind on localhost:{}@{} with sndbuf {} -> {}", localPort, s, origSndbuf, newSndbuf);
+
+			MicroPacketSink::instance()->bindOpcode(MicroPacketOpcode::CLIENT_DISCONNECTING, onClientDisconnecting);
 		}
 	}
 	return result;
@@ -140,7 +146,9 @@ ON_DLL_LOAD_RELIESON("engine.dll", WSAHOOKS, ConVar, (CModule module))
 	Cvar_kcp_select_timeout =
 		new ConVar("kcp_select_timeout", "5", FCVAR_NONE, "miliseconds select has to wait, lower is better but consumes more CPU.");
 
-	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "10000", FCVAR_NONE, "miliseconds before a connection is dropped.");
+	Cvar_kcp_conn_timeout = new ConVar("kcp_conn_timeout", "30000", FCVAR_NONE, "miliseconds before a connection is dropped.");
+
+	Cvar_kcp_conn_grace_period = new ConVar("kcp_conn_grace_period", "1000", FCVAR_NONE, "miliseconds before a disconnected connection is cleaned.");
 
 	Cvar_kcp_fec = new ConVar("kcp_fec", "1", FCVAR_NONE, "whether to enable FEC or not.");
 
@@ -246,11 +254,22 @@ void recycleThreadPayload(std::stop_token stoken)
 		auto current = iclock();
 		for (const auto& entry : NetManager::instance()->routingTable)
 		{
-			if (itimediff(current, entry.second.second) > Cvar_kcp_conn_timeout->GetInt())
+			if (entry.second.disconnected)
 			{
-				removes.push_back(entry.first);
+				if (itimediff(current, entry.second.lastSeen) > Cvar_kcp_conn_grace_period->GetInt())
+				{
+					removes.push_back(entry.first);
+				}
+			}
+			else
+			{
+				if (itimediff(current, entry.second.lastSeen) > Cvar_kcp_conn_timeout->GetInt())
+				{
+					removes.push_back(entry.first);
+				}
 			}
 		}
+
 		for (const auto& removal : removes)
 		{
 			NS::log::NEW_NET->info("[NetManager] Disconnecting with {}", removal);
@@ -292,6 +311,7 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDe
 
 	mux->bindTop(0, std::static_pointer_cast<NetSink>(GameSink::instance()));
 	mux->bindTop(1, std::static_pointer_cast<NetSink>(NetGraphSink::instance()));
+	mux->bindTop(2, std::static_pointer_cast<NetSink>(MicroPacketSink::instance()));
 	mux->bindBottom(std::static_pointer_cast<NetSource>(kcp));
 	std::shared_ptr<FecLayer> fec =
 		std::shared_ptr<FecLayer>(new FecLayer(Cvar_kcp_fec_send_data_shards->GetInt(), Cvar_kcp_fec_send_parity_shards->GetInt(), 3, 2));
@@ -304,36 +324,32 @@ std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> connectionInitDe
 	return std::make_pair(std::static_pointer_cast<NetSink>(fec), std::static_pointer_cast<NetSource>(mux));
 }
 
-std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(const NetContext& ctx)
+NetConnection NetManager::initAndBind(const NetContext& ctx)
 {
 	return initAndBind(ctx, connectionInitDefault);
 }
 
-std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> NetManager::initAndBind(
+NetConnection NetManager::initAndBind(
 	const NetContext& ctx,
 	std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>> (*connectionInitFunc)(const sockaddr_in6& addr))
 {
-	auto result = connectionInitFunc(ctx.addr);
-	bind(ctx, result.first, result.second);
-	return result;
-}
-
-void NetManager::bind(const NetContext& ctx, std::shared_ptr<NetSink> inboundDst, std::shared_ptr<NetSource> outboundDst)
-{
 	NS::log::NEW_NET->info("[NetManager] Accepting new connection with {}", ctx);
 	std::shared_lock routingTableLock(routingTableMutex);
-	routingTable.insert(std::make_pair(ctx, std::make_pair(std::make_pair(inboundDst, outboundDst), iclock())));
+	auto result = connectionInitFunc(ctx.addr);
+	NetConnection conn = {result.first, result.second, iclock(), false};
+	routingTable.insert(std::make_pair(ctx, conn));
+	return conn;
 }
 
-std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>> NetManager::route(const NetContext& ctx)
+std::optional<NetConnection> NetManager::route(const NetContext& ctx)
 {
 	std::shared_lock routingTableLock(routingTableMutex);
 	auto it = routingTable.find(ctx);
 	if (it == routingTable.end())
 	{
-		return std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>>();
+		return std::optional<NetConnection>();
 	}
-	return std::optional<std::pair<std::shared_ptr<NetSink>, std::shared_ptr<NetSource>>>((*it).second.first);
+	return std::optional<NetConnection>((*it).second);
 }
 
 void NetManager::updateLastSeen(const NetContext& ctx)
@@ -342,7 +358,7 @@ void NetManager::updateLastSeen(const NetContext& ctx)
 	auto it = routingTable.find(ctx);
 	if (it != routingTable.end())
 	{
-		(*it).second.second = iclock();
+		(*it).second.lastSeen = iclock();
 	}
 }
 
@@ -398,9 +414,9 @@ void selectThreadPayload(std::stop_token stoken)
 		auto route =
 			NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
 		
-		if (route->first->initialized(FROM_CAL))
+		if (route->sink->initialized(FROM_CAL))
 		{
-			route->first->input(NetBuffer(buf), ctx, UdpSource::instance().get());
+			route->sink->input(NetBuffer(buf), ctx, UdpSource::instance().get());
 		}
 		else
 		{
@@ -426,8 +442,6 @@ UdpSource::~UdpSource()
 		NS::log::NEW_NET->error("[UdpSource]UdpSource::~UdpSource() Tries to join a thread of id 0!");
 	}
 }
-
-
 
 int UdpSource::sendto(NetBuffer&& buf, const NetContext& ctx, const NetSink* top)
 {
@@ -525,10 +539,10 @@ int GameSink::sendto(
 
 	auto route = NetManager::instance()->route(ctx).or_else([&ctx]() { return std::optional(NetManager::instance()->initAndBind(ctx)); });
 
-	if (route->second->initialized(FROM_CAL))
+	if (route->source->initialized(FROM_CAL))
 	{
 		NetManager::instance()->updateLastSeen(ctx);
-		return route->second->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
+		return route->source->sendto(NetBuffer(buf, len), ctx, GameSink::instance().get());
 	}
 	else
 	{
@@ -1175,4 +1189,70 @@ void MuxLayer::bindTop(IUINT8 channelId, std::shared_ptr<NetSink> top)
 void MuxLayer::bindBottom(std::weak_ptr<NetSource> bottom)
 {
 	this->bottom = bottom;
+}
+
+MicroPacketSink::MicroPacketSink() {}
+
+MicroPacketSink::~MicroPacketSink() {}
+
+int MicroPacketSink::input(NetBuffer&& buf, const NetContext& ctx, const NetSource* bottom)
+{
+	if (buf.size() < 4)
+	{
+		NS::log::NEW_NET->warn("[MicroPacketSink] Spurious micro packet received: insufficient size");
+	}
+	else
+	{
+		uint32_t opcode = buf.getU32H();
+		auto it = funcMap.find(opcode);
+		if (it == funcMap.end())
+		{
+			NS::log::NEW_NET->warn("[MicroPacketSink] Spurious micro packet received: unknown opcode");
+		}
+		else
+		{
+			it->second(std::move(buf), ctx);
+		}
+	}
+
+	return 0;
+}
+
+bool MicroPacketSink::initialized(int from)
+{
+	return true;
+}
+
+std::shared_ptr<MicroPacketSink> MicroPacketSink::instance()
+{
+	static std::shared_ptr<MicroPacketSink> singleton = std::shared_ptr<MicroPacketSink>(new MicroPacketSink());
+	return singleton;
+}
+
+void MicroPacketSink::bindOpcode(uint32_t opcode, MicroPacketProcessFunc func) {
+	funcMap.insert(std::make_pair(opcode, func));
+}
+
+void MicroPacketSink::sendMicroPacket(uint32_t opcode, NetBuffer&& payload, const NetContext& ctx)
+{
+	auto nm = NetManager::instance();
+	auto route = nm->route(ctx);
+	if (route.has_value())
+	{
+		payload.putU32H(opcode);
+		route->source->sendto(std::move(payload), ctx, this);
+	}
+}
+
+// opcode 0x1
+void onClientDisconnecting(NetBuffer&& buf, const NetContext& ctx)
+{
+	NS::log::NEW_NET->info("[MicroPacketSink] Client is disconnecting: {}", ctx);
+	auto nm = NetManager::instance();
+	std::shared_lock lk(nm->routingTableMutex);
+	auto route = nm->routingTable.find(ctx);
+	if (route != nm->routingTable.end())
+	{
+		route->second.disconnected = true;
+	}
 }
