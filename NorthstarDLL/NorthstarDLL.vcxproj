@@ -216,6 +216,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClInclude Include="core\sourceinterface.h" />
     <ClInclude Include="core\structs.h" />
     <ClInclude Include="core\tier0.h" />
+    <ClInclude Include="core\vanilla.h" />
     <ClInclude Include="dedicated\dedicated.h" />
     <ClInclude Include="dedicated\dedicatedlogtoclient.h" />
     <ClInclude Include="dllmain.h" />
@@ -234,6 +235,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClInclude Include="logging\logging.h" />
     <ClInclude Include="logging\loghooks.h" />
     <ClInclude Include="logging\sourceconsole.h" />
+    <ClInclude Include="masterserver\cabundle.h" />
     <ClInclude Include="masterserver\masterserver.h" />
     <ClInclude Include="mods\modmanager.h" />
     <ClInclude Include="mods\modsavefiles.h" />

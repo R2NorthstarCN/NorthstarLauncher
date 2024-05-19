@@ -1,6 +1,7 @@
 #include "masterserver/masterserver.h"
 #include "core/convar/convar.h"
 #include "client/r2client.h"
+#include "core/vanilla.h"
 
 AUTOHOOK_INIT()
 
@@ -16,6 +17,15 @@ AUTOHOOK(AuthWithStryder, engine.dll + 0x1843A0,
 void, __fastcall, (void* a1))
 // clang-format on
 {
+
+	// don't attempt to do Atlas auth if we are in vanilla compatibility mode
+	// this prevents users from joining untrustworthy servers (unless they use a concommand or something)
+	if (g_pVanillaCompatibility->GetVanillaCompatibility())
+	{
+		AuthWithStryder(a1);
+		return;
+	}
+
 	// spdlog::info("IS THIS EVEN FUCKING CALLED????");
 	//  game will call this forever, until it gets a valid auth key
 	//  so, we need to manually invalidate our key until we're authed with northstar, then we'll allow game to auth with stryder
@@ -40,7 +50,7 @@ AUTOHOOK(Auth3PToken, engine.dll + 0x183760,
 char*, __fastcall, ())
 // clang-format on
 {
-	if (!g_pMasterServerManager->m_sOwnClientAuthToken.empty())
+	if (!g_pMasterServerManager->m_sOwnClientAuthToken.empty() && !g_pVanillaCompatibility->GetVanillaCompatibility() )
 	{
 		memset(p3PToken, 0x0, 1024);
 		strcpy(p3PToken, "Protocol 3: Protect the Pilot");

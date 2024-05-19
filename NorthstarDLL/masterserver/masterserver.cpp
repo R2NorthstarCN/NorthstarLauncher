@@ -22,6 +22,8 @@
 #include "scripts/scriptgamestate.h"
 #include "scripts/scriptmatchmakingevents.h"
 #include "nlohmann/json.hpp"
+#include "masterserver/cabundle.h"
+#include "core/vanilla.h"
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
 ClientAnticheatSystem g_ClientAnticheatSystem;
@@ -85,6 +87,7 @@ void SetCommonHttpClientOptions(CURL* curl)
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 }
 
+
 httplib::Client SetupHttpClient()
 {
 	std::string ms_addr = Cvar_ns_masterserver_hostname->GetString();
@@ -95,6 +98,9 @@ httplib::Client SetupHttpClient()
 	cli.set_decompress(true);
 	cli.set_read_timeout(10, 0);
 	cli.set_write_timeout(10, 0);
+	//cli.enable_server_certificate_verification(false);
+	cli.load_ca_cert_store(cabundle, sizeof(cabundle));
+	//cli.set_ca_cert_path("ca-bundle.crt");
 	if (!strstr(GetCommandLineA(), "-disabledoh"))
 	{
 		std::string doh_result = g_DohWorker->GetDOHResolve(ms_addr);
@@ -393,7 +399,7 @@ bool MasterServerManager::SetLocalPlayerClanTag(const std::string clantag)
 
 void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, const char* originToken)
 {
-	if (m_bOriginAuthWithMasterServerInProgress)
+	if (m_bOriginAuthWithMasterServerInProgress || g_pVanillaCompatibility->GetVanillaCompatibility())
 		return;
 
 	// do this here so it's instantly set
@@ -594,8 +600,9 @@ void MasterServerManager::RequestMainMenuPromos()
 
 void MasterServerManager::AuthenticateWithOwnServer(const char* uid, const std::string& playerToken)
 {
+
 	// don't wait, just stop if we're trying to do 2 auth requests at once
-	if (m_bAuthenticatingWithGameServer)
+	if (m_bAuthenticatingWithGameServer || g_pVanillaCompatibility->GetVanillaCompatibility())
 		return;
 
 	m_sAuthFailureReason = "No error message provided";
@@ -676,7 +683,7 @@ void MasterServerManager::AuthenticateWithServer(
 	const char* uid, const std::string& playerToken, const std::string& serverId, const char* password)
 {
 	// dont wait, just stop if we're trying to do 2 auth requests at once
-	if (m_bAuthenticatingWithGameServer)
+	if (m_bAuthenticatingWithGameServer|| g_pVanillaCompatibility->GetVanillaCompatibility())
 		return;
 	m_sAuthFailureReason = "No error message provided";
 	m_sAuthFailureMessage = "No error message provided";
@@ -1070,8 +1077,8 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 			{
 				spdlog::error(
 					"Failed adding self to server list: error {}",
-					res.error() == httplib::Error::Success ? fmt::format("{} {}", res->status, res->body)
-														   : std::to_string(static_cast<int>(res.error())));
+					std::to_string(static_cast<int>(res.error())));
+				spdlog::error("res:{}", res->body);
 				return return_cleanup(MasterServerReportPresenceResult::FailedNoConnect);
 			}
 		});

@@ -6,6 +6,7 @@
 #include "engine/r2engine.h"
 #include "core/tier0.h"
 #include "mods/modsavefiles.h"
+#include "core/vanilla.h"
 #include <any>
 
 AUTOHOOK_INIT()
@@ -208,6 +209,9 @@ template <ScriptContext context> void SquirrelManager<context>::VMCreated(CSquir
 		defconst(m_pSQVM, pair.first.c_str(), bWasFound);
 	}
 	defconst(m_pSQVM, "MAX_FOLDER_SIZE", GetMaxSaveFolderSize() / 1024);
+
+	// define squirrel constant for if we are in vanilla-compatibility mode
+	defconst(m_pSQVM, "VANILLA", g_pVanillaCompatibility->GetVanillaCompatibility());
 	g_pSquirrel<context>->messageBuffer = new SquirrelMessageBuffer();
 }
 

@@ -384,6 +384,12 @@
     <ClInclude Include="engine\disconnecthook.h">
       <Filter>Header Files\engine</Filter>
     </ClInclude>
+    <ClInclude Include="masterserver\cabundle.h">
+      <Filter>Header Files\masterserver</Filter>
+    </ClInclude>
+    <ClInclude Include="core\vanilla.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="client\audio.cpp">

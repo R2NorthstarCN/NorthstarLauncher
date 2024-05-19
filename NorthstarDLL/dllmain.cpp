@@ -8,6 +8,7 @@
 #include "util/version.h"
 #include "squirrel/squirrel.h"
 #include "client/igig/igig.h"
+#include "core/vanilla.h"
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
@@ -161,6 +162,13 @@ bool InitialiseNorthstar()
 	curl_global_init_mem(CURL_GLOBAL_DEFAULT, _malloc_base, _free_base, _realloc_base, _strdup_base, _calloc_base);
 
 	InitialiseCrashHandler();
+
+	
+	// determine if we are in vanilla-compatibility mode
+	g_pVanillaCompatibility = new VanillaCompatibility();
+	g_pVanillaCompatibility->SetVanillaCompatibility(strstr(GetCommandLineA(), "-vanilla") != NULL);
+
+
 	InstallInitialHooks();
 	CreateLogFiles();
 
