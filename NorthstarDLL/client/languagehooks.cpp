@@ -41,8 +41,12 @@ std::vector<std::string> file_list(fs::path dir, std::regex ext_pattern)
 std::string GetAnyInstalledAudioLanguage()
 {
 	for (const auto& lang : file_list("r2\\sound\\", std::regex(".*?general_([a-z]+)_patch_1\\.mstr")))
-		if (lang != "general" || lang != "")
+	{
+		//spdlog::info("Lang: {}({}:{})", lang, lang.size(), std::string("stream").size());
+		if (lang != "general" && lang != "" && lang != "stream")
 			return lang;
+	}
+
 	return "NO LANGUAGE DETECTED";
 }
 
@@ -79,10 +83,11 @@ char*, __fastcall, ())
 		auto lang = GetGameLanguage();
 		if (!CheckLangAudioExists(lang))
 		{
-			if (strcmp(lang, "russian") !=
-				0) // don't log for "russian" since it's the default and that means Origin detection just didn't change it most likely
+			if (strcmp(lang, "russian") != 0)
+			{ // don't log for "russian" since it's the default and that means Origin detection just didn't change it most likely
 				spdlog::info(
 					"Origin detected language \"{}\", but we do not have audio for it installed, falling back to the next option", lang);
+			}
 		}
 		else
 		{

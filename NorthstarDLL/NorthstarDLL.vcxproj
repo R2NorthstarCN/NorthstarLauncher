@@ -304,6 +304,7 @@ IF EXIST "$(SolutionDir)..\NorthstarCN_Binaries\Northstar.dll" del "$(SolutionDi
     <ClCompile Include="core\math\color.cpp" />
     <ClCompile Include="core\memalloc.cpp" />
     <ClCompile Include="core\memory.cpp" />
+    <ClCompile Include="core\origincheck.cpp" />
     <ClCompile Include="core\sourceinterface.cpp" />
     <ClCompile Include="core\tier0.cpp" />
     <ClCompile Include="dedicated\dedicated.cpp" />

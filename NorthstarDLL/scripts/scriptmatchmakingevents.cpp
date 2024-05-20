@@ -7,6 +7,7 @@
 #include "scriptmasterservermessages.h"
 #include "scriptmatchmakingevents.h"
 #include "core/tier0.h"
+#include "core/vanilla.h"
 
 #define NSCN_MATCHMAKING
 
@@ -227,9 +228,9 @@ AUTOHOOK(CCLIENT__GetMyMatchmakingStatus, client.dll + 0x3B1B70, SQRESULT, __fas
 
 ON_DLL_LOAD_CLIENT_RELIESON("client.dll", ScriptMatchmakingEvents, ClientSquirrel, (CModule module))
 {
-	if (Tier0::CommandLine()->CheckParm("-norestrictservercommands"))
+	if (g_pVanillaCompatibility->GetVanillaCompatibility())
 	{
-		spdlog::info("[Matchmaker] NSCN Matchmaker is disabled! (found -norestrictservercommands)");
+		spdlog::info("[Matchmaker] NSCN Matchmaker is disabled! (found -vanilla)");
 		return;
 	}
 	AUTOHOOK_DISPATCH();

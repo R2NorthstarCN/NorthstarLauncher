@@ -9,6 +9,7 @@ namespace Tier0
 	CommandLineType CommandLine;
 	Plat_FloatTimeType Plat_FloatTime;
 	ThreadInServerFrameThreadType ThreadInServerFrameThread;
+	Tier0_GetOriginStartupResultType Tier0_GetOriginStartupResult;
 } // namespace Tier0
 
 typedef Tier0::IMemAlloc* (*CreateGlobalMemAllocType)();
@@ -33,4 +34,5 @@ ON_DLL_LOAD("tier0.dll", Tier0GameFuncs, (CModule module))
 	Tier0::CommandLine = module.GetExport("CommandLine").As<Tier0::CommandLineType>();
 	Tier0::Plat_FloatTime = module.GetExport("Plat_FloatTime").As<Tier0::Plat_FloatTimeType>();
 	Tier0::ThreadInServerFrameThread = module.GetExport("ThreadInServerFrameThread").As<Tier0::ThreadInServerFrameThreadType>();
+	Tier0::Tier0_GetOriginStartupResult = module.GetExport("Tier0_GetOriginStartupResult").As<Tier0::Tier0_GetOriginStartupResultType>();
 }

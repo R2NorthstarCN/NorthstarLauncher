@@ -63,6 +63,9 @@ namespace Tier0
 
 	typedef bool (*ThreadInServerFrameThreadType)();
 	extern ThreadInServerFrameThreadType ThreadInServerFrameThread;
+
+	typedef __int64 (*Tier0_GetOriginStartupResultType)();
+	extern Tier0_GetOriginStartupResultType Tier0_GetOriginStartupResult;
 } // namespace Tier0
 
 void TryCreateGlobalMemAlloc();
