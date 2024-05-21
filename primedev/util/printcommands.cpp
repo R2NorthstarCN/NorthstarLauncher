@@ -234,12 +234,12 @@ void ConCommand_differences(const CCommand& arg)
 			continue;
 		}
 
-		if (strcmp(cvar->GetString(), "FCVAR_NEVER_AS_STRING") == NULL)
+		if (strcmp(cvar->GetString(), "FCVAR_NEVER_AS_STRING") == 0)
 		{
 			continue;
 		}
 
-		if (strcmp(cvar->GetString(), cvar->m_pszDefaultValue) == NULL)
+		if (strcmp(cvar->GetString(), cvar->m_pszDefaultValue) == 0)
 		{
 			continue;
 		}

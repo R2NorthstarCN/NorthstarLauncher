@@ -48,6 +48,8 @@ EventOverrideData::EventOverrideData(const std::string& data, const fs::path& pa
 		return;
 	}
 
+	
+
 	rapidjson_document dataJson;
 	dataJson.Parse<rapidjson::ParseFlag::kParseCommentsFlag | rapidjson::ParseFlag::kParseTrailingCommasFlag>(data);
 

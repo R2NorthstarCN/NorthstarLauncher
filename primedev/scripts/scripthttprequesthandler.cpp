@@ -278,7 +278,7 @@ template <ScriptContext context> int HttpRequestHandler::MakeHttpRequest(const H
 			}
 
 			// Ensure we only allow HTTP or HTTPS.
-			curl_easy_setopt(curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+			curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
 
 			// Allow redirects
 			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
