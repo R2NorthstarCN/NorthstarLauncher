@@ -143,10 +143,10 @@ ON_DLL_LOAD_DEDI_RELIESON("engine.dll", DedicatedServer, ServerPresence, (CModul
 		CMemory base = module.Offset(0x1C4EBD);
 
 		// cmp => mov
-		base.Offset(1).Patch("C6 87");
+		base.Offset(1).PatchLiteral("C6 87");
 
 		// 00 => 01
-		base.Offset(7).Patch("01");
+		base.Offset(7).PatchLiteral("01");
 	}
 
 	// Some init that i'm not sure of that crashes
@@ -187,7 +187,7 @@ ON_DLL_LOAD_DEDI_RELIESON("engine.dll", DedicatedServer, ServerPresence, (CModul
 
 	// func that checks if origin is inited
 	// always return 1
-	module.Offset(0x183B70).Patch("B0 01 C3"); // mov al,01 ret
+	module.Offset(0x183B70).PatchLiteral("B0 01 C3"); // mov al,01 ret
 
 	// HostState_State_ChangeLevel
 	// nop clientinterface call
@@ -267,7 +267,7 @@ ON_DLL_LOAD_DEDI("tier0.dll", DedicatedServerOrigin, (CModule module))
 	// disable origin on dedicated
 	// for any big ea lawyers, this can't be used to play the game without origin, game will throw a fit if you try to do anything without
 	// an origin id as a client for dedi it's fine though, game doesn't care if origin is disabled as long as there's only a server
-	module.GetExportedFunction("Tier0_InitOrigin").Patch("C3");
+	module.GetExportedFunction("Tier0_InitOrigin").PatchLiteral("C3");
 }
 
 // clang-format off
@@ -293,8 +293,8 @@ ON_DLL_LOAD_DEDI("server.dll", DedicatedServerGameDLL, (CModule module))
 
 	if (CommandLine()->CheckParm("-nopakdedi"))
 	{
-		module.Offset(0x6BA350).Patch("C3"); // dont load skins.rson from rpak if we don't have rpaks, as loading it will cause a crash
-		module.Offset(0x6BA300).Patch(
+		module.Offset(0x6BA350).PatchLiteral("C3"); // dont load skins.rson from rpak if we don't have rpaks, as loading it will cause a crash
+		module.Offset(0x6BA300).PatchLiteral(
 			"B8 C8 00 00 00 C3"); // return 200 as the number of skins from server.dll + 6BA300, this is the normal value read from
 								  // skins.rson and should be updated when we need it more modular
 	}

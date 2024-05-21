@@ -1,9 +1,4 @@
 if(NOT minizip-ng_FOUND)
-
-    # zlib 1.3.1 had a cmake change that broke stuff, so this branch on our fork reverts that one commit :)
-    set(ZLIB_TAG "develop")
-    set(ZLIB_REPOSITORY "https://github.com/madler/zlib")
-
     check_init_submodule(${PROJECT_SOURCE_DIR}/thirdparty/minizip-ng)
 
     set(MZ_ZLIB
@@ -34,8 +29,6 @@ if(NOT minizip-ng_FOUND)
         OFF
         CACHE BOOL "Disable zip signing support"
         )
-
-    set(MZ_FORCE_FETCH_LIBS ON)
 
     add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/minizip-ng minizip-ng)
     set(minizip-ng_FOUND

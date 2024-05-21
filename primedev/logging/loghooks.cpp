@@ -90,7 +90,7 @@ void,, (BFRead* msg))
 		break;
 
 	default:
-		spdlog::warn("Unimplemented TextMsg type {}! printing to console", msg_dest);
+		spdlog::warn("Unimplemented TextMsg type {}! printing to console", (int)msg_dest);
 		[[fallthrough]];
 
 	case TextMsgPrintType_t::HUD_PRINTCONSOLE:

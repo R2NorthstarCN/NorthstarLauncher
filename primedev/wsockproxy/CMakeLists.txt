@@ -12,7 +12,9 @@ add_library(
 
 target_link_libraries(
     loader_wsock32_proxy
-    PRIVATE minhook
+    PRIVATE 
+            -Wl,-Bstatic
+            minhook
             mswsock.lib
             ws2_32.lib
             ShLwApi.lib

@@ -36,7 +36,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 	return TRUE;
 }
 
-bool InitialiseNorthstar()
+extern "C" bool InitialiseNorthstar()
 {
 	static bool bInitialised = false;
 	if (bInitialised)

@@ -62,7 +62,7 @@ int GetMaxPlayers()
 
 template <class T> void ChangeOffset(CMemory addr, unsigned int offset)
 {
-	addr.Patch((BYTE*)&offset, sizeof(T));
+	addr.PatchBytes((BYTE*)&offset, sizeof(T));
 }
 
 // clang-format off
@@ -91,7 +91,7 @@ ON_DLL_LOAD("engine.dll", MaxPlayersOverride_Engine, (CModule module))
 	AUTOHOOK_DISPATCH_MODULE(engine.dll)
 
 	// patch GetPlayerLimits to ignore the boundary limit
-	module.Offset(0x116458).Patch("0xEB"); // jle => jmp
+	module.Offset(0x116458).PatchLiteral("0xEB"); // jle => jmp
 
 	// patch ED_Alloc to change nFirstIndex
 	ChangeOffset<int>(module.Offset(0x18F46C + 1), NEW_MAX_PLAYERS + 8 + 1); // original: 41 (sv.GetMaxClients() + 1)
@@ -122,7 +122,7 @@ ON_DLL_LOAD("engine.dll", MaxPlayersOverride_Engine, (CModule module))
 	ChangeOffset<unsigned char>(module.Offset(0x114C48 + 2), NEW_MAX_PLAYERS); // original: 32
 
 	// do not load prebaked SendTable message list
-	module.Offset(0x75859).Patch("EB"); // jnz -> jmp
+	module.Offset(0x75859).PatchLiteral("EB"); // jnz -> jmp
 }
 
 typedef void (*RunUserCmds_Type)(bool a1, float a2);

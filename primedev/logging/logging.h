@@ -4,6 +4,8 @@
 #include "squirrel/squirrel.h"
 #include "core/math/color.h"
 
+namespace fmt_lib = spdlog::fmt_lib;
+
 void CreateLogFiles();
 void InitialiseLogging();
 void InitialiseConsole();
@@ -61,7 +63,7 @@ public:
 			{
 				sink->log(custom_msg);
 			}
-			SPDLOG_LOGGER_CATCH()
+			SPDLOG_LOGGER_CATCH(msg.source)
 		}
 
 		for (auto& sink : custom_sinks_)
@@ -70,7 +72,7 @@ public:
 			{
 				sink->custom_log(custom_msg);
 			}
-			SPDLOG_LOGGER_CATCH()
+			SPDLOG_LOGGER_CATCH(msg.source)
 		}
 
 		if (should_flush_(custom_msg))

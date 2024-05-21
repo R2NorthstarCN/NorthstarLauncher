@@ -39,8 +39,9 @@ typedef void (*callable_v)(void* v);
 #include "logging/logging.h"
 #include "MinHook.h"
 #include "curl/curl.h"
-#include "silver-bun/module.h"
-#include "silver-bun/memaddr.h"
+#include "silver-bun.h"
 #include "core/hooks.h"
+
+#include <winrt/base.h>
 
 #endif

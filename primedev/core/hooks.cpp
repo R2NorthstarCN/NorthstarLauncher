@@ -285,7 +285,7 @@ AUTOHOOK_ABSOLUTEADDR(_GetCommandLineA, (LPVOID)GetCommandLineA, LPSTR, WINAPI, 
 std::vector<std::string> calledTags;
 void CallLoadLibraryACallbacks(LPCSTR lpLibFileName, HMODULE moduleAddress)
 {
-	CModule cModule(moduleAddress);
+	CModule cModule((uintptr_t) moduleAddress);
 
 	while (true)
 	{
@@ -313,7 +313,7 @@ void CallLoadLibraryACallbacks(LPCSTR lpLibFileName, HMODULE moduleAddress)
 				if (bShouldContinue)
 					continue;
 
-				callbackStruct.callback(moduleAddress);
+				callbackStruct.callback((uintptr_t)moduleAddress);
 				calledTags.push_back(callbackStruct.tag);
 				callbackStruct.called = true;
 			}
@@ -326,7 +326,7 @@ void CallLoadLibraryACallbacks(LPCSTR lpLibFileName, HMODULE moduleAddress)
 
 void CallLoadLibraryWCallbacks(LPCWSTR lpLibFileName, HMODULE moduleAddress)
 {
-	CModule cModule(moduleAddress);
+	CModule cModule((uintptr_t) moduleAddress);
 
 	while (true)
 	{
@@ -354,7 +354,7 @@ void CallLoadLibraryWCallbacks(LPCWSTR lpLibFileName, HMODULE moduleAddress)
 				if (bShouldContinue)
 					continue;
 
-				callbackStruct.callback(moduleAddress);
+				callbackStruct.callback((uintptr_t) moduleAddress);
 				calledTags.push_back(callbackStruct.tag);
 				callbackStruct.called = true;
 			}

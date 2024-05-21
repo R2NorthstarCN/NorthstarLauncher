@@ -1,9 +1,6 @@
 [submodule "thirdparty/spdlog"]
 	path = thirdparty/spdlog
 	url = https://github.com/gabime/spdlog.git
-[submodule "thirdparty/silver-bun"]
-	path = thirdparty/silver-bun
-	url = https://github.com/IcePixelx/silver-bun.git
 [submodule "thirdparty/rapidjson"]
 	path = thirdparty/rapidjson
 	url = https://github.com/Tencent/rapidjson
@@ -16,3 +13,9 @@
 [submodule "thirdparty/minizip-ng"]
 	path = thirdparty/minizip-ng
 	url = https://github.com/zlib-ng/minizip-ng
+[submodule "thirdparty/silver-bun"]
+	path = thirdparty/silver-bun
+	url = https://github.com/WtzLAS/silver-bun
+[submodule "thirdparty/zlib-ng"]
+	path = thirdparty/zlib-ng
+	url = https://github.com/zlib-ng/zlib-ng.git

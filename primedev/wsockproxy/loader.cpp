@@ -10,7 +10,7 @@
 namespace fs = std::filesystem;
 
 static wchar_t northstarPath[8192];
-static wchar_t exePath[4096];
+wchar_t exePath[4096];
 
 bool GetExePathWide(wchar_t* dest, DWORD destSize)
 {

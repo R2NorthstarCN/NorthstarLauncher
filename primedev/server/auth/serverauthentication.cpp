@@ -364,17 +364,17 @@ ON_DLL_LOAD_RELIESON("engine.dll", ServerAuthentication, (ConCommand, ConVar), (
 		"ns_resetpersistence", ConCommand_ns_resetpersistence, "resets your pdata when you next enter the lobby", FCVAR_NONE);
 
 	// patch to disable kicking based on incorrect serverfilter in connectclient, since we repurpose it for use as an auth token
-	module.Offset(0x114655).Patch("EB");
+	module.Offset(0x114655).PatchLiteral("EB");
 
 	// patch to disable fairfight marking players as cheaters and kicking them
-	module.Offset(0x101012).Patch("E9 90 00");
+	module.Offset(0x101012).PatchLiteral("E9 90 00");
 
 	CBaseServer__RejectConnection = module.Offset(0x1182E0).RCast<CBaseServer__RejectConnectionType>();
 
 	if (CommandLine()->CheckParm("-allowdupeaccounts"))
 	{
 		// patch to allow same of multiple account
-		module.Offset(0x114510).Patch("EB");
+		module.Offset(0x114510).PatchLiteral("EB");
 
 		g_pServerAuthentication->m_bAllowDuplicateAccounts = true;
 	}

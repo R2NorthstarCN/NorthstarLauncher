@@ -6,7 +6,7 @@
 #include "plugins/plugins.h"
 #include "plugins/pluginmanager.h"
 
-#include <minidumpapiset.h>
+#include <dbghelp.h>
 
 #define CRASHHANDLER_MAX_FRAMES 32
 #define CRASHHANDLER_GETMODULEHANDLE_FAIL "GetModuleHandleExA failed!"

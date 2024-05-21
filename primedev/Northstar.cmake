@@ -1,5 +1,6 @@
 # NorthstarDLL
 
+find_package(ZLIB REQUIRED)
 find_package(minhook REQUIRED)
 find_package(curl REQUIRED)
 find_package(minizip-ng REQUIRED)
@@ -170,8 +171,12 @@ add_library(
 
 target_link_libraries(
     NorthstarDLL
-    PRIVATE minhook
-            curl
+    PRIVATE -static
+            winpthread
+            stdc++
+            minhook
+            libcurl_static
+            zlibstatic
             minizip
             silver-bun
             RapidJSON
