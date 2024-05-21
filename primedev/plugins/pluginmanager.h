@@ -1,7 +1,6 @@
-#ifndef PLUGIN_MANAGER_H
-#define PLUGIN_MANAGER_H
+#pragma once
 
-#include <windows.h>
+#include "squirrel/squirreldatatypes.h"
 
 class Plugin;
 
@@ -29,5 +28,3 @@ private:
 };
 
 extern PluginManager* g_pPluginManager;
-
-#endif

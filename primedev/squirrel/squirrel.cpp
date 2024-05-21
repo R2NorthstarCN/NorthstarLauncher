@@ -31,19 +31,6 @@ std::shared_ptr<ColoredLogger> getSquirrelLoggerByContext(ScriptContext context)
 	}
 }
 
-namespace NS::log
-{
-	template <ScriptContext context> std::shared_ptr<spdlog::logger> squirrel_logger()
-	{
-		// Switch statements can't be constexpr afaik
-		// clang-format off
-		if constexpr (context == ScriptContext::UI) { return SCRIPT_UI; }
-		if constexpr (context == ScriptContext::CLIENT) { return SCRIPT_CL; }
-		if constexpr (context == ScriptContext::SERVER) { return SCRIPT_SV; }
-		// clang-format on
-	}
-}; // namespace NS::log
-
 const char* GetContextName(ScriptContext context)
 {
 	switch (context)

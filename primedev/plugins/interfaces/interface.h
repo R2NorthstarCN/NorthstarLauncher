@@ -1,5 +1,6 @@
-#ifndef INTERFACE_H
-#define INTERFACE_H
+#pragma once
+
+#include "core/sourceinterface.h"
 
 typedef void* (*InstantiateInterfaceFn)();
 
@@ -35,5 +36,3 @@ public:
 	EXPOSE_SINGLE_INTERFACE_GLOBALVAR(className, interfaceName, versionName, __g_##className##_singleton)
 
 EXPORT void* CreateInterface(const char* pName, InterfaceStatus* pReturnCode);
-
-#endif

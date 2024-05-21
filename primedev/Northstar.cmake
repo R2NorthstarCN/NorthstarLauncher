@@ -191,6 +191,11 @@ target_link_libraries(
             version.lib
     )
 
+target_compile_options(
+    NorthstarDLL
+    PRIVATE -mavx
+)
+
 target_precompile_headers(
     NorthstarDLL
     PRIVATE

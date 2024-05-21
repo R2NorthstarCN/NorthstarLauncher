@@ -39,7 +39,7 @@ public:
 class CGameConsole
 {
 public:
-	virtual ~CGameConsole() = 0;
+	virtual void CGameConsoleDestructor() = 0;
 
 	// activates the console, makes it visible and brings it to the foreground
 	virtual void Activate() = 0;

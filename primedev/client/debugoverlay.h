@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/math/vector.h"
+
 // Render Line
 inline void (*RenderLine)(const Vector3& v1, const Vector3& v2, Color c, bool bZBuffer);
 

@@ -54,7 +54,15 @@ ScriptContext ScriptContextFromString(std::string string);
 
 namespace NS::log
 {
-	template <ScriptContext context> std::shared_ptr<spdlog::logger> squirrel_logger();
+	template <ScriptContext context> inline std::shared_ptr<spdlog::logger> squirrel_logger()
+	{
+		// Switch statements can't be constexpr afaik
+		// clang-format off
+		if constexpr (context == ScriptContext::UI) { return SCRIPT_UI; }
+		if constexpr (context == ScriptContext::CLIENT) { return SCRIPT_CL; }
+		if constexpr (context == ScriptContext::SERVER) { return SCRIPT_SV; }
+		// clang-format on
+	}
 }; // namespace NS::log
 
 // This base class means that only the templated functions have to be rebuilt for each template instance

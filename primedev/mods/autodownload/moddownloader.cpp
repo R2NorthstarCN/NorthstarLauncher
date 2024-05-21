@@ -1,5 +1,7 @@
 #include "moddownloader.h"
 #include "util/utils.h"
+#include "mods/modmanager.h"
+#include "squirrel/squirrel.h"
 #include <rapidjson/fwd.h>
 #include <mz_strm_mem.h>
 #include <mz.h>
