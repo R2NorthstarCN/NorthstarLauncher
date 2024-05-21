@@ -7,6 +7,7 @@ find_package(minizip-ng REQUIRED)
 find_package(silver-bun REQUIRED)
 find_package(rapidjson REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
@@ -181,6 +182,7 @@ target_link_libraries(
         silver-bun
         RapidJSON
         spdlog
+        nlohmann_json
 
         winpthread
         stdc++
