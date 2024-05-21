@@ -33,12 +33,12 @@ message(STATUS "NS: Building to ${NS_BINARY_DIR}")
 list(
     APPEND
     CMAKE_MODULE_PATH
-    "${CMAKE_CURRENT_SOURCE_DIR}/primedev/cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
     )
 include(utils)
 
 include_directories(primedev)
-include_directories(primedev/thirdparty)
+include_directories(thirdparty)
 
 # Targets
 add_subdirectory(primedev)

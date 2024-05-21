@@ -1,9 +1,11 @@
 # NorthstarDLL
 
 find_package(minhook REQUIRED)
-find_package(libcurl REQUIRED)
-find_package(minizip REQUIRED)
+find_package(curl REQUIRED)
+find_package(minizip-ng REQUIRED)
 find_package(silver-bun REQUIRED)
+find_package(rapidjson REQUIRED)
+find_package(spdlog REQUIRED)
 
 add_library(
     NorthstarDLL SHARED
@@ -169,9 +171,11 @@ add_library(
 target_link_libraries(
     NorthstarDLL
     PRIVATE minhook
-            libcurl
+            curl
             minizip
             silver-bun
+            RapidJSON
+            spdlog
             WS2_32.lib
             Crypt32.lib
             Cryptui.lib
@@ -199,5 +203,4 @@ set_target_properties(
     NorthstarDLL
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${NS_BINARY_DIR}
                OUTPUT_NAME Northstar
-               LINK_FLAGS "/MANIFEST:NO /DEBUG"
     )

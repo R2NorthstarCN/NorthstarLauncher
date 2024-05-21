@@ -1,11 +1,18 @@
-[submodule "thirdparty/libcurl"]
-	path = primedev/thirdparty/libcurl
+[submodule "thirdparty/spdlog"]
+	path = thirdparty/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "thirdparty/silver-bun"]
+	path = thirdparty/silver-bun
+	url = https://github.com/IcePixelx/silver-bun.git
+[submodule "thirdparty/rapidjson"]
+	path = thirdparty/rapidjson
+	url = https://github.com/Tencent/rapidjson
+[submodule "thirdparty/curl"]
+	path = thirdparty/curl
 	url = https://github.com/curl/curl
-	ignore = untracked
 [submodule "thirdparty/minhook"]
-	path = primedev/thirdparty/minhook
+	path = thirdparty/minhook
 	url = https://github.com/TsudaKageyu/minhook
-	ignore = untracked
-[submodule "thirdparty/minizip"]
-	path = primedev/thirdparty/minizip
-	url = https://github.com/zlib-ng/minizip-ng.git
+[submodule "thirdparty/minizip-ng"]
+	path = thirdparty/minizip-ng
+	url = https://github.com/zlib-ng/minizip-ng
