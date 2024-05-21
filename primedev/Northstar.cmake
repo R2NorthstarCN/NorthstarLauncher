@@ -8,6 +8,8 @@ find_package(silver-bun REQUIRED)
 find_package(rapidjson REQUIRED)
 find_package(spdlog REQUIRED)
 
+set(CMAKE_SHARED_LIBRARY_PREFIX "")
+
 add_library(
     NorthstarDLL SHARED
     "resources.rc"
@@ -172,23 +174,17 @@ add_library(
 target_link_libraries(
     NorthstarDLL
     PRIVATE -static
-            winpthread
-            stdc++
-            minhook
-            libcurl_static
-            zlibstatic
-            minizip
-            silver-bun
-            RapidJSON
-            spdlog
-            WS2_32.lib
-            Crypt32.lib
-            Cryptui.lib
-            dbghelp.lib
-            Wldap32.lib
-            Normaliz.lib
-            Bcrypt.lib
-            version.lib
+        minhook
+        libcurl_static
+        zlibstatic
+        minizip
+        silver-bun
+        RapidJSON
+        spdlog
+
+        winpthread
+        stdc++
+        Dbghelp.lib
     )
 
 target_compile_options(
@@ -214,3 +210,10 @@ set_target_properties(
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${NS_BINARY_DIR}
                OUTPUT_NAME Northstar
     )
+
+add_custom_command(TARGET NorthstarDLL POST_BUILD
+    COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> $<$<CONFIG:release>:${NS_BINARY_DIR}/Northstar.dll>)
+
+if( ipo_supported )
+    set_property(TARGET NorthstarDLL PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()

@@ -13,25 +13,9 @@ add_library(
 target_link_libraries(
     loader_wsock32_proxy
     PRIVATE 
-            -Wl,-Bstatic
-            minhook
-            mswsock.lib
-            ws2_32.lib
-            ShLwApi.lib
-            imagehlp.lib
-            dbghelp.lib
-            kernel32.lib
-            user32.lib
-            gdi32.lib
-            winspool.lib
-            comdlg32.lib
-            advapi32.lib
-            shell32.lib
-            ole32.lib
-            oleaut32.lib
-            uuid.lib
-            odbc32.lib
-            odbccp32.lib
+    -static
+    minhook
+    Shlwapi.lib
     )
 
 target_precompile_headers(
@@ -47,3 +31,10 @@ set_target_properties(
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${NS_BINARY_DIR}/bin/x64_retail
                OUTPUT_NAME wsock32
     )
+
+add_custom_command(TARGET loader_wsock32_proxy POST_BUILD
+    COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> $<$<CONFIG:release>:${NS_BINARY_DIR}/bin/x64_retail/wsock32.dll>)
+
+if( ipo_supported )
+    set_property(TARGET loader_wsock32_proxy PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()

@@ -7,23 +7,19 @@ target_compile_definitions(NorthstarLauncher PRIVATE UNICODE _UNICODE)
 target_link_libraries(
     NorthstarLauncher
     PRIVATE -static
-            winpthread
-            stdc++
-            shlwapi.lib
-            kernel32.lib
-            user32.lib
-            gdi32.lib
-            winspool.lib
-            comdlg32.lib
-            advapi32.lib
-            shell32.lib
-            ole32.lib
-            oleaut32.lib
-            uuid.lib
-            odbc32.lib
-            odbccp32.lib
-            WS2_32.lib
+        winpthread
+        stdc++
+        Shlwapi.lib
+        Ws2_32.lib
     )
 
 set_target_properties(NorthstarLauncher PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${NS_BINARY_DIR})
+
 target_link_options(NorthstarLauncher PUBLIC "LINKER:--stack,8000000")
+
+add_custom_command(TARGET NorthstarLauncher POST_BUILD
+    COMMAND $<$<CONFIG:release>:${CMAKE_STRIP}> $<$<CONFIG:release>:${NS_BINARY_DIR}/NorthstarLauncher.exe>)
+
+if( ipo_supported )
+    set_property(TARGET NorthstarLauncher PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()

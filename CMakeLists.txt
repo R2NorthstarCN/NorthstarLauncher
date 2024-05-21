@@ -21,6 +21,9 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_VS_PLATFORM_TOOLSET v143)
 
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+
 # This determines the real binary root directory
 set(NS_BINARY_DIR ${CMAKE_BINARY_DIR}/game)
 # NOTE [Fifty]: Visual studio deems Build root with the value "${projectDir}" in CMakeSettings.json as invalid and
