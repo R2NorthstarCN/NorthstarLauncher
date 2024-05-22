@@ -3,6 +3,8 @@
 #include "squirrel/squirrel.h"
 #include "core/tier0.h"
 
+#include "curl/curl.h"
+
 HttpRequestHandler* g_httpRequestHandler;
 
 bool IsHttpDisabled()

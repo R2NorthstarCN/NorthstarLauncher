@@ -32,7 +32,6 @@ namespace fs = std::filesystem;
 #include "spdlog/spdlog.h"
 #include "logging/logging.h"
 #include "MinHook.h"
-#include "curl/curl.h"
 #include "silver-bun.h"
 #include "core/hooks.h"
 #include "nlohmann/json.hpp"

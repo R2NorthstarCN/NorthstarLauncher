@@ -17,6 +17,8 @@
 #include "rapidjson/writer.h"
 #include "rapidjson/error/en.h"
 
+#include "curl/curl.h"
+
 #include <cstring>
 #include <regex>
 
