@@ -13,9 +13,11 @@ extern ConVar* Cvar_ns_curl_log_enable;
 
 struct RemoteModInfo
 {
-public:
 	std::string Name;
 	std::string Version;
+	bool RequiredOnClient;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(RemoteModInfo, Name, Version, RequiredOnClient)
 };
 
 class RemoteServerInfo
@@ -59,25 +61,37 @@ public:
 	unsigned short port;
 };
 
+
+
 struct MainMenuPromoData
 {
 public:
-	std::string newInfoTitle1;
-	std::string newInfoTitle2;
-	std::string newInfoTitle3;
+	struct NewInfo {
+		std::string Title1;
+		std::string Title2;
+		std::string Title3;
 
-	std::string largeButtonTitle;
-	std::string largeButtonText;
-	std::string largeButtonUrl;
-	int largeButtonImageIndex;
+		NLOHMANN_DEFINE_TYPE_INTRUSIVE(NewInfo, Title1, Title2, Title3)
+	} newInfo;
 
-	std::string smallButton1Title;
-	std::string smallButton1Url;
-	int smallButton1ImageIndex;
+	struct LargeButton {
+		int ImageIndex;
+		std::string Text;
+		std::string Title;
+		std::string Url;
 
-	std::string smallButton2Title;
-	std::string smallButton2Url;
-	int smallButton2ImageIndex;
+		NLOHMANN_DEFINE_TYPE_INTRUSIVE(LargeButton, ImageIndex, Text, Title, Url)
+	} largeButton;
+
+	struct SmallButton {
+		int ImageIndex;
+		std::string Title;
+		std::string Url;
+
+		NLOHMANN_DEFINE_TYPE_INTRUSIVE(SmallButton, ImageIndex, Title, Url)
+	} smallButton1, smallButton2;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(MainMenuPromoData, newInfo, largeButton, smallButton1, smallButton2)
 };
 
 class MasterServerManager

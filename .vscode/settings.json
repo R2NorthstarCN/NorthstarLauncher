@@ -94,6 +94,11 @@
         "shared_mutex": "cpp",
         "text_encoding": "cpp",
         "cinttypes": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "csignal": "cpp",
+        "coroutine": "cpp",
+        "resumable": "cpp",
+        "stack": "cpp",
+        "valarray": "cpp"
     }
 }

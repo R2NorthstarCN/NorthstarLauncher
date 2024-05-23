@@ -133,50 +133,36 @@ void MasterServerManager::AuthenticateOriginWithMasterServer(const char* uid, co
 			{
 				m_bSuccessfullyConnected = true;
 
-				rapidjson_document originAuthInfo;
-				originAuthInfo.Parse(readBuffer.c_str());
-
-				if (originAuthInfo.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading origin auth info response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(originAuthInfo.GetParseError()));
-					return;
-				}
-
-				if (!originAuthInfo.IsObject() || !originAuthInfo.HasMember("success"))
-				{
-					spdlog::error("Failed reading origin auth info response: malformed response object {}", readBuffer);
-					return;
-				}
-
-				if (originAuthInfo["success"].IsTrue() && originAuthInfo.HasMember("token") && originAuthInfo["token"].IsString())
-				{
-					strncpy_s(
-						m_sOwnClientAuthToken,
-						sizeof(m_sOwnClientAuthToken),
-						originAuthInfo["token"].GetString(),
-						sizeof(m_sOwnClientAuthToken) - 1);
-					spdlog::info("Northstar origin authentication completed successfully!");
-					m_bOriginAuthWithMasterServerSuccessful = true;
-				}
-				else
-				{
-					spdlog::error("Northstar origin authentication failed");
-
-					if (originAuthInfo.HasMember("error") && originAuthInfo["error"].IsObject())
+					nlohmann::json originAuthInfo = nlohmann::json::parse(readBuffer);
+					if (originAuthInfo.at("success").template get<bool>())
 					{
-
-						if (originAuthInfo["error"].HasMember("enum") && originAuthInfo["error"]["enum"].IsString())
+						strncpy_s(
+							m_sOwnClientAuthToken,
+							sizeof(m_sOwnClientAuthToken),
+							originAuthInfo.at("token").template get<std::string>().c_str(),
+							sizeof(m_sOwnClientAuthToken) - 1);
+						spdlog::info("Northstar origin authentication completed successfully!");
+						m_bOriginAuthWithMasterServerSuccessful = true;
+					}
+					else
+					{
+						if (originAuthInfo.contains("error") && originAuthInfo["error"].contains("enum"))
 						{
-							m_sOriginAuthWithMasterServerErrorCode = originAuthInfo["error"]["enum"].GetString();
+							originAuthInfo["error"]["enum"].get_to(m_sOriginAuthWithMasterServerErrorCode);
 						}
 
-						if (originAuthInfo["error"].HasMember("msg") && originAuthInfo["error"]["msg"].IsString())
+						if (originAuthInfo.contains("error") && originAuthInfo["error"].contains("msg"))
 						{
-							m_sOriginAuthWithMasterServerErrorMessage = originAuthInfo["error"]["msg"].GetString();
+							originAuthInfo["error"]["msg"].get_to(m_sOriginAuthWithMasterServerErrorMessage);
 						}
 					}
+				}
+				catch (nlohmann::json::exception e)
+				{
+					spdlog::error("Failed reading origin auth info response: encountered error \"{}\"", e.what());
+					return;
 				}
 			}
 			else
@@ -229,124 +215,58 @@ void MasterServerManager::RequestServerList()
 			{
 				m_bSuccessfullyConnected = true;
 
-				rapidjson_document serverInfoJson;
-				serverInfoJson.Parse(readBuffer.c_str());
-
-				if (serverInfoJson.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading masterserver response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(serverInfoJson.GetParseError()));
-					return;
-				}
-
-				if (serverInfoJson.IsObject() && serverInfoJson.HasMember("error"))
-				{
-					spdlog::error("Failed reading masterserver response: got fastify error response");
-					spdlog::error(readBuffer);
-					return;
-				}
-
-				if (!serverInfoJson.IsArray())
-				{
-					spdlog::error("Failed reading masterserver response: root object is not an array");
-					return;
-				}
-
-				rapidjson::GenericArray<false, rapidjson_document::GenericValue> serverArray = serverInfoJson.GetArray();
-
-				spdlog::info("Got {} servers", serverArray.Size());
-
-				for (auto& serverObj : serverArray)
-				{
-					if (!serverObj.IsObject())
+					nlohmann::json serverInfo = nlohmann::json::parse(readBuffer);
+					if (serverInfo.contains("error"))
 					{
-						spdlog::error("Failed reading masterserver response: member of server array is not an object");
+						spdlog::error("Failed getting server list from masterserver: error \"{}\"", readBuffer);
 						return;
 					}
+					spdlog::info("Got {} servers", serverInfo.size());
 
-					// todo: verify json props are fine before adding to m_remoteServers
-					if (!serverObj.HasMember("id") || !serverObj["id"].IsString() || !serverObj.HasMember("name") ||
-						!serverObj["name"].IsString() || !serverObj.HasMember("description") || !serverObj["description"].IsString() ||
-						!serverObj.HasMember("map") || !serverObj["map"].IsString() || !serverObj.HasMember("playlist") ||
-						!serverObj["playlist"].IsString() || !serverObj.HasMember("playerCount") || !serverObj["playerCount"].IsNumber() ||
-						!serverObj.HasMember("maxPlayers") || !serverObj["maxPlayers"].IsNumber() || !serverObj.HasMember("hasPassword") ||
-						!serverObj["hasPassword"].IsBool() || !serverObj.HasMember("modInfo") || !serverObj["modInfo"].HasMember("Mods") ||
-						!serverObj["modInfo"]["Mods"].IsArray())
+					m_vRemoteServers.clear();
+
+					for (auto& serverObj : serverInfo)
 					{
-						spdlog::error("Failed reading masterserver response: malformed server object");
-						continue;
-					};
-
-					const char* id = serverObj["id"].GetString();
-
-					RemoteServerInfo* newServer = nullptr;
-
-					bool createNewServerInfo = true;
-					for (RemoteServerInfo& server : m_vRemoteServers)
-					{
-						// if server already exists, update info rather than adding to it
-						if (!strncmp((const char*)server.id, id, 32))
+						auto& server = m_vRemoteServers.emplace_back(
+							serverObj.at("id").template get<std::string>().c_str(),
+							serverObj.at("name").template get<std::string>().c_str(),
+							serverObj.at("description").template get<std::string>().c_str(),
+							serverObj.at("map").template get<std::string>().c_str(),
+							serverObj.at("playlist").template get<std::string>().c_str(),
+							serverObj.contains("region") ? serverObj["region"].template get<std::string>().c_str() : "",
+							serverObj.at("playerCount").template get<int>(),
+							serverObj.at("maxPlayers").template get<int>(),
+							serverObj.at("hasPassword").template get<bool>());
+						server.requiredMods.clear();
+						for (auto& mod : serverObj.at("modInfo").at("Mods"))
 						{
-							server = RemoteServerInfo(
-								id,
-								serverObj["name"].GetString(),
-								serverObj["description"].GetString(),
-								serverObj["map"].GetString(),
-								serverObj["playlist"].GetString(),
-								(serverObj.HasMember("region") && serverObj["region"].IsString()) ? serverObj["region"].GetString() : "",
-								serverObj["playerCount"].GetInt(),
-								serverObj["maxPlayers"].GetInt(),
-								serverObj["hasPassword"].IsTrue());
-							newServer = &server;
-							createNewServerInfo = false;
-							break;
+							try
+							{
+								auto modInfo = mod.template get<RemoteModInfo>();
+								if (modInfo.RequiredOnClient)
+								{
+									server.requiredMods.push_back(std::move(modInfo));
+								}
+							}
+							catch (nlohmann::json::exception e)
+							{
+								spdlog::warn("Malformed required mod: \"{}\"", e.what());
+							}
 						}
 					}
 
-					// server didn't exist
-					if (createNewServerInfo)
-						newServer = &m_vRemoteServers.emplace_back(
-							id,
-							serverObj["name"].GetString(),
-							serverObj["description"].GetString(),
-							serverObj["map"].GetString(),
-							serverObj["playlist"].GetString(),
-							(serverObj.HasMember("region") && serverObj["region"].IsString()) ? serverObj["region"].GetString() : "",
-							serverObj["playerCount"].GetInt(),
-							serverObj["maxPlayers"].GetInt(),
-							serverObj["hasPassword"].IsTrue());
-
-					newServer->requiredMods.clear();
-					for (auto& requiredMod : serverObj["modInfo"]["Mods"].GetArray())
-					{
-						RemoteModInfo modInfo;
-
-						if (!requiredMod.HasMember("RequiredOnClient") || !requiredMod["RequiredOnClient"].IsTrue())
-							continue;
-
-						if (!requiredMod.HasMember("Name") || !requiredMod["Name"].IsString())
-							continue;
-						modInfo.Name = requiredMod["Name"].GetString();
-
-						if (!requiredMod.HasMember("Version") || !requiredMod["Version"].IsString())
-							continue;
-						modInfo.Version = requiredMod["Version"].GetString();
-
-						newServer->requiredMods.push_back(modInfo);
-					}
-					// Can probably re-enable this later with a -verbose flag, but slows down loading of the server browser quite a bit as
-					// is
-					// spdlog::info(
-					//	"Server {} on map {} with playlist {} has {}/{} players", serverObj["name"].GetString(),
-					//	serverObj["map"].GetString(), serverObj["playlist"].GetString(), serverObj["playerCount"].GetInt(),
-					//	serverObj["maxPlayers"].GetInt());
+					std::sort(
+						m_vRemoteServers.begin(),
+						m_vRemoteServers.end(),
+						[](RemoteServerInfo& a, RemoteServerInfo& b) { return a.playerCount > b.playerCount; });
 				}
-
-				std::sort(
-					m_vRemoteServers.begin(),
-					m_vRemoteServers.end(),
-					[](RemoteServerInfo& a, RemoteServerInfo& b) { return a.playerCount > b.playerCount; });
+				catch (nlohmann::json::exception e)
+				{
+					spdlog::error("Failed getting server list from masterserver: json error \"{}\"", e.what());
+					return;
+				}
 			}
 			else
 			{
@@ -385,74 +305,15 @@ void MasterServerManager::RequestMainMenuPromos()
 			{
 				m_bSuccessfullyConnected = true;
 
-				rapidjson_document mainMenuPromoJson;
-				mainMenuPromoJson.Parse(readBuffer.c_str());
-
-				if (mainMenuPromoJson.HasParseError())
+				try
 				{
-					spdlog::error(
-						"Failed reading masterserver main menu promos response: encountered parse error \"{}\"",
-						rapidjson::GetParseError_En(mainMenuPromoJson.GetParseError()));
+					nlohmann::json::parse(readBuffer).get_to(m_sMainMenuPromoData);
+				}
+				catch (nlohmann::json::exception e)
+				{
+					spdlog::error("Failed reading masterserver main menu promos response: encountered error\"{}\"", e.what());
 					return;
 				}
-
-				if (!mainMenuPromoJson.IsObject())
-				{
-					spdlog::error("Failed reading masterserver main menu promos response: root object is not an object");
-					return;
-				}
-
-				if (mainMenuPromoJson.HasMember("error"))
-				{
-					spdlog::error("Failed reading masterserver response: got fastify error response");
-					spdlog::error(readBuffer);
-					return;
-				}
-
-				if (!mainMenuPromoJson.HasMember("newInfo") || !mainMenuPromoJson["newInfo"].IsObject() ||
-					!mainMenuPromoJson["newInfo"].HasMember("Title1") || !mainMenuPromoJson["newInfo"]["Title1"].IsString() ||
-					!mainMenuPromoJson["newInfo"].HasMember("Title2") || !mainMenuPromoJson["newInfo"]["Title2"].IsString() ||
-					!mainMenuPromoJson["newInfo"].HasMember("Title3") || !mainMenuPromoJson["newInfo"]["Title3"].IsString() ||
-
-					!mainMenuPromoJson.HasMember("largeButton") || !mainMenuPromoJson["largeButton"].IsObject() ||
-					!mainMenuPromoJson["largeButton"].HasMember("Title") || !mainMenuPromoJson["largeButton"]["Title"].IsString() ||
-					!mainMenuPromoJson["largeButton"].HasMember("Text") || !mainMenuPromoJson["largeButton"]["Text"].IsString() ||
-					!mainMenuPromoJson["largeButton"].HasMember("Url") || !mainMenuPromoJson["largeButton"]["Url"].IsString() ||
-					!mainMenuPromoJson["largeButton"].HasMember("ImageIndex") ||
-					!mainMenuPromoJson["largeButton"]["ImageIndex"].IsNumber() ||
-
-					!mainMenuPromoJson.HasMember("smallButton1") || !mainMenuPromoJson["smallButton1"].IsObject() ||
-					!mainMenuPromoJson["smallButton1"].HasMember("Title") || !mainMenuPromoJson["smallButton1"]["Title"].IsString() ||
-					!mainMenuPromoJson["smallButton1"].HasMember("Url") || !mainMenuPromoJson["smallButton1"]["Url"].IsString() ||
-					!mainMenuPromoJson["smallButton1"].HasMember("ImageIndex") ||
-					!mainMenuPromoJson["smallButton1"]["ImageIndex"].IsNumber() ||
-
-					!mainMenuPromoJson.HasMember("smallButton2") || !mainMenuPromoJson["smallButton2"].IsObject() ||
-					!mainMenuPromoJson["smallButton2"].HasMember("Title") || !mainMenuPromoJson["smallButton2"]["Title"].IsString() ||
-					!mainMenuPromoJson["smallButton2"].HasMember("Url") || !mainMenuPromoJson["smallButton2"]["Url"].IsString() ||
-					!mainMenuPromoJson["smallButton2"].HasMember("ImageIndex") ||
-					!mainMenuPromoJson["smallButton2"]["ImageIndex"].IsNumber())
-				{
-					spdlog::error("Failed reading masterserver main menu promos response: malformed json object");
-					return;
-				}
-
-				m_sMainMenuPromoData.newInfoTitle1 = mainMenuPromoJson["newInfo"]["Title1"].GetString();
-				m_sMainMenuPromoData.newInfoTitle2 = mainMenuPromoJson["newInfo"]["Title2"].GetString();
-				m_sMainMenuPromoData.newInfoTitle3 = mainMenuPromoJson["newInfo"]["Title3"].GetString();
-
-				m_sMainMenuPromoData.largeButtonTitle = mainMenuPromoJson["largeButton"]["Title"].GetString();
-				m_sMainMenuPromoData.largeButtonText = mainMenuPromoJson["largeButton"]["Text"].GetString();
-				m_sMainMenuPromoData.largeButtonUrl = mainMenuPromoJson["largeButton"]["Url"].GetString();
-				m_sMainMenuPromoData.largeButtonImageIndex = mainMenuPromoJson["largeButton"]["ImageIndex"].GetInt();
-
-				m_sMainMenuPromoData.smallButton1Title = mainMenuPromoJson["smallButton1"]["Title"].GetString();
-				m_sMainMenuPromoData.smallButton1Url = mainMenuPromoJson["smallButton1"]["Url"].GetString();
-				m_sMainMenuPromoData.smallButton1ImageIndex = mainMenuPromoJson["smallButton1"]["ImageIndex"].GetInt();
-
-				m_sMainMenuPromoData.smallButton2Title = mainMenuPromoJson["smallButton2"]["Title"].GetString();
-				m_sMainMenuPromoData.smallButton2Url = mainMenuPromoJson["smallButton2"]["Url"].GetString();
-				m_sMainMenuPromoData.smallButton2ImageIndex = mainMenuPromoJson["smallButton2"]["ImageIndex"].GetInt();
 
 				m_bHasMainMenuPromoData = true;
 			}
