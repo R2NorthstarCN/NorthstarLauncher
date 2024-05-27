@@ -21,6 +21,8 @@
 
 #include <cstring>
 #include <regex>
+#include <random>
+#include "masterserver.h"
 
 using namespace std::chrono_literals;
 
@@ -28,6 +30,10 @@ MasterServerManager* g_pMasterServerManager;
 
 ConVar* Cvar_ns_masterserver_hostname;
 ConVar* Cvar_ns_curl_log_enable;
+
+std::random_device rd;
+std::mt19937 gen(rd());
+std::uniform_int_distribution<uint32_t> dis(1, 0xFFFFFFFF);
 
 RemoteServerInfo::RemoteServerInfo(
 	const char* newId,
@@ -849,6 +855,12 @@ void MasterServerManager::ProcessConnectionlessPacketSigreq1(std::string data)
 	spdlog::error("invalid Atlas connectionless packet request: unknown type {}", type);
 }
 
+void ConCommand_ns_wstest(const CCommand& args)
+{
+	NOTE_UNUSED(args);
+	WebSocketManager::instance();
+}
+
 void ConCommand_ns_fetchservers(const CCommand& args)
 {
 	NOTE_UNUSED(args);
@@ -856,6 +868,306 @@ void ConCommand_ns_fetchservers(const CCommand& args)
 }
 
 MasterServerManager::MasterServerManager() : m_pendingConnectionInfo {}, m_sOwnServerId {""}, m_sOwnClientAuthToken {""} {}
+
+WebSocketManager& WebSocketManager::instance()
+{
+	static WebSocketManager WEBSOCKET_MANAGER;
+	return WEBSOCKET_MANAGER;
+}
+
+WebSocketManager::WebSocketManager()
+{
+	spdlog::info("Initializing WebSocket Manager for server authentication");
+}
+
+bool WebSocketManager::InitialiseWebSocket()
+{
+	std::string url = std::string(Cvar_ns_masterserver_hostname->GetString());
+	std::string wsurl = fmt::format("{}/ws", url.replace(url.find_first_of("http"), 4, "ws")); // http -> ws, https -> wss
+	spdlog::info("WS:Initialize on {}", wsurl);
+
+	curl = curl_easy_init();
+	CURLcode res;
+	SetCommonHttpClientOptions(curl);
+	// I don't we need to strip this from main thread because for dedicated servers this step is rather crucial.
+	curl_easy_setopt(curl, CURLOPT_URL, wsurl.c_str());
+	curl_easy_setopt(curl, CURLOPT_CONNECT_ONLY, 2L);
+	res = curl_easy_perform(curl);
+	if (res != CURLE_OK)
+	{
+		// websocket establish failed. we should retry as long as the server is still running!
+		fprintf(stderr, "WS:Establish failed: %s\n", curl_easy_strerror(res));
+		curl_easy_cleanup(curl);
+		return false;
+		// todo: add retry solution
+	}
+	else
+	{
+		// connected and ready
+		return true; // do not clean curl stuff here as we still need to use the socket.
+	}
+
+}
+
+void WebSocketManager::SendJsonRequest(nlohmann::json json)
+{
+	uint32_t msg_id = dis(gen);
+	json["metadata"]["id"] = msg_id;
+	std::string jsonString = json.dump();
+	size_t sent;
+	CURLcode result = curl_ws_send(curl, jsonString.c_str(), strlen(jsonString.c_str()), &sent, 0, CURLWS_TEXT);
+	AddMessageCallback(msg_id); // immediately add coresponding callback for handling the response later.
+}
+
+void WebSocketManager::SendJsonResponse(nlohmann::json json)
+{
+	std::string jsonString = json.dump();
+	size_t sent;
+	CURLcode result = curl_ws_send(curl, jsonString.c_str(), strlen(jsonString.c_str()), &sent, 0, CURLWS_TEXT);
+}
+
+void WebSocketManager::EstablishMasterServerConnection()
+{
+
+	// create message handler thread
+	updateThread = std::thread(
+		[this]
+		{
+			// 1. initiate websocket connection with ms, grab curl result. if success, send register request then go to REGISTERING.
+			// 2. go to message polling loop, if get register response, if success: goto REGISTERED, continue on register loop. if failed,
+			// go back to 1.
+
+			while (!this->updateThreadStopToken.stop_requested())
+			{
+
+				while (this->webSocketState == WebSocketStates::STATE_CONNECTING)
+				{
+					if (InitialiseWebSocket())
+					{
+						spdlog::info("WS:Successfully established websocket connection to masterserver.");
+						this->webSocketState == WebSocketStates::STATE_REGISTERING;
+						break;
+					}
+					else
+					{
+						spdlog::error("WS:Failed to establish websocket connection to masterserver. retrying in 5 seconds.");
+						std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+					}
+				}
+				// websocket connection is established, now we keep sending registering request until we are registered.
+				std::chrono::steady_clock::time_point lastRegisterRequest = std::chrono::steady_clock::now();
+				uint32_t registerRetryCount;
+				while (this->webSocketState == WebSocketStates::STATE_REGISTERING)
+				{
+					WebSocketRequestRegistration request;
+					auto elapsed =
+						std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - lastRegisterRequest)
+							.count();
+
+					if (elapsed > 3000LL || registerRetryCount == 0)
+					{
+						if (registerRetryCount == 0)
+						{
+							spdlog::info("WS:Attempting to register us on masterserver!");
+						}
+						else
+						{
+							spdlog::info("WS:Retrying masterserver registration ({})", registerRetryCount);
+						}
+
+						registerRetryCount++;
+						std::string password = "";
+						uint32_t msg_id = dis(gen);
+						request.metadata.id = msg_id;
+						request.metadata.type = 1;
+						request.info.name = "Test Name";
+						request.info.desc = "Test Desc";
+						request.info.port = 37015;
+						request.info.map = "mp_forwardbase_kodai";
+						request.info.playlist = "ps";
+						request.info.curPlayers = 114;
+						request.info.maxPlayers = 514;
+						request.info.password = password.empty() ? std::optional<std::string>() : std::optional<std::string>(password);
+						request.info.gameState = 3;
+						request.regToken = "wtz_very_fat_cock_i_love_sucking";
+						nlohmann::json j = request;
+						std::string jsonString = j.dump();
+						size_t sent;
+						CURLcode result = curl_ws_send(curl, jsonString.c_str(), strlen(jsonString.c_str()), &sent, 0, CURLWS_TEXT);
+						lastRegisterRequest = std::chrono::steady_clock::now();
+						if (result != CURLE_OK)
+						{
+							spdlog::error("WS:SocketError: {}", curl_easy_strerror(result));
+							this->webSocketState = WebSocketStates::STATE_CONNECTING;
+							curl_easy_cleanup(curl);
+							break;
+						}
+
+					} // send register request per 3 sec if we didn't receive a response yet.
+
+					size_t rlen;
+					const curl_ws_frame* meta;
+					char buffer[16384];
+					CURLcode res = curl_ws_recv(curl, buffer, sizeof(buffer), &rlen, &meta);
+					if (res != CURLE_OK)
+					{
+						if (res == CURLE_AGAIN)
+						{
+							// socket have nothing to give us, wait for it!
+							std::this_thread::sleep_for(std::chrono::milliseconds(100));
+							continue;
+						}
+						else
+						{
+							spdlog::error("WS:SocketError: {}", curl_easy_strerror(res));
+						}
+					}
+					if (meta->flags & CURLWS_TEXT)
+					{
+						nlohmann::json message = nlohmann::json::parse(buffer);
+						auto metadata = message.at("metadata").get<WebSocketMetadata>();
+						if (metadata.id != request.metadata.id)
+						{
+							spdlog::error("WS:Registration error: message id mismatch!");
+							continue;
+						}
+						if (metadata.type == 2) // reg response
+						{
+							auto response = message.get<WebSocketResponseRegistration>();
+							if (response.success)
+							{
+								spdlog::info("WS:Successfully registered on masterserver!");
+								this->webSocketState = WebSocketStates::STATE_REGISTERED;
+								break;
+							}
+							else
+							{
+								spdlog::error("WS:Failed while registering on masterserver: {}. Retrying in 3 seconds.", response.error.value().msg);
+								std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+							}
+						}
+					}
+				}
+
+				while (this->webSocketState == WebSocketStates::STATE_REGISTERED)
+				{
+					// recv operations
+					size_t rlen;
+					const curl_ws_frame* meta;
+					char buffer[16384];
+					CURLcode res = curl_ws_recv(curl, buffer, sizeof(buffer), &rlen, &meta);
+					if (res != CURLE_OK)
+					{
+						if (res == CURLE_AGAIN)
+						{
+							// socket have nothing to give us, wait for it!
+							std::this_thread::sleep_for(std::chrono::milliseconds(100));
+							continue;
+						}
+						else
+						{
+							spdlog::error("WS:SocketError: {}", curl_easy_strerror(res));
+							curl_easy_cleanup(curl);
+							this->webSocketState = WebSocketStates::STATE_CONNECTING;
+						}
+					}
+					if (meta->flags & CURLWS_PING)
+					{
+						// ms sent ping frames to us, respond with presence data
+						std::string password = "";
+						WebSocketResponseServerPresence payload;
+						payload.name = "Test Name";
+						payload.desc = "Test Desc";
+						payload.port = 37015;
+						payload.map = "mp_forwardbase_kodai";
+						payload.playlist = "ps";
+						payload.curPlayers = 114;
+						payload.maxPlayers = 514;
+						payload.password = password.empty() ? std::optional<std::string>() : std::optional<std::string>(password);
+						payload.gameState = 3;
+						nlohmann::json j = payload;
+						std::string jstr = j.dump();
+						size_t sent;
+						CURLcode result = curl_ws_send(curl, jstr.c_str(), strlen(jstr.c_str()), &sent, 0, CURLWS_PONG);
+						continue;
+					}
+					else if (meta->flags & CURLWS_CLOSE)
+					{
+						// send a close frame to server, then cleanup
+						spdlog::info("WS:Masterserver sent close frame to us. Disconnecting");
+						this->webSocketState = WebSocketStates::STATE_CONNECTING;
+						//size_t sent;
+						//CURLcode result = curl_ws_send(curl, jstr.c_str(), strlen(jstr.c_str()), &sent, 0, CURLWS_CLOSE);
+					}
+					else if (meta->flags & CURLWS_TEXT)
+					{
+						nlohmann::json message = nlohmann::json::parse(buffer);
+						auto metadata = message.at("metadata").get<WebSocketMetadata>();
+
+						// handle incoming message by type first, so we don't have to traverse callbacks on every recv call.
+						if (metadata.type == 3)
+						{
+							// player join request
+							// put this in a new thread and move on to the next message, cause player join request can take quite some time
+							// (download pdata etc)
+							std::thread(
+								[this, message]
+								{
+									auto request = message.get<WebSocketRequestPlayerJoin>();
+
+									// strip some data we need from the message
+
+									// download pdata, add remote player info and send success back.
+
+									WebSocketResponsePlayerJoin response;
+									response.metadata.type = 4;
+									response.metadata.id = request.metadata.id;
+									response.success = true;
+									SendJsonResponse(response);
+								})
+								.detach();
+							continue;
+						}
+						
+						// handle response messages
+						for (auto it = this->messageCallbacks.begin(); it != this->messageCallbacks.end();)
+						{
+							if (metadata.id == it->first)
+							{
+								if (it->second(message)) // execute the callback and remove it from pending messages
+								{
+									it = this->messageCallbacks.erase(it);
+									break; // go to the next message
+								}
+							}
+							++it;
+						}
+					}
+					// sleep
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+				}
+			}
+		});
+	updateThread.detach();
+}
+void WebSocketManager::AddMessageCallback(int id)
+{
+	// process general messages here
+	messageCallbacks.emplace(
+		id,
+		[this](nlohmann::json message)
+		{
+			auto metadata = message.at("metadata").get<WebSocketMetadata>();
+			switch (metadata.type)
+			{
+			case 1:
+				return true;
+				
+			default:
+				return false;
+			}
+		});
+}
 
 ON_DLL_LOAD_RELIESON("engine.dll", MasterServer, (ConCommand, ServerPresence), (CModule module))
 {
@@ -865,7 +1177,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", MasterServer, (ConCommand, ServerPresence), (
 	Cvar_ns_curl_log_enable = new ConVar("ns_curl_log_enable", "0", FCVAR_NONE, "Whether curl should log to the console");
 
 	RegisterConCommand("ns_fetchservers", ConCommand_ns_fetchservers, "Fetch all servers from the masterserver", FCVAR_CLIENTDLL);
-
+	RegisterConCommand("ns_wstest", ConCommand_ns_wstest, "Test websocket connection", FCVAR_CLIENTDLL);
 	MasterServerPresenceReporter* presenceReporter = new MasterServerPresenceReporter;
 	g_pServerPresence->AddPresenceReporter(presenceReporter);
 }

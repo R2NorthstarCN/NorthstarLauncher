@@ -1,12 +1,36 @@
 #pragma once
 
 #include "core/convar/convar.h"
+#include "curl/curl.h"
 #include "server/serverpresence.h"
 #include <winsock2.h>
 #include <string>
 #include <cstring>
 #include <future>
 #include <unordered_set>
+#include <map>
+
+namespace nlohmann {
+
+	template <class T>
+	void to_json(nlohmann::json& j, const std::optional<T>& v)
+	{
+		if (v.has_value())
+			j = *v;
+		else
+			j = nullptr;
+	}
+
+	template <class T>
+	void from_json(const nlohmann::json& j, std::optional<T>& v)
+	{
+		if (j.is_null())
+			v = std::nullopt;
+		else
+			v = j.get<T>();
+	}
+	
+} // namespace nlohmann
 
 extern ConVar* Cvar_ns_masterserver_hostname;
 extern ConVar* Cvar_ns_curl_log_enable;
@@ -61,12 +85,11 @@ public:
 	unsigned short port;
 };
 
-
-
 struct MainMenuPromoData
 {
 public:
-	struct NewInfo {
+	struct NewInfo
+	{
 		std::string Title1;
 		std::string Title2;
 		std::string Title3;
@@ -74,7 +97,8 @@ public:
 		NLOHMANN_DEFINE_TYPE_INTRUSIVE(NewInfo, Title1, Title2, Title3)
 	} newInfo;
 
-	struct LargeButton {
+	struct LargeButton
+	{
 		int ImageIndex;
 		std::string Text;
 		std::string Title;
@@ -83,7 +107,8 @@ public:
 		NLOHMANN_DEFINE_TYPE_INTRUSIVE(LargeButton, ImageIndex, Text, Title, Url)
 	} largeButton;
 
-	struct SmallButton {
+	struct SmallButton
+	{
 		int ImageIndex;
 		std::string Title;
 		std::string Url;
@@ -152,6 +177,109 @@ public:
 
 extern MasterServerManager* g_pMasterServerManager;
 extern ConVar* Cvar_ns_masterserver_hostname;
+
+enum WebSocketStates
+{
+	STATE_CONNECTING = 0,
+	STATE_REGISTERING,
+	STATE_REGISTERED
+};
+
+
+
+
+struct WebSocketMetadata
+{
+public:
+	uint32_t type;
+	int64_t id;
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketMetadata, type, id)
+};
+struct WebSocketError
+{
+public:
+	int32_t type;
+	std::string msg;
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketError,type,msg)
+};
+
+struct WebSocketResponseServerPresence
+{
+public:
+	std::string name;
+	std::string desc;
+	uint16_t port;
+	std::string map;
+	std::string playlist;
+	int32_t curPlayers;
+	int32_t maxPlayers;
+	std::optional<std::string> password;
+	int32_t gameState;
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketResponseServerPresence,name,desc,port,map,playlist,curPlayers,maxPlayers,password,gameState)
+};
+
+struct WebSocketRequestRegistration
+{
+public:
+	WebSocketMetadata metadata; 
+	WebSocketResponseServerPresence info;
+	std::string regToken;
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRequestRegistration, metadata, info, regToken)
+};
+
+struct WebSocketResponseRegistration
+{
+public:
+	WebSocketMetadata metadata; 
+	bool success;
+	std::optional<int64_t> id;
+	std::optional<WebSocketError> error;
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketResponseRegistration,metadata,success,id,error)
+};
+
+
+struct WebSocketRequestPlayerJoin
+{
+	WebSocketMetadata metadata;
+	std::string sessionToken;
+	std::string username;
+	std::string clantag;
+	uint32_t conv;
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRequestPlayerJoin,metadata,sessionToken,username,clantag,conv)
+};
+
+struct WebSocketResponsePlayerJoin
+{
+	WebSocketMetadata metadata;
+
+	bool success;
+	std::optional<WebSocketError> error;
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketResponsePlayerJoin,metadata,success,error)
+};
+
+
+class WebSocketManager
+{
+public:
+	static WebSocketManager& instance();
+
+private:
+	WebSocketManager();
+	bool InitialiseWebSocket();
+	bool SendRegistrationRequest();
+	void EstablishMasterServerConnection();
+	void AddMessageCallback(int);
+	void SendJsonRequest(nlohmann::json);
+	void SendJsonResponse(nlohmann::json);
+	CURL* curl;
+	int webSocketState;
+	bool supressWebSocket = false;
+	std::map<int, std::function<bool(nlohmann::json)>> messageCallbacks;
+	std::mutex webSocketMtx;
+	std::thread updateThread;
+	std::thread stateThread;
+	std::stop_token updateThreadStopToken;
+};
 
 /** Result returned in the std::future of a MasterServerPresenceReporter::ReportPresence() call. */
 enum class MasterServerReportPresenceResult

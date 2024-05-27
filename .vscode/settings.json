@@ -99,6 +99,9 @@
         "coroutine": "cpp",
         "resumable": "cpp",
         "stack": "cpp",
-        "valarray": "cpp"
-    }
+        "valarray": "cpp",
+        "*.inc": "cpp",
+        "*.def": "cpp"
+    },
+    "cmake.configureOnOpen": false
 }
