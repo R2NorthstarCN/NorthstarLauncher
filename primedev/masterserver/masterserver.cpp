@@ -878,12 +878,13 @@ WebSocketManager& WebSocketManager::instance()
 WebSocketManager::WebSocketManager()
 {
 	spdlog::info("Initializing WebSocket Manager for server authentication");
+	EstablishMasterServerConnection();
 }
 
 bool WebSocketManager::InitialiseWebSocket()
 {
 	std::string url = std::string(Cvar_ns_masterserver_hostname->GetString());
-	std::string wsurl = fmt::format("{}/ws", url.replace(url.find_first_of("http"), 4, "ws")); // http -> ws, https -> wss
+	std::string wsurl = fmt::format("{}/v2/server/ws", url.replace(url.find_first_of("http"), 4, "ws")); // http -> ws, https -> wss
 	spdlog::info("WS:Initialize on {}", wsurl);
 
 	curl = curl_easy_init();
@@ -904,6 +905,7 @@ bool WebSocketManager::InitialiseWebSocket()
 	else
 	{
 		// connected and ready
+		
 		return true; // do not clean curl stuff here as we still need to use the socket.
 	}
 
@@ -1128,7 +1130,7 @@ void WebSocketManager::EstablishMasterServerConnection()
 								.detach();
 							continue;
 						}
-						
+
 						// handle response messages
 						for (auto it = this->messageCallbacks.begin(); it != this->messageCallbacks.end();)
 						{
