@@ -15,6 +15,7 @@ set(CMAKE_SHARED_LIBRARY_PREFIX "")
 add_library(
     NorthstarDLL SHARED
     "resources.rc"
+    "client/fontawesome.h"
     "client/igig/igig.cpp"
     "client/igig/igig.h"
     "client/igig/ime.cpp"
