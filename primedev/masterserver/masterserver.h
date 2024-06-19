@@ -180,9 +180,8 @@ extern ConVar* Cvar_ns_masterserver_hostname;
 
 enum WebSocketStates
 {
-	STATE_CONNECTING = 0,
-	STATE_REGISTERING,
-	STATE_REGISTERED
+	CONNECTING = 0,
+	CONNECTED
 };
 
 
@@ -203,7 +202,7 @@ public:
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketError,type,msg)
 };
 
-struct WebSocketResponseServerPresence
+struct WebSocketServerPresenceResponse
 {
 public:
 	std::string name;
@@ -215,46 +214,45 @@ public:
 	int32_t maxPlayers;
 	std::optional<std::string> password;
 	int32_t gameState;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketResponseServerPresence,name,desc,port,map,playlist,curPlayers,maxPlayers,password,gameState)
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketServerPresenceResponse,name,desc,port,map,playlist,curPlayers,maxPlayers,password,gameState)
 };
 
-struct WebSocketRequestRegistration
+struct WebSocketRegistrationRequest
 {
 public:
 	WebSocketMetadata metadata; 
-	WebSocketResponseServerPresence info;
+	WebSocketServerPresenceResponse info;
 	std::string regToken;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRequestRegistration, metadata, info, regToken)
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRegistrationRequest, metadata, info, regToken)
 };
 
-struct WebSocketResponseRegistration
+struct WebSocketRegistrationResponse
 {
 public:
 	WebSocketMetadata metadata; 
 	bool success;
 	std::optional<int64_t> id;
 	std::optional<WebSocketError> error;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketResponseRegistration,metadata,success,id,error)
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRegistrationResponse,metadata,success,id,error)
 };
 
 
-struct WebSocketRequestPlayerJoin
+struct WebSocketPlayerJoinRequest
 {
 	WebSocketMetadata metadata;
 	std::string sessionToken;
 	std::string username;
 	std::string clantag;
 	uint32_t conv;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRequestPlayerJoin,metadata,sessionToken,username,clantag,conv)
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketPlayerJoinRequest,metadata,sessionToken,username,clantag,conv)
 };
 
-struct WebSocketResponsePlayerJoin
+struct WebSocketGenericResponse
 {
 	WebSocketMetadata metadata;
-
 	bool success;
 	std::optional<WebSocketError> error;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketResponsePlayerJoin,metadata,success,error)
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketGenericResponse,metadata,success,error)
 };
 
 
@@ -267,14 +265,19 @@ private:
 	WebSocketManager();
 	bool InitialiseWebSocket();
 	bool SendRegistrationRequest();
+	void SendServerPresence();
 	void EstablishMasterServerConnection();
 	void AddMessageCallback(int);
 	void SendJsonRequest(nlohmann::json);
 	void SendJsonResponse(nlohmann::json);
+	void SendGenericResponse(uint64_t,int,bool);
+	void ProcessIncomingMessage(const curl_ws_frame*, const nlohmann::json&);
+	void ProcessCallbacks(const nlohmann::json&);
+	void RemoveDeadCallbacks();
 	CURL* curl;
 	int webSocketState;
 	bool supressWebSocket = false;
-	std::map<int, std::function<bool(nlohmann::json)>> messageCallbacks;
+	std::map<int, std::pair<std::function<bool(nlohmann::json)>,std::chrono::steady_clock::time_point>> messageCallbacks;
 	std::mutex webSocketMtx;
 	std::thread updateThread;
 	std::thread stateThread;
