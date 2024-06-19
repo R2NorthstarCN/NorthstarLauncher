@@ -8,19 +8,20 @@ find_package(silver-bun REQUIRED)
 find_package(rapidjson REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(imgui REQUIRED)
 
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 add_library(
     NorthstarDLL SHARED
     "resources.rc"
-#    "client/igig/igig.cpp"
-#    "client/igig/igig.h"
-#    "client/igig/ime.cpp"
-#    "client/igig/ime.h"
-#    "client/igig/kiero.cpp"
-#    "client/igig/kiero.h"
-#    "client/igig/kcpstats.cpp"
+    "client/igig/igig.cpp"
+    "client/igig/igig.h"
+    "client/igig/ime.cpp"
+    "client/igig/ime.h"
+    "client/igig/kiero.cpp"
+    "client/igig/kiero.h"
+    "client/igig/kcpstats.cpp"
     "client/audio.cpp"
     "client/audio.h"
     "client/chatcommand.cpp"
@@ -190,6 +191,7 @@ target_link_libraries(
         RapidJSON
         spdlog
         nlohmann_json
+        imgui
 
         winpthread
         stdc++

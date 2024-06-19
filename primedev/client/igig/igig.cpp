@@ -8,6 +8,7 @@
 #include "client/fontawesome.h"
 #include "dedicated/dedicated.h"
 #include "client/igig/ime.h"
+
 typedef HRESULT(__stdcall* fpPresent)(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags);
 typedef LRESULT(CALLBACK* fpWndProc)(HWND, UINT, WPARAM, LPARAM);
 
