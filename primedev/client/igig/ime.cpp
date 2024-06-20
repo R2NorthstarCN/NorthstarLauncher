@@ -1,12 +1,12 @@
 #include "client/igig/igig.h"
 #include "imgui.h"
 #include "core/hooks.h"
-#include "client/fontawesome.h"
 #include "client/igig/ime.h"
 #include "core/memalloc.h"
 #include "shared/keyvalues.h"
-
-#include <concurrent_queue.h>
+#include <queue>
+#include <mutex>
+//#include <concurrent_queue.h>
 
 AUTOHOOK_INIT()
 
@@ -33,7 +33,8 @@ Panel__GetSize_t Panel__GetSize;
 TextEntry__CursorToPixelSpace_t TextEntry__CursorToPixelSpace;
 
 std::vector<std::wstring> candidates;
-concurrency::concurrent_queue<std::wstring> inputQueue;
+std::mutex inputQueueMtx;
+std::queue<std::wstring> inputQueue;
 
 std::wstring composite;
 DWORD candiX, candiY;
@@ -90,16 +91,15 @@ std::string convert_from_wstring(const std::wstring& wstr)
 
 void PostUpdateCandidateWindowPosMessage()
 {
+	std::lock_guard<std::mutex> lk(inputQueueMtx);
 	while (!inputQueue.empty())
 	{
-		std::wstring str;
-		if (inputQueue.try_pop(str))
+		std::wstring str = inputQueue.front();
+		for (const auto& wc : str)
 		{
-			for (const auto& wc : str)
-			{
-				CInputWin32__InternalKeyTyped(CInputWin32__Instance, wc);
-			}
+			CInputWin32__InternalKeyTyped(CInputWin32__Instance, wc);
 		}
+		inputQueue.pop();
 	}
 	CInputWin32__PostKeyMessage(CInputWin32__Instance, new KeyValues("DoIMEUpdateCandidateWindowPos"));
 }
@@ -138,6 +138,7 @@ bool ImeWndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			else
 			{
+				std::lock_guard<std::mutex> lk(inputQueueMtx);
 				inputQueue.push(std::wstring(hStr,realSize));
 			}
 
@@ -294,11 +295,11 @@ ON_DLL_LOAD("client.dll", IMETEXTENTRY, (CModule module))
 {
 	AUTOHOOK_DISPATCH_MODULE(client.dll)
 
-	VGUI__FindOrAddPanelMessageMap = module.Offset(0x75ACB0).As<VGUI__FindOrAddPanelMessageMap_t>();
-	CUtlVector__MessageMapItem_t__AddToTail = module.Offset(0x34BBE0).As<CUtlVector__MessageMapItem_t__AddToTail_t>();
-	Panel__LocalToScreen = module.Offset(0x766840).As<Panel__LocalToScreen_t>();
-	Panel__GetSize = module.Offset(0x75D680).As<Panel__GetSize_t>();
-	TextEntry__CursorToPixelSpace = module.Offset(0x783BE0).As<TextEntry__CursorToPixelSpace_t>();
+	VGUI__FindOrAddPanelMessageMap = module.Offset(0x75ACB0).RCast<VGUI__FindOrAddPanelMessageMap_t>();
+	CUtlVector__MessageMapItem_t__AddToTail = module.Offset(0x34BBE0).RCast<CUtlVector__MessageMapItem_t__AddToTail_t>();
+	Panel__LocalToScreen = module.Offset(0x766840).RCast<Panel__LocalToScreen_t>();
+	Panel__GetSize = module.Offset(0x75D680).RCast<Panel__GetSize_t>();
+	TextEntry__CursorToPixelSpace = module.Offset(0x783BE0).RCast<TextEntry__CursorToPixelSpace_t>();
 
 	MessageMapItem_t entry;
 	entry.name = "DoIMEUpdateCandidateWindowPos";
@@ -332,7 +333,7 @@ ON_DLL_LOAD("vgui2.dll", CHATBOX, (CModule module))
 	AUTOHOOK_DISPATCH_MODULE(vgui2.dll)
 
 	ImGuiManager::instance().addDrawFunction(draw_candidates);
-	CInputWin32__Instance = (__int64)(module.m_nAddress + 0x121A10);
-	CInputWin32__PostKeyMessage = module.Offset(0xEDA0).As<CInputWin32__PostKeyMessage_t>();
-	CInputWin32__InternalKeyTyped = module.Offset(0xCFD0).As<CInputWin32__InternalKeyTyped_t>();
+	CInputWin32__Instance = (__int64)(module.GetModuleBase() + 0x121A10);
+	CInputWin32__PostKeyMessage = module.Offset(0xEDA0).RCast<CInputWin32__PostKeyMessage_t>();
+	CInputWin32__InternalKeyTyped = module.Offset(0xCFD0).RCast<CInputWin32__InternalKeyTyped_t>();
 }

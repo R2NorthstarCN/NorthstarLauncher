@@ -15,7 +15,6 @@ set(CMAKE_SHARED_LIBRARY_PREFIX "")
 add_library(
     NorthstarDLL SHARED
     "resources.rc"
-    "client/fontawesome.h"
     "client/igig/igig.cpp"
     "client/igig/igig.h"
     "client/igig/ime.cpp"
@@ -166,6 +165,7 @@ add_library(
     "squirrel/squirrelautobind.h"
     "squirrel/squirrelclasstypes.h"
     "squirrel/squirreldatatypes.h"
+    "util/concurrentqueue.h"
     "util/printcommands.cpp"
     "util/printcommands.h"
     "util/printmaps.cpp"
