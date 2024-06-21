@@ -1,5 +1,7 @@
-#include "scriptgamestate.h"
 #include "squirrel/squirrel.h"
+#include "scriptgamestate.h"
+#include "client/r2client.h"
+#include "engine/r2engine.h"
 
 SQGameState* g_pSQGameState = new SQGameState;
 
