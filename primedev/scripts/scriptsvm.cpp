@@ -1,5 +1,5 @@
 #include "squirrel/squirrel.h"
-#include <svm.h>
+#include "server/svm.h"
 
 const float COORD_MIN = -16384.0;
 const float COORD_LEN = 32767.0;
@@ -90,7 +90,7 @@ ADD_SQFUNC(
 	}
 	svm_set_print_string_function(svm_print_string);
 	svm_model* model = svm_train(&prob, &param);
-	svm_model** userdata_model = g_pSquirrel<context>->createuserdata<svm_model*>(sqvm, 8);
+	svm_model** userdata_model = g_pSquirrel<context>->template createuserdata<svm_model*>(sqvm, 8);
 	*userdata_model = model;
 
 	SQUserData* userdata = (SQUserData*)(((uintptr_t)userdata_model) - 80);

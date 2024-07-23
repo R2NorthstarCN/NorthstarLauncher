@@ -9,12 +9,22 @@ find_package(rapidjson REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(imgui REQUIRED)
+set(OPENSSL_ROOT_DIR c:/msys64/usr/local/openssl)
+#set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
+message("Libs: ${OPENSSL_LIBRARIES}")
+message("Includes: ${OPENSSL_INCLUDE_DIR}")
+
+find_package(httplib REQUIRED)
 
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 add_library(
     NorthstarDLL SHARED
     "resources.rc"
+    "core/anticheat.cpp"
+    "core/anticheat.h"
+    
     "client/igig/igig.cpp"
     "client/igig/igig.h"
     "client/igig/ime.cpp"
@@ -92,6 +102,7 @@ add_library(
     "logging/sourceconsole.h"
     "masterserver/masterserver.cpp"
     "masterserver/masterserver.h"
+    "masterserver/cabundle.h"
     "mods/autodownload/moddownloader.h"
     "mods/autodownload/moddownloader.cpp"
     "mods/compiled/kb_act.cpp"
@@ -123,6 +134,14 @@ add_library(
     "scripts/server/miscserverfixes.cpp"
     "scripts/server/miscserverscript.cpp"
     "scripts/server/scriptuserinfo.cpp"
+    "scripts/scriptmasterservermessages.cpp"
+    "scripts/scriptmasterservermessages.h"
+    "scripts/scriptgamestate.cpp"
+    "scripts/scriptsvm.cpp"
+    "scripts/scriptplayerinfo.cpp"
+    "scripts/scriptgamestate.h"
+    "scripts/scriptmatchmakingevents.h"
+    "scripts/scriptmatchmakingevents.cpp"
     "scripts/scriptdatatables.cpp"
     "scripts/scripthttprequesthandler.cpp"
     "scripts/scripthttprequesthandler.h"
@@ -143,7 +162,9 @@ add_library(
     "server/r2server.h"
     "server/serverchathooks.cpp"
     "server/serverchathooks.h"
-    "server/servernethooks.cpp"
+    "server/svm.cpp"
+    "server/svm.h"
+    #"server/servernethooks.cpp"
     "server/serverpresence.cpp"
     "server/serverpresence.h"
     "shared/exploit_fixes/exploitfixes.cpp"
@@ -176,6 +197,10 @@ add_library(
     "util/version.h"
     "util/wininfo.cpp"
     "util/wininfo.h"
+    "util/base64.cpp"
+    "util/base64.h"
+    "util/dohworker.cpp"
+    "util/dohworker.h"
     "dllmain.cpp"
     "ns_version.h"
     "Northstar.def"
@@ -193,10 +218,27 @@ target_link_libraries(
         spdlog
         nlohmann_json
         imgui
+        d3dcompiler
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        httplib::httplib
+
 
         winpthread
         stdc++
-        Dbghelp.lib
+        Dbghelp
+        Imm32
+        Dwmapi
+    )
+target_link_directories(
+    NorthstarDLL
+    PRIVATE
+    thirdparty/
+)
+target_include_directories(
+    NorthstarDLL 
+    PRIVATE 
+    ${OPENSSL_INCLUDE_DIR}
     )
 
 target_compile_options(

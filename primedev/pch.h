@@ -7,7 +7,7 @@
 #define NOMINMAX // this too
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // temp because i'm very lazy and want to use inet_addr, remove later
 #define RAPIDJSON_HAS_STDSTRING 1
-
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 // add headers that you want to pre-compile here
 #include "core/memalloc.h"
 
@@ -16,7 +16,7 @@
 #include <filesystem>
 #include <sstream>
 namespace fs = std::filesystem;
-
+#include <unknwn.h>
 #include <windows.h>
 #include <psapi.h>
 #include <winrt/base.h>

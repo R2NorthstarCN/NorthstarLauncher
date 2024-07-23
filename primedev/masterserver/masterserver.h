@@ -1,37 +1,14 @@
 #pragma once
 
 #include "core/convar/convar.h"
-#include "curl/curl.h"
 #include "server/serverpresence.h"
 #include <winsock2.h>
 #include <string>
+#include <shared_mutex>
 #include <cstring>
 #include <future>
+#include "scripts/scriptmatchmakingevents.h"
 #include <unordered_set>
-#include <map>
-
-namespace nlohmann {
-
-	template <class T>
-	void to_json(nlohmann::json& j, const std::optional<T>& v)
-	{
-		if (v.has_value())
-			j = *v;
-		else
-			j = nullptr;
-	}
-
-	template <class T>
-	void from_json(const nlohmann::json& j, std::optional<T>& v)
-	{
-		if (j.is_null())
-			v = std::nullopt;
-		else
-			v = j.get<T>();
-	}
-	
-} // namespace nlohmann
-
 extern ConVar* Cvar_ns_masterserver_hostname;
 extern ConVar* Cvar_ns_curl_log_enable;
 
@@ -39,105 +16,78 @@ struct RemoteModInfo
 {
 	std::string Name;
 	std::string Version;
-	bool RequiredOnClient;
-
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(RemoteModInfo, Name, Version, RequiredOnClient)
 };
 
-class RemoteServerInfo
+struct RemoteServerInfo
 {
-public:
-	char id[33]; // 32 bytes + nullterminator
-
-	// server info
-	char name[64];
+	std::string id;
+	std::string name;
 	std::string description;
-	char map[32];
-	char playlist[16];
-	char region[32];
+	std::string map;
+	std::string playlist;
+	std::string region;
 	std::vector<RemoteModInfo> requiredMods;
-
+	int gameState;
 	int playerCount;
 	int maxPlayers;
 
 	// connection stuff
 	bool requiresPassword;
-
-public:
-	RemoteServerInfo(
-		const char* newId,
-		const char* newName,
-		const char* newDescription,
-		const char* newMap,
-		const char* newPlaylist,
-		const char* newRegion,
-		int newPlayerCount,
-		int newMaxPlayers,
-		bool newRequiresPassword);
 };
 
 struct RemoteServerConnectionInfo
 {
-public:
-	char authToken[32];
-
+	std::string authToken;
 	in_addr ip;
 	unsigned short port;
 };
 
 struct MainMenuPromoData
 {
-public:
-	struct NewInfo
-	{
-		std::string Title1;
-		std::string Title2;
-		std::string Title3;
+	std::string newInfoTitle1;
+	std::string newInfoTitle2;
+	std::string newInfoTitle3;
 
-		NLOHMANN_DEFINE_TYPE_INTRUSIVE(NewInfo, Title1, Title2, Title3)
-	} newInfo;
+	std::string largeButtonTitle;
+	std::string largeButtonText;
+	std::string largeButtonUrl;
+	int largeButtonImageIndex;
 
-	struct LargeButton
-	{
-		int ImageIndex;
-		std::string Text;
-		std::string Title;
-		std::string Url;
+	std::string smallButton1Title;
+	std::string smallButton1Url;
+	int smallButton1ImageIndex;
 
-		NLOHMANN_DEFINE_TYPE_INTRUSIVE(LargeButton, ImageIndex, Text, Title, Url)
-	} largeButton;
-
-	struct SmallButton
-	{
-		int ImageIndex;
-		std::string Title;
-		std::string Url;
-
-		NLOHMANN_DEFINE_TYPE_INTRUSIVE(SmallButton, ImageIndex, Title, Url)
-	} smallButton1, smallButton2;
-
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(MainMenuPromoData, newInfo, largeButton, smallButton1, smallButton2)
+	std::string smallButton2Title;
+	std::string smallButton2Url;
+	int smallButton2ImageIndex;
 };
 
 class MasterServerManager
 {
-private:
+  private:
+	bool m_RequestingClantag = false;
+	bool m_RequestingRemoteBanlistVersion = false;
+	bool m_RequestingRemoteBanlist = false;
 	bool m_bRequestingServerList = false;
 	bool m_bAuthenticatingWithGameServer = false;
 
-public:
+  public:
+	std::unordered_set<std::string> m_sPlayerPersistenceStates;
+	std::mutex m_PlayerPersistenceMutex;
+
 	char m_sOwnServerId[33];
 	char m_sOwnServerAuthToken[33];
-	char m_sOwnClientAuthToken[33];
+	std::string m_sOwnClientAuthToken;
 
 	std::string m_sOwnModInfoJson;
 
+	std::string RemoteBanlistString;
+	std::string LocalBanlistVersion = "undefined";
+	std::string RemoteBanlistVersion;
+
 	bool m_bOriginAuthWithMasterServerDone = false;
 	bool m_bOriginAuthWithMasterServerInProgress = false;
-
-	bool m_bOriginAuthWithMasterServerSuccessful = false;
-	std::string m_sOriginAuthWithMasterServerErrorCode = "";
-	std::string m_sOriginAuthWithMasterServerErrorMessage = "";
+	bool m_bOriginAuthWithMasterServerSuccess = false;
 
 	bool m_bSavingPersistentData = false;
 
@@ -148,6 +98,7 @@ public:
 	bool m_bScriptAuthenticatingWithGameServer = false;
 	bool m_bSuccessfullyAuthenticatedWithGameServer = false;
 	std::string m_sAuthFailureReason {};
+	std::string m_sAuthFailureMessage {};
 
 	bool m_bHasPendingConnectionInfo = false;
 	RemoteServerConnectionInfo m_pendingConnectionInfo;
@@ -157,132 +108,29 @@ public:
 	bool m_bHasMainMenuPromoData = false;
 	MainMenuPromoData m_sMainMenuPromoData;
 
-	std::optional<RemoteServerInfo> m_currentServer;
-	std::string m_sCurrentServerPassword;
-
-	std::unordered_set<std::string> m_handledServerConnections;
-
-public:
+  public:
 	MasterServerManager();
-
 	void ClearServerList();
 	void RequestServerList();
 	void RequestMainMenuPromos();
 	void AuthenticateOriginWithMasterServer(const char* uid, const char* originToken);
-	void AuthenticateWithOwnServer(const char* uid, const char* playerToken);
-	void AuthenticateWithServer(const char* uid, const char* playerToken, RemoteServerInfo server, const char* password);
-	void WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize);
-	void ProcessConnectionlessPacketSigreq1(std::string req);
+	void AuthenticateWithOwnServer(const char* uid, const std::string& playerToken);
+	void AuthenticateWithServer(const char* uid, const std::string& playerToken, const std::string& serverId, const char* password);
+	bool AuthenticateWithMatchmakingServer(
+		RemoteServerConnectionInfo& conn_info,const char* uid,
+		const std::string& playerToken,
+		const std::string& serverId,
+		const char* password);
+	void WritePlayerPersistentData(const char* player_id, const char* pdata, size_t pdata_size);
+	bool SetLocalPlayerClanTag(std::string clantag);
+	bool StartMatchmaking(MatchmakeInfo* status);
+	bool CancelMatchmaking();
+	bool UpdateMatchmakingStatus(MatchmakeInfo* status);
 };
 
 extern MasterServerManager* g_pMasterServerManager;
 extern ConVar* Cvar_ns_masterserver_hostname;
-
-enum WebSocketStates
-{
-	CONNECTING = 0,
-	CONNECTED
-};
-
-
-
-
-struct WebSocketMetadata
-{
-public:
-	uint32_t type;
-	int64_t id;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketMetadata, type, id)
-};
-struct WebSocketError
-{
-public:
-	int32_t type;
-	std::string msg;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketError,type,msg)
-};
-
-struct WebSocketServerPresenceResponse
-{
-public:
-	std::string name;
-	std::string desc;
-	uint16_t port;
-	std::string map;
-	std::string playlist;
-	int32_t curPlayers;
-	int32_t maxPlayers;
-	std::optional<std::string> password;
-	int32_t gameState;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketServerPresenceResponse,name,desc,port,map,playlist,curPlayers,maxPlayers,password,gameState)
-};
-
-struct WebSocketRegistrationRequest
-{
-public:
-	WebSocketMetadata metadata; 
-	WebSocketServerPresenceResponse info;
-	std::string regToken;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRegistrationRequest, metadata, info, regToken)
-};
-
-struct WebSocketRegistrationResponse
-{
-public:
-	WebSocketMetadata metadata; 
-	bool success;
-	std::optional<int64_t> id;
-	std::optional<WebSocketError> error;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketRegistrationResponse,metadata,success,id,error)
-};
-
-
-struct WebSocketPlayerJoinRequest
-{
-	WebSocketMetadata metadata;
-	std::string sessionToken;
-	std::string username;
-	std::string clantag;
-	uint32_t conv;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketPlayerJoinRequest,metadata,sessionToken,username,clantag,conv)
-};
-
-struct WebSocketGenericResponse
-{
-	WebSocketMetadata metadata;
-	bool success;
-	std::optional<WebSocketError> error;
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(WebSocketGenericResponse,metadata,success,error)
-};
-
-
-class WebSocketManager
-{
-public:
-	static WebSocketManager& instance();
-
-private:
-	WebSocketManager();
-	bool InitialiseWebSocket();
-	bool SendRegistrationRequest();
-	void SendServerPresence();
-	void EstablishMasterServerConnection();
-	void AddMessageCallback(int);
-	void SendJsonRequest(nlohmann::json);
-	void SendJsonResponse(nlohmann::json);
-	void SendGenericResponse(uint64_t,int,bool);
-	void ProcessIncomingMessage(const curl_ws_frame*, const nlohmann::json&);
-	void ProcessCallbacks(const nlohmann::json&);
-	void RemoveDeadCallbacks();
-	CURL* curl;
-	int webSocketState;
-	bool supressWebSocket = false;
-	std::map<int, std::pair<std::function<bool(nlohmann::json)>,std::chrono::steady_clock::time_point>> messageCallbacks;
-	std::mutex webSocketMtx;
-	std::thread updateThread;
-	std::thread stateThread;
-	std::stop_token updateThreadStopToken;
-};
+extern ConVar* Cvar_ns_matchmaker_hostname;
 
 /** Result returned in the std::future of a MasterServerPresenceReporter::ReportPresence() call. */
 enum class MasterServerReportPresenceResult
@@ -301,7 +149,7 @@ enum class MasterServerReportPresenceResult
 
 class MasterServerPresenceReporter : public ServerPresenceReporter
 {
-public:
+  public:
 	/** Full data returned in the std::future of a MasterServerPresenceReporter::ReportPresence() call. */
 	struct ReportPresenceResultData
 	{
@@ -325,7 +173,7 @@ public:
 	// Called every frame.
 	void RunFrame(double flCurrentTime, const ServerPresence* pServerPresence) override;
 
-protected:
+  protected:
 	// Contains the async logic to add the server to the MS.
 	void InternalAddServer(const ServerPresence* pServerPresence);
 

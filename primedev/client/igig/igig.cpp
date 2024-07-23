@@ -87,14 +87,14 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 			font_config_chs.OversampleV = 1;
 			io.Fonts->AddFontFromFileTTF("c:\\windows\\fonts\\msyh.ttc", 15.0f, &font_config_chs, io.Fonts->GetGlyphRangesChineseFull());
 
-			ImFontConfig icons_config;
-			strcpy_s(icons_config.Name, "FontAwesome");
-			icons_config.GlyphOffset = ImVec2(0.0, 2.0);
-			icons_config.MergeMode = true;
-			icons_config.PixelSnapH = true;
-			icons_config.OversampleH = 1;
-			io.Fonts->AddFontFromMemoryCompressedBase85TTF(
-				FontAwesome_compressed_data_base85, 13.0f, &icons_config, GetGlyphRangesFontAwesome());
+			// ImFontConfig icons_config;
+			// strcpy_s(icons_config.Name, "FontAwesome");
+			// icons_config.GlyphOffset = ImVec2(0.0, 2.0);
+			// icons_config.MergeMode = true;
+			// icons_config.PixelSnapH = true;
+			// icons_config.OversampleH = 1;
+			// io.Fonts->AddFontFromMemoryCompressedBase85TTF(
+			// 	FontAwesome_compressed_data_base85, 13.0f, &icons_config, GetGlyphRangesFontAwesome());
 			ImGui_ImplDX11_CreateDeviceObjects();
 			originalWndProc = (WNDPROC)SetWindowLongPtr(igig.window, GWLP_WNDPROC, (LONG_PTR)hookedWndProc);
 
@@ -110,8 +110,8 @@ static HRESULT __stdcall hookedPresent(IDXGISwapChain* pSwapChain, UINT SyncInte
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	ImGui::SetShortcutRouting(ImGuiMod_Ctrl | ImGuiKey_Tab, ImGuiKeyOwner_None);
-	ImGui::SetShortcutRouting(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Tab, ImGuiKeyOwner_None);
+	ImGui::SetShortcutRouting(ImGuiMod_Ctrl | ImGuiKey_Tab, 0, ImGuiKeyOwner_NoOwner);
+	ImGui::SetShortcutRouting(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Tab, 0, ImGuiKeyOwner_NoOwner);
 	
 	for (const auto& func : igig.drawFunctions)
 	{
@@ -141,7 +141,7 @@ void ImGuiManager::startInitThread()
 					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 					continue;
 				}
-				if (kiero::bind(8, (void**)&originalPresent, hookedPresent) != kiero::Status::Success)
+				if (kiero::bind(8, (void**)&originalPresent, (void*)hookedPresent) != kiero::Status::Success)
 				{
 					spdlog::error("[IGIG] Kiero bind failed");
 					break;

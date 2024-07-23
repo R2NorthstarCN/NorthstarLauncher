@@ -30,6 +30,8 @@ namespace NS::log
 	std::shared_ptr<ColoredLogger> rpak;
 	std::shared_ptr<ColoredLogger> echo;
 
+	std::shared_ptr<ColoredLogger> NEW_NET;
+
 	std::shared_ptr<ColoredLogger> NORTHSTAR;
 	std::shared_ptr<ColoredLogger> PLUGINSYS;
 }; // namespace NS::log
@@ -199,6 +201,9 @@ void InitialiseLogging()
 	NS::log::rpak = std::make_shared<ColoredLogger>("RPAK_FSYS", NS::Colors::RPAK);
 	NS::log::echo = std::make_shared<ColoredLogger>("ECHO", NS::Colors::ECHO);
 
+	NS::log::NEW_NET = std::make_shared<ColoredLogger>("NEW _ NET", NS::Colors::NEW_NET);
+
+
 	NS::log::PLUGINSYS = std::make_shared<ColoredLogger>("PLUGINSYS", NS::Colors::PLUGINSYS);
 
 	loggers.push_back(NS::log::SCRIPT_UI);
@@ -215,6 +220,9 @@ void InitialiseLogging()
 	loggers.push_back(NS::log::fs);
 	loggers.push_back(NS::log::rpak);
 	loggers.push_back(NS::log::echo);
+
+	loggers.push_back(NS::log::NEW_NET);
+
 }
 
 void NS::log::FlushLoggers()

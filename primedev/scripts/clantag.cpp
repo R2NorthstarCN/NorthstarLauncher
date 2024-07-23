@@ -1,3 +1,4 @@
+//#include "pch.h"
 #include "dedicated/dedicated.h"
 #include <cstring>
 #include "masterserver/masterserver.h"
@@ -19,9 +20,6 @@ static SQRESULT SQ_SetLocalPlayerClanTag(HSquirrelVM* sqvm)
 	g_pSquirrel<ScriptContext::CLIENT>->pushbool(sqvm, result);
 	return SQRESULT_NOTNULL;
 }
-
-
-
 
 
 AUTOHOOK(StryderShit,engine.dll + 0x1712F0, char*,__fastcall,

@@ -188,6 +188,7 @@ namespace NS::Colors
 	extern Color ECHO;
 	extern Color PLUGINSYS;
 	extern Color PLUGIN;
+	extern Color NEW_NET;
 
 	extern Color TRACE;
 	extern Color DEBUG;

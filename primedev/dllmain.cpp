@@ -9,6 +9,7 @@
 #include "util/wininfo.h"
 #include "squirrel/squirrel.h"
 #include "server/serverpresence.h"
+#include "client/igig/igig.h"
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
@@ -69,6 +70,7 @@ extern "C" bool InitialiseNorthstar()
 
 	g_pServerPresence = new ServerPresenceManager();
 
+	// we don't really need plugins in nscn
 	g_pPluginManager = new PluginManager();
 	g_pPluginManager->LoadPlugins();
 
@@ -81,6 +83,7 @@ extern "C" bool InitialiseNorthstar()
 
 	// run callbacks for any libraries that are already loaded by now
 	CallAllPendingDLLLoadCallbacks();
+	ImGuiManager::instance().startInitThread();
 
 	return true;
 }

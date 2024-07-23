@@ -5,8 +5,7 @@ struct ServerPresence
 {
 public:
 	int m_iPort;
-
-	std::string m_sServerId;
+	int m_iAuthPort;
 
 	std::string m_sServerName;
 	std::string m_sServerDesc;
@@ -19,16 +18,12 @@ public:
 	int m_iPlayerCount;
 	int m_iMaxPlayers;
 
-	ServerPresence()
-	{
-		memset(this, 0, sizeof(this));
-	}
+	ServerPresence() {}
 
 	ServerPresence(const ServerPresence* obj)
 	{
 		m_iPort = obj->m_iPort;
-
-		m_sServerId = obj->m_sServerId;
+		m_iAuthPort = obj->m_iAuthPort;
 
 		m_sServerName = obj->m_sServerName;
 		m_sServerDesc = obj->m_sServerDesc;
@@ -81,6 +76,7 @@ public:
 	void RunFrame(double flCurrentTime);
 
 	void SetPort(const int iPort);
+	void SetAuthPort(const int iPort);
 
 	void SetName(const std::string sServerNameUnicode);
 	void SetDescription(const std::string sServerDescUnicode);
