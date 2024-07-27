@@ -1023,7 +1023,7 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 		[threaded_presence, mod_info, hostname, server_account]
 		{
 			httplib::Client cli = SetupHttpClient();
-			const std::string querystring = fmt::format(
+			std::string querystring = fmt::format(
 				"/server/"
 				"add_server?port={}&authPort={}&name={}&description={}&map={}&playlist={}&maxPlayers={}&password={}&serverRegToken="
 				"{}&isMmServer={}",
@@ -1048,9 +1048,9 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				data.serverAuthToken = server_auth_token;
 				return data;
 			};
-			spdlog::info("{}", mod_info);
+			//spdlog::info("{}", mod_info);
 			auto res = cli.Post(querystring, mod_info, "application/json");
-
+				
 			if (res && res->status == 200)
 			{
 				try
@@ -1088,7 +1088,8 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				spdlog::error(
 					"Failed adding self to server list: error {}",
 					std::to_string(static_cast<int>(res.error())));
-				spdlog::error("res:{}", res->body);
+				if(!res->body.empty())
+					spdlog::error("res:{}", res->body);
 				return return_cleanup(MasterServerReportPresenceResult::FailedNoConnect);
 			}
 		});
@@ -1131,7 +1132,7 @@ void MasterServerPresenceReporter::InternalUpdateServer(const ServerPresence* pS
 			};
 
 			httplib::Client cli = SetupHttpClient();
-			const std::string querystring = fmt::format(
+			std::string querystring = fmt::format(
 				"/server/"
 				"update_values?id={}&port={}&authPort={}&name={}&description={}&map={}&playlist={}&playerCount={}&"
 				"maxPlayers={}&password={}&gameState={}&serverAuthToken={}",

@@ -63,21 +63,28 @@ void SetNewModSearchPaths(Mod* mod)
 {
 	// put our new path to the head if we need to read from a different mod path
 	// in the future we could also determine whether the file we're setting paths for needs a mod dir, or compiled assets
+	//NS::log::fs->info("SetNewModSearchPaths {}", mod->Name);
 	if (mod != nullptr)
 	{
+
 		if ((fs::absolute(mod->m_ModDirectory) / MOD_OVERRIDE_DIR).string().compare(sCurrentModPath))
 		{
 			AddSearchPath(
 				&*(*g_pFilesystem), (fs::absolute(mod->m_ModDirectory) / MOD_OVERRIDE_DIR).string().c_str(), "GAME", PATH_ADD_TO_HEAD);
 			sCurrentModPath = (fs::absolute(mod->m_ModDirectory) / MOD_OVERRIDE_DIR).string();
 		}
+		//NS::log::fs->info("SetNewModSearchPaths done {}", mod->Name);
 	}
 	else // push compiled to head
+	{
 		AddSearchPath(&*(*g_pFilesystem), fs::absolute(GetCompiledAssetsPath()).string().c_str(), "GAME", PATH_ADD_TO_HEAD);
+		//NS::log::fs->info("SetNewModSearchPaths done 2 {}", mod->Name);
+	}
 }
 
 bool TryReplaceFile(const char* pPath, bool shouldCompile)
 {
+	//NS::log::fs->info("tryreplacefile {}", pPath);
 	if (bReadingOriginalFile)
 		return false;
 
@@ -92,36 +99,73 @@ bool TryReplaceFile(const char* pPath, bool shouldCompile)
 		SetNewModSearchPaths(file->second.m_pOwningMod);
 		return true;
 	}
-
+	//NS::log::fs->info("tryreplacefile done {}", pPath);
 	return false;
 }
 
+std::string ConvertWideToANSI(const std::wstring& wstr)
+{
+    int count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
+    std::string str(count, 0);
+    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
+    return str;
+}
+
+std::wstring ConvertAnsiToWide(const std::string& str)
+{
+    int count = MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
+    std::wstring wstr(count, 0);
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
+    return wstr;
+}
+
+std::string ConvertWideToUtf8(const std::wstring& wstr)
+{
+    int count = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
+    std::string str(count, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
+    return str;
+}
+
+std::wstring ConvertUtf8ToWide(const std::string& str)
+{
+    int count = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), NULL, 0);
+    std::wstring wstr(count, 0);
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), &wstr[0], count);
+    return wstr;
+}
+
+std::string SanitizeEncodings(const char* buf)
+{
+	std::wstring ws = ConvertAnsiToWide(buf);
+	return ConvertWideToUtf8(ws);
+}
 // force modded files to be read from mods, not cache
 // clang-format off
 HOOK(ReadFromCacheHook, ReadFromCache,
-bool, __fastcall, (IFileSystem * filesystem, char* pPath, void* result))
+bool, __fastcall, (IFileSystem * filesystem,const char* pPath, void* result))
 // clang-format off
 {
-	if (TryReplaceFile(pPath, true))
+	if (TryReplaceFile(SanitizeEncodings(pPath).c_str(), true))
 		return false;
 
-	return ReadFromCache(filesystem, pPath, result);
+	return ReadFromCache(filesystem, SanitizeEncodings(pPath).c_str(), result);
 }
 
 // force modded files to be read from mods, not vpk
 // clang-format off
 AUTOHOOK(ReadFileFromVPK, filesystem_stdio.dll + 0x5CBA0,
-FileHandle_t, __fastcall, (VPKData* vpkInfo, uint64_t* b, char* filename))
+FileHandle_t, __fastcall, (VPKData* vpkInfo, uint64_t* b, const char* filename))
 // clang-format on
 {
 	// don't compile here because this is only ever called from OpenEx, which already compiles
-	if (TryReplaceFile(filename, false))
+	if (TryReplaceFile(SanitizeEncodings(filename).c_str(), false))
 	{
 		*b = -1;
 		return b;
 	}
 
-	return ReadFileFromVPK(vpkInfo, b, filename);
+	return ReadFileFromVPK(vpkInfo, b, SanitizeEncodings(filename).c_str());
 }
 
 // clang-format off
@@ -129,15 +173,16 @@ AUTOHOOK(CBaseFileSystem__OpenEx, filesystem_stdio.dll + 0x15F50,
 FileHandle_t, __fastcall, (IFileSystem* filesystem, const char* pPath, const char* pOptions, uint32_t flags, const char* pPathID, char **ppszResolvedFilename))
 // clang-format on
 {
-	TryReplaceFile(pPath, true);
+	TryReplaceFile(SanitizeEncodings(pPath).c_str(), true);
 	return CBaseFileSystem__OpenEx(filesystem, pPath, pOptions, flags, pPathID, ppszResolvedFilename);
 }
 
 HOOK(MountVPKHook, MountVPK, VPKData*, , (IFileSystem * fileSystem, const char* pVpkPath))
 {
-	NS::log::fs->info("MountVPK {}", pVpkPath);
-	VPKData* ret = MountVPK(fileSystem, pVpkPath);
-
+	
+	NS::log::fs->info("MountVPK {}", SanitizeEncodings(pVpkPath).c_str());
+	VPKData* ret = MountVPK(fileSystem, SanitizeEncodings(pVpkPath).c_str());
+	//NS::log::fs->info("afterOriginal mountVPK {}", SanitizeEncodings(pVpkPath).c_str());
 	for (Mod mod : g_pModManager->m_LoadedMods)
 	{
 		if (!mod.m_bEnabled)
@@ -150,13 +195,16 @@ HOOK(MountVPKHook, MountVPK, VPKData*, , (IFileSystem * fileSystem, const char* 
 			{
 				// resolve vpk name and try to load one with the same name
 				// todo: we should be unloading these on map unload manually
-				std::string mapName(fs::path(pVpkPath).filename().string());
-				std::string modMapName(fs::path(vpkEntry.m_sVpkPath.c_str()).filename().string());
+				//NS::log::fs->info("ProcessMods {} - {}", SanitizeEncodings(pVpkPath).c_str(),vpkEntry.m_sVpkPath);
+				//NS::log::FlushLoggers();
+				//std::this_thread::sleep_for(std::chrono::milliseconds(100));
+				std::string mapName(fs::path(SanitizeEncodings(pVpkPath).c_str()).filename().string());
+				std::string modMapName(fs::path(SanitizeEncodings(vpkEntry.m_sVpkPath.c_str()).c_str()).filename().string());
 				if (mapName.compare(modMapName))
 					continue;
 			}
 
-			VPKData* loaded = MountVPK(fileSystem, vpkEntry.m_sVpkPath.c_str());
+			VPKData* loaded = MountVPK(fileSystem, SanitizeEncodings(vpkEntry.m_sVpkPath.c_str()).c_str());
 			if (!ret) // this is primarily for map vpks and stuff, so the map's vpk is what gets returned from here
 				ret = loaded;
 		}

@@ -182,9 +182,10 @@ class MasterServerPresenceReporter : public ServerPresenceReporter
 
 	// The future used for InternalAddServer() calls.
 	std::future<ReportPresenceResultData> addServerFuture;
-
+	std::thread addServerThread;
 	// The future used for InternalAddServer() calls.
 	std::future<ReportPresenceResultData> updateServerFuture;
+	std::thread updateServerThread;
 
 	int m_nNumRegistrationAttempts;
 

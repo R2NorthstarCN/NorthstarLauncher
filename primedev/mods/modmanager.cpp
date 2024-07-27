@@ -1089,7 +1089,7 @@ std::string ModManager::NormaliseModFilePath(const fs::path path)
 	for (char& c : str)
 		if (c <= 'Z' && c >= 'A')
 			c = c - ('Z' - 'z');
-
+	
 	return str;
 }
 
