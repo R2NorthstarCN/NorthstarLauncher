@@ -555,34 +555,38 @@ void ModDownloader::DownloadMod(std::string modName, std::string modVersion)
 		return;
 	}
 
+	if(this->isDownloadingMod)
+		return;
+
+	modState.state = IDLE;
+	
 	std::thread requestThread(
 		[this, modName, modVersion]()
-		{
+		{	
+			
+
+			this->isDownloadingMod = true;
 			fs::path archiveLocation;
 
-			ScopeGuard cleanup(
-				[&]
-				{
-					try
-					{
-						remove(archiveLocation);
-					}
-					catch (const std::exception& a)
-					{
-						spdlog::error("Error while removing downloaded archive: {}", a.what());
-					}
-
-					modState.state = DONE;
-					spdlog::info("Done downloading {}.", modName);
-				});
-
 			// Download mod archive
+			
 			std::string expectedHash = verifiedMods[modName].versions[modVersion].checksum;
 			std::optional<fs::path> fetchingResult = FetchModFromDistantStore(std::string_view(modName), std::string_view(modVersion));
+
+
 			if (!fetchingResult.has_value())
 			{
 				spdlog::error("Something went wrong while fetching archive, aborting.");
 				modState.state = MOD_FETCHING_FAILED;
+				this->isDownloadingMod = false;
+				try
+				{
+					remove(archiveLocation);
+				}
+				catch (const std::exception& a)
+				{
+					spdlog::error("Error while removing downloaded archive: {}", a.what());
+				}
 				return;
 			}
 			archiveLocation = fetchingResult.value();
@@ -590,11 +594,33 @@ void ModDownloader::DownloadMod(std::string modName, std::string modVersion)
 			{
 				spdlog::warn("Archive hash does not match expected checksum, aborting.");
 				modState.state = MOD_CORRUPTED;
+				this->isDownloadingMod = false;
+				try
+				{
+					remove(archiveLocation);
+				}
+				catch (const std::exception& a)
+				{
+					spdlog::error("Error while removing downloaded archive: {}", a.what());
+				}
 				return;
 			}
 
 			// Extract downloaded mod archive
 			ExtractMod(archiveLocation);
+			try
+			{
+				remove(archiveLocation);
+			}
+			catch (const std::exception& a)
+			{
+				spdlog::error("Error while removing downloaded archive: {}", a.what());
+			}
+
+			modState.state = DONE;
+			this->isDownloadingMod = false;
+			spdlog::info("Done downloading {}.", modName);
+			return;
 		});
 
 	requestThread.detach();

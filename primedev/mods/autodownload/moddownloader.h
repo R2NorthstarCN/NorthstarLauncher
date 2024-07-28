@@ -8,8 +8,9 @@ private:
 	const char* VERIFICATION_FLAG = "-disablemodverification";
 	const char* CUSTOM_MODS_URL_FLAG = "-customverifiedurl=";
 	const char* STORE_URL = "https://gcdn.thunderstore.io/live/repository/packages/";
-	const char* DEFAULT_MODS_LIST_URL = "https://raw.githubusercontent.com/R2Northstar/VerifiedMods/main/verified-mods.json";
+	const char* DEFAULT_MODS_LIST_URL = "https://gitee.com/R2NorthstarCN/VerifiedMods/raw/master/verified-mods.json";
 	char* modsListUrl;
+	
 
 	struct VerifiedModVersion
 	{
@@ -118,6 +119,8 @@ public:
 
 	enum ModInstallState
 	{
+		// Indicate UI to not immediately return false
+		IDLE,
 		// Normal installation process
 		DOWNLOADING,
 		CHECKSUMING,
@@ -152,4 +155,7 @@ public:
 	 * @returns nothing
 	 */
 	void CancelDownload();
+
+
+	bool isDownloadingMod = false;
 };

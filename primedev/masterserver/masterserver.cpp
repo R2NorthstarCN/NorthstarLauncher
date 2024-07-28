@@ -733,7 +733,7 @@ void MasterServerManager::AuthenticateWithServer(
 					nlohmann::json connection_info_json = nlohmann::json::parse(res->body);
 					if (connection_info_json.at("success") == true)
 					{
-						spdlog::info("[auth_with_server] body: {}", res->body);
+						//spdlog::info("[auth_with_server] body: {}", res->body);
 						m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(std::string(connection_info_json.at("ip")).c_str());
 						m_pendingConnectionInfo.port = static_cast<unsigned short>(connection_info_json.at("port"));
 						m_pendingConnectionInfo.authToken = connection_info_json.at("authToken");
