@@ -121,6 +121,8 @@ public:
 	{
 		// Indicate UI to not immediately return false
 		IDLE,
+		MANIFESTO_FETCHING,
+
 		// Normal installation process
 		DOWNLOADING,
 		CHECKSUMING,
