@@ -200,6 +200,8 @@ add_library(
     "util/version.h"
     "util/wininfo.cpp"
     "util/wininfo.h"
+    "windows/libsys.cpp"
+    "windows/libsys.h"
     "util/base64.cpp"
     "util/base64.h"
     "util/dohworker.cpp"

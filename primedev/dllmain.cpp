@@ -11,6 +11,8 @@
 #include "server/serverpresence.h"
 #include "client/igig/igig.h"
 
+#include "windows/libsys.h"
+
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
@@ -66,7 +68,11 @@ extern "C" bool InitialiseNorthstar()
 	// Write launcher version to log
 	StartupLog();
 
-	InstallInitialHooks();
+	// Init minhook
+	HookSys_Init();
+
+	// Init loadlibrary callbacks
+	LibSys_Init();
 
 	g_pServerPresence = new ServerPresenceManager();
 
