@@ -110,13 +110,12 @@ void PakLoadManager::UnloadMarkedPaks()
 
 	(*o_pCModelLoader_UnreferenceAllModels)(*ppModelLoader);
 	(*o_pCleanMaterialSystemStuff)();
-
 	for (auto& modPak : m_modPaks)
 	{
 		if (modPak.m_handle == PakHandle::INVALID || !modPak.m_markedForDelete)
 			continue;
 
-		g_pakLoadApi->UnloadPak(modPak.m_handle, *o_pCleanMaterialSystemStuff);
+		g_pakLoadApi->UnloadPak(modPak.m_handle, (void*)(*o_pCleanMaterialSystemStuff));
 		modPak.m_handle = PakHandle::INVALID;
 	}
 }
@@ -158,7 +157,7 @@ void PakLoadManager::UnloadModPaks()
 				continue;
 
 			m_mapPaks.erase(it, it + 1);
-			g_pakLoadApi->UnloadPak(modPak.m_handle, *o_pCleanMaterialSystemStuff);
+			g_pakLoadApi->UnloadPak(modPak.m_handle, (void*)(*o_pCleanMaterialSystemStuff));
 			modPak.m_handle = PakHandle::INVALID;
 			break;
 		}
@@ -329,7 +328,7 @@ void PakLoadManager::UnloadDependentPaks(PakHandle handle)
 				continue;
 
 			// unload pak
-			g_pakLoadApi->UnloadPak(modPak.m_handle, *o_pCleanMaterialSystemStuff);
+			g_pakLoadApi->UnloadPak(modPak.m_handle, (void*)(*o_pCleanMaterialSystemStuff));
 			modPak.m_handle = PakHandle::INVALID;
 		}
 
@@ -405,14 +404,14 @@ static bool h_LoadMapRpaks(char* mapPath)
 	{
 		(*o_pCModelLoader_UnreferenceAllModels)(*ppModelLoader);
 		(*o_pCleanMaterialSystemStuff)();
-		g_pakLoadApi->UnloadPak(curHandle, *o_pCleanMaterialSystemStuff);
+		g_pakLoadApi->UnloadPak(curHandle, (void*)(*o_pCleanMaterialSystemStuff));
 		*piCurrentMapRpakHandle = PakHandle::INVALID;
 	}
 	if (curPatchHandle != PakHandle::INVALID)
 	{
 		(*o_pCModelLoader_UnreferenceAllModels)(*ppModelLoader);
 		(*o_pCleanMaterialSystemStuff)();
-		g_pakLoadApi->UnloadPak(curPatchHandle, *o_pCleanMaterialSystemStuff);
+		g_pakLoadApi->UnloadPak(curPatchHandle, (void*)(*o_pCleanMaterialSystemStuff));
 		*piCurrentMapPatchRpakHandle = PakHandle::INVALID;
 	}
 
@@ -459,7 +458,7 @@ PakHandle, __fastcall, (const char* pPath, void* memoryAllocator, int flags))
 	}
 
 	PakHandle iPakHandle = LoadPakAsync(resultingPath.c_str(), memoryAllocator, flags);
-	NS::log::rpak->info("LoadPakAsync {} {}", resultingPath, iPakHandle);
+	NS::log::rpak->info("LoadPakAsync {} {}", resultingPath, (int)iPakHandle);
 
 	g_pPakLoadManager->OnPakLoaded(svOriginalPath, resultingPath, iPakHandle);
 
@@ -473,7 +472,7 @@ void*, __fastcall, (PakHandle nPakHandle, void* pCallback))
 {
 	g_pPakLoadManager->OnPakUnloading(nPakHandle);
 
-	NS::log::rpak->info("UnloadPak {}", nPakHandle);
+	NS::log::rpak->info("UnloadPak {}", (int)nPakHandle);
 	return UnloadPak(nPakHandle, pCallback);
 }
 
@@ -581,6 +580,6 @@ ON_DLL_LOAD("engine.dll", RpakFilesystem, (CModule module))
 	HookAttach(&(PVOID&)o_pLoadMapRpaks, (PVOID)h_LoadMapRpaks);
 
 	// kinda bad, doing things in rtech in an engine callback but it seems fine for now
-	CModule rtechModule(GetModuleHandleA("rtech_game.dll"));
+	CModule rtechModule("rtech_game.dll");
 	o_pGetPakPatchNumber = rtechModule.Offset(0x9A00).RCast<decltype(o_pGetPakPatchNumber)>();
 }

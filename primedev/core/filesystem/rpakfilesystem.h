@@ -1,7 +1,7 @@
 #pragma once
 
 #include <regex>
-
+#include "mods/modmanager.h"
 enum PakHandle : int
 {
 	INVALID = -1,
