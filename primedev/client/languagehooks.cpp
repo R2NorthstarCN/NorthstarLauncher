@@ -1,5 +1,5 @@
 #include "core/tier0.h"
-
+#include "core/filesystem/filesystem.h"
 #include <filesystem>
 #include <regex>
 
@@ -7,18 +7,19 @@ namespace fs = std::filesystem;
 
 typedef LANGID (*Tier0_DetectDefaultLanguageType)();
 
+
 bool CheckLangAudioExists(char* lang)
 {
 	std::string path {"r2\\sound\\general_"};
 	path += lang;
 	path += ".mstr";
-	return fs::exists(path);
+	return fs::exists(SanitizeEncodings(path.c_str()));
 }
 
 std::vector<std::string> file_list(fs::path dir, std::regex ext_pattern)
 {
 	std::vector<std::string> result;
-
+	
 	if (!fs::exists(dir) || !fs::is_directory(dir))
 		return result;
 
@@ -40,7 +41,7 @@ std::vector<std::string> file_list(fs::path dir, std::regex ext_pattern)
 
 std::string GetAnyInstalledAudioLanguage()
 {
-	for (const auto& lang : file_list("r2\\sound\\", std::regex(".*?general_([a-z]+)_patch_1\\.mstr")))
+	for (const auto& lang : file_list(SanitizeEncodings("r2\\sound\\"), std::regex(".*?general_([a-z]+)_patch_1\\.mstr")))
 		if (lang != "general" && lang != "" && lang != "stream")
 			return lang;
 	return "NO LANGUAGE DETECTED";

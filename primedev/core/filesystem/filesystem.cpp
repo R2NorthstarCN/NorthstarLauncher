@@ -83,11 +83,11 @@ bool TryReplaceFile(const char* pPath, bool shouldCompile)
 		return false;
 
 	if (shouldCompile)
-		g_pModManager->CompileAssetsForFile(pPath);
+		g_pModManager->CompileAssetsForFile(SanitizeEncodings(pPath).c_str());
 
 	// idk how efficient the lexically normal check is
 	// can't just set all /s in path to \, since some paths aren't in writeable memory
-	auto file = g_pModManager->m_ModFiles.find(g_pModManager->NormaliseModFilePath(fs::path(pPath)));
+	auto file = g_pModManager->m_ModFiles.find(g_pModManager->NormaliseModFilePath(fs::path(SanitizeEncodings(pPath))));
 	if (file != g_pModManager->m_ModFiles.end())
 	{
 		SetNewModSearchPaths(file->second.m_pOwningMod);
@@ -97,43 +97,7 @@ bool TryReplaceFile(const char* pPath, bool shouldCompile)
 	return false;
 }
 
-std::string ConvertWideToANSI(const std::wstring& wstr)
-{
-    int count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
-    std::string str(count, 0);
-    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
-    return str;
-}
 
-std::wstring ConvertAnsiToWide(const std::string& str)
-{
-    int count = MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
-    std::wstring wstr(count, 0);
-    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
-    return wstr;
-}
-
-std::string ConvertWideToUtf8(const std::wstring& wstr)
-{
-    int count = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
-    std::string str(count, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
-    return str;
-}
-
-std::wstring ConvertUtf8ToWide(const std::string& str)
-{
-    int count = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), NULL, 0);
-    std::wstring wstr(count, 0);
-    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), &wstr[0], count);
-    return wstr;
-}
-
-std::string SanitizeEncodings(const char* buf)
-{
-	std::wstring ws = ConvertAnsiToWide(buf);
-	return ConvertWideToUtf8(ws);
-}
 // force modded files to be read from mods, not cache
 static bool(__fastcall* o_pReadFromCache)(IFileSystem* filesystem, char* pPath, void* result) = nullptr;
 static bool __fastcall h_ReadFromCache(IFileSystem* filesystem, char* pPath, void* result)
