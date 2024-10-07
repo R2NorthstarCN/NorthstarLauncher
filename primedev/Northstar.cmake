@@ -224,7 +224,7 @@ target_link_libraries(
         spdlog
         nlohmann_json
         imgui
-        d3dcompiler
+        "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/d3dcompiler46.lib"
         OpenSSL::SSL
         OpenSSL::Crypto
         httplib::httplib

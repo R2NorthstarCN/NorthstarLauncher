@@ -111,7 +111,8 @@ std::string DohWorker::ResolveDomain(std::string domainname)
 	else
 	{
 		// DOH failed, we need to fallback to use normal DNS
-		spdlog::error("[DOH] CURL failed : error {}", curl_easy_strerror(result));
+		if(m_bDohAvailable)
+			spdlog::error("[DOH] CURL failed : error {}", curl_easy_strerror(result));
 		m_bDohAvailable = false;
 	}
 

@@ -80,8 +80,8 @@ void SetCommonHttpClientOptions(CURL* curl)
 			curl_easy_setopt(curl, CURLOPT_RESOLVE, host);
 		}
 		else
-		{
-			spdlog::warn("[DOH] service is not available. falling back to DNS");
+		{	
+			//spdlog::warn("[DOH] service is not available. falling back to DNS");
 		}
 	}
 	else
@@ -118,7 +118,7 @@ httplib::Client SetupHttpClient()
 		}
 		else
 		{
-			spdlog::warn("[DOH] service is not available. falling back to DNS");
+			//spdlog::warn("[DOH] service is not available. falling back to DNS");
 		}
 	}
 	return cli;
@@ -142,7 +142,7 @@ httplib::Client SetupMatchmakerHttpClient()
 		}
 		else
 		{
-			spdlog::warn("[DOH] service is not available. falling back to DNS");
+			//spdlog::warn("[DOH] service is not available. falling back to DNS");
 		}
 	}
 	return cli;
