@@ -101,7 +101,8 @@
         "stack": "cpp",
         "valarray": "cpp",
         "*.inc": "cpp",
-        "*.def": "cpp"
+        "*.def": "cpp",
+        "*.rh": "cpp"
     },
     "cmake.configureOnOpen": false
 }

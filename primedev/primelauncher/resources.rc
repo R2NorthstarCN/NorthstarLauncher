@@ -1,5 +1,8 @@
 // Microsoft Visual C++ generated resource script.
 //
+#include <winresrc.h>
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "shared.manifest"
+
 #include "resource1.h"
 #include "../ns_version.h"
 

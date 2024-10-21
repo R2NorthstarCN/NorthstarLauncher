@@ -21,6 +21,7 @@ set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 add_library(
     NorthstarDLL SHARED
+    
     "resources.rc"
     "core/anticheat.cpp"
     "core/anticheat.h"
@@ -249,7 +250,10 @@ target_include_directories(
 
 target_compile_options(
     NorthstarDLL
-    PRIVATE -mavx
+    PRIVATE 
+    -mavx
+    -finput-charset=utf-8 
+    -fexec-charset=utf-8
 )
 
 target_precompile_headers(

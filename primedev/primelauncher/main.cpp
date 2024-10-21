@@ -11,6 +11,7 @@
 
 #include <winsock2.h>
 #include <WS2tcpip.h>
+#include <shellapi.h>
 
 namespace fs = std::filesystem;
 
@@ -74,13 +75,13 @@ FARPROC GetLauncherMain()
 
 void LibraryLoadError(DWORD dwMessageId, const wchar_t* libName, const wchar_t* location)
 {
-	char text[8192];
+	wchar_t text[8192];
 	std::string message = std::system_category().message(dwMessageId);
 
-	sprintf_s(
+	swprintf_s(
 		text,
-		"Failed to load the %ls at \"%ls\" (%lu):\n\n%hs\n\nMake sure you followed the Northstar installation instructions carefully "
-		"before reaching out for help.",
+		L"无法读取文件 %ls 于 \"%ls\" (%lu):\n\n%hs\n\n请检查安装流程是否正确"
+		L"或在北极星CN Wiki中查询常见疑难问题解答",
 		libName,
 		location,
 		dwMessageId,
@@ -88,44 +89,47 @@ void LibraryLoadError(DWORD dwMessageId, const wchar_t* libName, const wchar_t* 
 
 	if (dwMessageId == 126 && std::filesystem::exists(location))
 	{
-		sprintf_s(
+		swprintf_s(
 			text,
-			"%s\n\nThe file at the specified location DOES exist, so this error indicates that one of its *dependencies* failed to be "
-			"found.\n\nTry the following steps:\n1. Install Visual C++ 2022 Redistributable: "
-			"https://aka.ms/vs/17/release/vc_redist.x64.exe\n2. Repair game files",
+			L"%s\n\n该文件在文件系统中存在，但其所需的其他文件可能无法被正常读取 "
+			"\n\n请尝试以下可能得解决方案: \n1. 安装 Visual C++ 2022 运行库: "
+			"https://aka.ms/vs/17/release/vc_redist.x64.exe"
+			"\n2. 在您安装游戏的平台中校验游戏完整性",
 			text);
 	}
 	else if (!fs::exists("Titanfall2.exe") && (fs::exists("..\\Titanfall2.exe") || fs::exists("..\\..\\Titanfall2.exe")))
 	{
-		auto curDir = std::filesystem::current_path().filename().string();
-		auto aboveDir = std::filesystem::current_path().parent_path().filename().string();
-		sprintf_s(
+		auto curDir = std::filesystem::current_path().filename().wstring();
+		auto aboveDir = std::filesystem::current_path().parent_path().filename().wstring();
+		swprintf_s(
 			text,
-			"%s\n\nWe detected that in your case you have extracted the files into a *subdirectory* of your Titanfall 2 "
-			"installation.\nPlease move all the files and folders from current folder (\"%s\") into the Titanfall 2 installation directory "
-			"just above (\"%s\").\n\nPlease try out the above steps by yourself before reaching out to the community for support.",
+			L"%s\n\n检测到您将北极星CN的安装包解压到了 Titanfall 2 的次级文件夹中"
+			"\n请删除或撤销您在当前文件夹中的操作，并将北极星CN安装包解压到与'Titanfall2.exe'同级的文件夹中",
 			text,
 			curDir.c_str(),
 			aboveDir.c_str());
 	}
 	else if (!fs::exists("Titanfall2.exe"))
 	{
-		sprintf_s(
+		swprintf_s(
 			text,
-			"%s\n\nRemember: you need to unpack the contents of this archive into your Titanfall 2 game installation directory, not just "
-			"to any random folder.",
+			L"%s\n\n请注意: 您需要将北极星CN安装包解压到游戏安装目录，与'Titanfall2.exe'同级的文件夹中，"
+			"而不是直接在压缩包内运行或解压到任意位置！",
 			text);
 	}
 	else if (fs::exists("Titanfall2.exe"))
 	{
-		sprintf_s(
+		swprintf_s(
 			text,
-			"%s\n\nTitanfall2.exe has been found in the current directory: is the game installation corrupted or did you not unpack all "
-			"Northstar files here?",
+			L"%s\n\n北极星CN安装位置正确，但游戏文件可能损坏或北极星CN文件缺失\n"
+			"请尝试在游戏安装平台中校验文件完整性，或重新安装北极星CN并确保所有文件都被解压到当前目录中！",
 			text);
 	}
 
-	MessageBoxA(GetForegroundWindow(), text, "Northstar Launcher Error", 0);
+	int result = MessageBoxW(GetForegroundWindow(), text, L"启动北极星CN时出现错误", 0);
+	if (result == IDOK) {
+		ShellExecuteW(NULL, L"open", L"https://wiki.northstar.cool/#/installing-northstar/troubleshooting", NULL, NULL, SW_SHOWNORMAL);
+	}
 }
 
 void AwaitOriginStartup()
@@ -339,7 +343,7 @@ HMODULE LoadDediStub(const char* name)
 
 int main(int argc, char* argv[])
 {
-
+	
 	if (strstr(GetCommandLineA(), "-waitfordebugger"))
 	{
 		while (!IsDebuggerPresent())
@@ -466,10 +470,10 @@ int main(int argc, char* argv[])
 	std::cout << "[*] Launching the game..." << std::endl;
 	auto LauncherMain = GetLauncherMain();
 	if (!LauncherMain)
-		MessageBoxA(
+		MessageBoxW(
 			GetForegroundWindow(),
-			"Failed loading launcher.dll.\nThe game cannot continue and has to exit.",
-			"Northstar Launcher Error",
+			L"无法找到 launcher.dll.\n启动游戏时失败",
+			L"错误",
 			0);
 
 	std::cout.flush();

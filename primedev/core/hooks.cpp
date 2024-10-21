@@ -247,13 +247,12 @@ static LPSTR WINAPI h_GetCommandLineA()
 				// if some other command line option includes "-northstar" in the future then you have to refactor this check to check with
 				// both either space after or ending with
 				if (!isDedi && argBuffer.str().find("-northstar") != std::string::npos)
-					MessageBoxA(
+					MessageBoxW(
 						NULL,
-						"The \"-northstar\" command line option is NOT supposed to go into ns_startup_args.txt file!\n\nThis option is "
-						"supposed to go into Origin/Steam game launch options, and then you are supposed to launch the original "
-						"Titanfall2.exe "
-						"rather than NorthstarLauncher.exe to make use of it.",
-						"Northstar Warning",
+						L"请勿将 \"-northstar\" 填入 ns_startup_args.txt!\n\n该选项"
+						"仅可用于Steam/EA App的高级启动选项中，通过"
+						"平台启动北极星CN使用",
+						L"警告",
 						MB_ICONWARNING);
 
 				args.append(argBuffer.str());

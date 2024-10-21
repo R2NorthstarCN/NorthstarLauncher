@@ -7,6 +7,8 @@
 #include "plugins/pluginmanager.h"
 
 #include <dbghelp.h>
+#include <codecvt>
+#include <shellapi.h>
 
 #define CRASHHANDLER_MAX_FRAMES 32
 #define CRASHHANDLER_GETMODULEHANDLE_FAIL "GetModuleHandleExA failed!"
@@ -299,15 +301,21 @@ void CCrashHandler::ShowPopUpMessage()
 
 	if (!IsDedicatedServer())
 	{
-		std::string svMessage = fmt::format(
-			"Northstar has crashed! Crash info can be found at {}/logs!\n\n{}\n{} + {}",
-			GetNorthstarPrefix(),
-			GetExceptionString(),
-			m_svCrashedModule,
-			m_svCrashedOffset);
+		std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+		
+		std::wstring svMessage = fmt::format(
+			L"北极星CN崩溃了! 详细错误信息已保存至 {}/logs!\n\n{}\n{} + {}\n点击'确定'以在浏览器中查看常见问题疑难解答",
+			converter.from_bytes(GetNorthstarPrefix()).c_str(),
+			converter.from_bytes(GetExceptionString()).c_str(),
+			converter.from_bytes(m_svCrashedModule).c_str(),
+			converter.from_bytes(m_svCrashedOffset).c_str());
 
-		MessageBoxA(GetForegroundWindow(), svMessage.c_str(), "Northstar has crashed!", MB_ICONERROR | MB_OK);
-	}
+		int result = MessageBoxW(GetForegroundWindow(), svMessage.c_str(), L"错误", MB_ICONERROR | MB_OKCANCEL);
+		if (result == IDOK) {
+        	ShellExecuteW(NULL, L"open", L"https://wiki.northstar.cool/#/installing-northstar/troubleshooting", NULL, NULL, SW_SHOWNORMAL);
+		}
+    }
+
 }
 
 //-----------------------------------------------------------------------------

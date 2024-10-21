@@ -15,6 +15,11 @@ target_link_libraries(
 
 set_target_properties(NorthstarLauncher PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${NS_BINARY_DIR})
 
+target_compile_options(NorthstarLauncher PRIVATE 
+-finput-charset=utf-8 
+-fexec-charset=utf-8
+)
+
 target_link_options(NorthstarLauncher PUBLIC "LINKER:--stack,8000000")
 
 add_custom_command(TARGET NorthstarLauncher POST_BUILD

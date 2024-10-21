@@ -1,5 +1,8 @@
 // Microsoft Visual C++ generated resource script.
 //
+#include <winresrc.h>
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "shared.manifest"
+
 #include "resource1.h"
 #include "../primedev/ns_version.h"
 
@@ -35,6 +38,8 @@ BEGIN
     "\r\n"
     "\0"
 END
+
+
 
 #endif    // APSTUDIO_INVOKED
 

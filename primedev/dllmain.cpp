@@ -22,6 +22,37 @@
 #include <string.h>
 #include <filesystem>
 
+bool WindowsVersionSupportsUtf8() {
+    typedef LONG(WINAPI* RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+    HMODULE hMod = ::GetModuleHandleW(L"ntdll.dll");
+    if (hMod) {
+        RtlGetVersionPtr fxPtr = (RtlGetVersionPtr)::GetProcAddress(hMod, "RtlGetVersion");
+        if (fxPtr != nullptr) {
+            RTL_OSVERSIONINFOW rovi = {0};
+            rovi.dwOSVersionInfoSize = sizeof(rovi);
+            if (fxPtr(&rovi) == 0) {
+                return (rovi.dwMajorVersion < 10) || 
+                       (rovi.dwMajorVersion == 10 && rovi.dwBuildNumber < 18362);
+            }
+        }
+    }
+    return false; // Default to false if unable to determine
+}
+
+bool IsUtf8BetaOptionEnabled() {
+    HKEY hKey;
+    DWORD utf8Enabled = 0;
+    DWORD bufferSize = sizeof(utf8Enabled);
+
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        RegQueryValueExW(hKey, L"ACP", nullptr, nullptr, reinterpret_cast<LPBYTE>(&utf8Enabled), &bufferSize);
+        RegCloseKey(hKey);
+    }
+
+    return utf8Enabled == 65001;
+}
+
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
 	NOTE_UNUSED(hModule);
@@ -40,13 +71,17 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 	return TRUE;
 }
 
+
 extern "C" bool InitialiseNorthstar()
-{
+{	
+	
 	static bool bInitialised = false;
 	if (bInitialised)
 		return false;
 
 	bInitialised = true;
+
+	
 
 	InitialiseNorthstarPrefix();
 
@@ -54,6 +89,19 @@ extern "C" bool InitialiseNorthstar()
 	InitialiseConsole();
 	// initialise logging before most other things so that they can use spdlog and it have the proper formatting
 	InitialiseLogging();
+
+	if (WindowsVersionSupportsUtf8() && !IsUtf8BetaOptionEnabled()) {
+		if(strstr(GetCommandLineA(), "-dedicated") == NULL)
+		{
+			MessageBoxW(nullptr,
+			L"由于运行库与旧版Windows存在兼容性问题，北极星CN 1.17只能保证在Windows 10 1903以上的版本在系统默认设置的情况下正常运行，若是Windows10 1903以下的系统版本，需要在控制面板-时钟和区域-区域-管理-更改系统区域设置-勾选使用Unicode UTF-8。如果在旧系统版本中不启用UTF-8，北极星CN将无法正确处理Windows中文字符，导致带有任何中文路径的Mod无法正常工作或游戏崩溃，并且不支持将游戏安装在包含中文字符的路径中。若您的系统版本无Unicode UTF-8 选项，或是启用此选项后其他应用程序或目录出现乱码问题，可以通过（1）升级操作系统版本至Windows 10 1903或更高版本。（2）手动重命名游戏安装目录、所有含中文名称的Mod（如模型和音频替换Mod）的目录名称以避免北极星CN出现故障。",
+			L"警告: 您的操作系统可能不受支持",
+			MB_OK | MB_ICONWARNING);
+			
+		}
+        std::wcout << L"警告: 由于运行库与旧版Windows存在兼容性问题，北极星CN 1.17只能保证在Windows 10 1903以上的版本在系统默认设置的情况下正常运行，若是Windows10 1903以下的系统版本，需要在控制面板-时钟和区域-区域-管理-更改系统区域设置-勾选使用Unicode UTF-8。如果在旧系统版本中不启用UTF-8，北极星CN将无法正确处理Windows中文字符，导致带有任何中文路径的Mod无法正常工作或游戏崩溃，并且不支持将游戏安装在包含中文字符的路径中。若您的系统版本无Unicode UTF-8 选项，或是启用此选项后其他应用程序或目录出现乱码问题，可以通过（1）升级操作系统版本至Windows 10 1903或更高版本。（2）手动重命名游戏安装目录、所有含中文名称的Mod（如模型和音频替换Mod）的目录名称以避免北极星CN出现故障。" << std::endl;
+    }
+	
 	InitialiseVersion();
 	CreateLogFiles();
 

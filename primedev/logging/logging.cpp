@@ -62,8 +62,8 @@ void CreateLogFiles()
 		catch (...)
 		{
 			spdlog::error("Failed creating log file!");
-			MessageBoxA(
-				0, "Failed creating log file! Make sure the profile directory is writable.", "Northstar Warning", MB_ICONWARNING | MB_OK);
+			MessageBoxW(
+				0, L"无法创建日志文件! 请检查Northstar目录是否可写!", L"警告", MB_ICONWARNING | MB_OK);
 		}
 	}
 }
@@ -130,6 +130,7 @@ void InitialiseConsole()
 	}
 	else
 	{
+		SetConsoleOutputCP(CP_UTF8);
 		freopen("CONOUT$", "w", stdout);
 		freopen("CONOUT$", "w", stderr);
 	}
