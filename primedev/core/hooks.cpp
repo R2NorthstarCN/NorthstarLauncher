@@ -323,7 +323,7 @@ void CallLoadLibraryWCallbacks(LPCWSTR lpLibFileName, HMODULE moduleAddress)
 		bool bDoneCalling = true;
 
 		for (auto& callbackStruct : GetDllLoadCallbacks())
-		{
+		{	
 			if (!callbackStruct.called && fs::path(lpLibFileName).filename() == fs::path(callbackStruct.dll).filename())
 			{
 				bool bShouldContinue = false;
