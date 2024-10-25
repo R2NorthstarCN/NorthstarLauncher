@@ -76,6 +76,9 @@ public:
 	// Minidump
 	//-----------------------------------------------------------------------------
 	void WriteMinidump();
+	
+	std::string GetCrashedModuleName();
+
 
 private:
 	PVOID m_hExceptionFilter;

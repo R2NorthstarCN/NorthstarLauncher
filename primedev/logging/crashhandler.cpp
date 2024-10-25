@@ -49,6 +49,13 @@ LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS* pExceptionInfo)
 
 	// Needs to be called first as we use the members this sets later on
 	g_pCrashHandler->SetCrashedModule();
+	
+	// Somehow IGO64.dll decided to crash with 20% chance, not handling it ourselves 
+	if(g_pCrashHandler->GetCrashedModuleName() == "IGO64.dll")
+	{
+		g_pCrashHandler->Unlock();
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
 
 	// Format
 	g_pCrashHandler->FormatException();
@@ -595,5 +602,9 @@ void CCrashHandler::WriteMinidump()
 		spdlog::error("Failed to write minidump file {}!", stream.str());
 }
 
+std::string CCrashHandler::GetCrashedModuleName()
+{
+	return 	m_svCrashedModule;
+}
 //-----------------------------------------------------------------------------
 CCrashHandler* g_pCrashHandler = nullptr;
