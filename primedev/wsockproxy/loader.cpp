@@ -40,6 +40,37 @@ void LibraryLoadError(DWORD dwMessageId, const wchar_t* libName, const wchar_t* 
 	MessageBoxA(GetForegroundWindow(), text, "Northstar Wsock32 Proxy Error", 0);
 }
 
+void RunUpdater()
+{
+	fs::path updater_path = std::filesystem::current_path() / L"NSCN_Updater.exe";
+	// run updater when we don't have -updated present and updater exists
+	if(std::filesystem::exists(updater_path) && !strstr(GetCommandLineA(), "-updated"))
+	{
+		PROCESS_INFORMATION pi;
+		memset(&pi, 0, sizeof(pi));
+		STARTUPINFO si;
+		memset(&si, 0, sizeof(si));
+		si.cb = sizeof(STARTUPINFO);
+		si.dwFlags = STARTF_USESHOWWINDOW;
+		si.wShowWindow = SW_MINIMIZE;
+		CreateProcessW(
+			updater_path.c_str(),
+			L"",
+			NULL,
+			NULL,
+			false,
+			CREATE_DEFAULT_ERROR_MODE | CREATE_NEW_PROCESS_GROUP,
+			NULL,
+			NULL,
+			(LPSTARTUPINFOW)&si,
+			&pi);
+		exit(0);
+	}
+
+	
+	
+}
+
 bool ShouldLoadNorthstar()
 {
 	bool loadNorthstar = strstr(GetCommandLineA(), "-northstar");
@@ -137,7 +168,7 @@ bool ProvisionNorthstar()
 {
 	if (!ShouldLoadNorthstar())
 		return true;
-
+	RunUpdater();
 	if (MH_Initialize() != MH_OK)
 	{
 		MessageBoxA(

@@ -30,7 +30,6 @@
 #include <regex>
 #include <random>
 
-
 using namespace std::chrono_literals;
 MasterServerManager* g_pMasterServerManager;
 ClientAnticheatSystem g_ClientAnticheatSystem;
@@ -80,8 +79,8 @@ void SetCommonHttpClientOptions(CURL* curl)
 			curl_easy_setopt(curl, CURLOPT_RESOLVE, host);
 		}
 		else
-		{	
-			//spdlog::warn("[DOH] service is not available. falling back to DNS");
+		{
+			// spdlog::warn("[DOH] service is not available. falling back to DNS");
 		}
 	}
 	else
@@ -94,7 +93,6 @@ void SetCommonHttpClientOptions(CURL* curl)
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 }
 
-
 httplib::Client SetupHttpClient()
 {
 	std::string ms_addr = Cvar_ns_masterserver_hostname->GetString();
@@ -105,10 +103,10 @@ httplib::Client SetupHttpClient()
 	cli.set_decompress(true);
 	cli.set_read_timeout(10, 0);
 	cli.set_write_timeout(10, 0);
-	//cli.enable_server_certificate_verification(false);
-	
+	// cli.enable_server_certificate_verification(false);
+
 	cli.load_ca_cert_store(cabundle, sizeof(cabundle));
-	//cli.set_ca_cert_path("ca-bundle.crt");
+	// cli.set_ca_cert_path("ca-bundle.crt");
 	if (!strstr(GetCommandLineA(), "-disabledoh"))
 	{
 		std::string doh_result = g_DohWorker->GetDOHResolve(ms_addr);
@@ -118,7 +116,7 @@ httplib::Client SetupHttpClient()
 		}
 		else
 		{
-			//spdlog::warn("[DOH] service is not available. falling back to DNS");
+			// spdlog::warn("[DOH] service is not available. falling back to DNS");
 		}
 	}
 	return cli;
@@ -142,7 +140,7 @@ httplib::Client SetupMatchmakerHttpClient()
 		}
 		else
 		{
-			//spdlog::warn("[DOH] service is not available. falling back to DNS");
+			// spdlog::warn("[DOH] service is not available. falling back to DNS");
 		}
 	}
 	return cli;
@@ -180,16 +178,16 @@ bool MasterServerManager::StartMatchmaking(MatchmakeInfo* status)
 	}
 	std::string query =
 		fmt::format(fmt::runtime(query_fmt_str), Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped, "true")
-							.c_str(); // TODO: add working AA selection
-	//spdlog::warn("{}", query);
-	//return false;
+			.c_str(); // TODO: add working AA selection
+	// spdlog::warn("{}", query);
+	// return false;
 	curl_easy_setopt(curl, CURLOPT_URL, query.c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
-	
+
 	const CURLcode result = curl_easy_perform(curl);
-	//spdlog::info("[Matchmaker] JOIN: Result:{},buffer:{}", result, read_buffer.c_str());
+	// spdlog::info("[Matchmaker] JOIN: Result:{},buffer:{}", result, read_buffer.c_str());
 	if (result == CURLcode::CURLE_OK)
 	{
 		try
@@ -238,18 +236,16 @@ bool MasterServerManager::CancelMatchmaking()
 	curl_easy_setopt(
 		curl,
 		CURLOPT_URL,
-		fmt::format("{}/quit?id={}&token={}", Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped)
-			.c_str());
+		fmt::format("{}/quit?id={}&token={}", Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped).c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
 
 	const CURLcode result = curl_easy_perform(curl);
 
-
 	if (result == CURLcode::CURLE_OK)
 	{
-		//spdlog::info("[Matchmaker] Result:{},buffer:{}", result, read_buffer.c_str());
+		// spdlog::info("[Matchmaker] Result:{},buffer:{}", result, read_buffer.c_str());
 		try
 		{
 			nlohmann::json resjson = nlohmann::json::parse(read_buffer);
@@ -300,8 +296,7 @@ bool MasterServerManager::UpdateMatchmakingStatus(MatchmakeInfo* status)
 	curl_easy_setopt(
 		curl,
 		CURLOPT_URL,
-		fmt::format("{}/state?id={}&token={}", Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped)
-			.c_str());
+		fmt::format("{}/state?id={}&token={}", Cvar_ns_matchmaker_hostname->GetString(), local_uid_escaped, token_escaped).c_str());
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteToStringBufferCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
@@ -310,25 +305,25 @@ bool MasterServerManager::UpdateMatchmakingStatus(MatchmakeInfo* status)
 
 	if (result == CURLcode::CURLE_OK)
 	{
-		//spdlog::info("[Matchmaker] STATE: Result:{},buffer:{}", result, read_buffer.c_str());
+		// spdlog::info("[Matchmaker] STATE: Result:{},buffer:{}", result, read_buffer.c_str());
 		try
 		{
 			nlohmann::json server_response = nlohmann::json::parse(read_buffer);
 			if (server_response.at("success") == true)
 			{
 				std::string state_type = server_response.at("state");
-				
+
 				if (!strcmp(state_type.c_str(), "#MATCHMAKING_QUEUED"))
 				{
 					status->etaSeconds = "";
 					status->status = state_type;
-					//spdlog::info("[Matchmaker] MATCHMAKING_QUEUED");
+					// spdlog::info("[Matchmaker] MATCHMAKING_QUEUED");
 					curl_easy_cleanup(curl);
 					return true;
 				}
 				if (!strcmp(state_type.c_str(), "#MATCHMAKING_ALLOCATING_SERVER"))
 				{
-					//spdlog::info("[Matchmaker] MATCHMAKING_ALLOCATING_SERVER");
+					// spdlog::info("[Matchmaker] MATCHMAKING_ALLOCATING_SERVER");
 					status->status = state_type;
 					curl_easy_cleanup(curl);
 					return true;
@@ -485,7 +480,7 @@ void MasterServerManager::RequestServerList()
 			m_bScriptRequestingServerList = true;
 
 			httplib::Client cli = SetupHttpClient();
-			
+
 			if (auto res = cli.Get("/client/servers"))
 			{
 				m_bSuccessfullyConnected = true;
@@ -693,7 +688,7 @@ void MasterServerManager::AuthenticateWithServer(
 	const char* uid, const std::string& playerToken, const std::string& serverId, const char* password)
 {
 	// dont wait, just stop if we're trying to do 2 auth requests at once
-	if (m_bAuthenticatingWithGameServer|| g_pVanillaCompatibility->GetVanillaCompatibility())
+	if (m_bAuthenticatingWithGameServer || g_pVanillaCompatibility->GetVanillaCompatibility())
 		return;
 	m_sAuthFailureReason = "No error message provided";
 	m_sAuthFailureMessage = "No error message provided";
@@ -733,7 +728,7 @@ void MasterServerManager::AuthenticateWithServer(
 					nlohmann::json connection_info_json = nlohmann::json::parse(res->body);
 					if (connection_info_json.at("success") == true)
 					{
-						//spdlog::info("[auth_with_server] body: {}", res->body);
+						// spdlog::info("[auth_with_server] body: {}", res->body);
 						m_pendingConnectionInfo.ip.S_un.S_addr = inet_addr(std::string(connection_info_json.at("ip")).c_str());
 						m_pendingConnectionInfo.port = static_cast<unsigned short>(connection_info_json.at("port"));
 						m_pendingConnectionInfo.authToken = connection_info_json.at("authToken");
@@ -783,13 +778,13 @@ void MasterServerManager::WritePlayerPersistentData(const char* player_id, const
 	// still call this if we don't have a server id, since lobbies that aren't port forwarded need to be able to call it
 	if (m_sPlayerPersistenceStates.contains(strPlayerId))
 	{
-		spdlog::warn("player {} attempted to write pdata while previous request still exists!");
+		spdlog::warn("player {} attempted to write pdata while previous request still exists!", strPlayerId);
 		// player is already requesting for leave, ignore the request.
 		return;
 	}
 	if (!pdata_size)
 	{
-		spdlog::warn("attempted to write pdata of size 0!");
+		spdlog::warn("player {} attempted to write pdata of size 0!", strPlayerId);
 		return;
 	}
 
@@ -809,10 +804,20 @@ void MasterServerManager::WritePlayerPersistentData(const char* player_id, const
 				"/accounts/write_persistence?id={}&serverId={}", encode_query_param(strPlayerId), encode_query_param(m_sOwnServerId));
 			const std::string encoded = base64_encode(str_pdata.data(), pdata_size);
 			auto res = cli.Post(querystring, encoded, "text/plain");
-			if (res && res->status == 200)
+			if (res != nullptr)
 			{
-				spdlog::info("[Pdata] Successfully wrote pdata for user: {}", strPlayerId);
-				m_bSuccessfullyConnected = true;
+				if (res->status == 200)
+				{
+					spdlog::info("[Pdata] Successfully wrote pdata for user: {}", strPlayerId);
+					m_bSuccessfullyConnected = true;
+				}
+				else
+				{
+					auto err = res->body;
+					spdlog::error("[Pdata] Write persistence failed for user: {}, error: {}", strPlayerId, err);
+
+					m_bSuccessfullyConnected = true;
+				}
 			}
 			else
 			{
@@ -835,7 +840,12 @@ void ConCommand_ns_fetchservers(const CCommand& args)
 	g_pMasterServerManager->RequestServerList();
 }
 
-MasterServerManager::MasterServerManager() : m_sOwnServerId {""}, m_sOwnClientAuthToken {""}, m_pendingConnectionInfo {} {}
+MasterServerManager::MasterServerManager()
+	: m_sOwnServerId {""}
+	, m_sOwnClientAuthToken {""}
+	, m_pendingConnectionInfo {}
+{
+}
 
 ON_DLL_LOAD_RELIESON("engine.dll", MasterServer, (ConCommand, ServerPresence), (CModule module))
 {
@@ -905,14 +915,12 @@ void MasterServerPresenceReporter::DestroyPresence(const ServerPresence* pServer
 	// Not bothering with better thread safety in this case since DestroyPresence() is called when the game is shutting down.
 	*g_pMasterServerManager->m_sOwnServerId = 0;
 
-
 	httplib::Client cli = SetupHttpClient();
 	const std::string querystring = fmt::format(
 		"/server/remove_server?id={}?serverAuthToken={}",
 		encode_query_param(g_pMasterServerManager->m_sOwnServerId),
 		encode_query_param(g_pMasterServerManager->m_sOwnServerAuthToken));
 	cli.Delete(querystring);
-
 }
 
 void MasterServerPresenceReporter::RunFrame(double flCurrentTime, const ServerPresence* pServerPresence)
@@ -1048,9 +1056,9 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 				data.serverAuthToken = server_auth_token;
 				return data;
 			};
-			//spdlog::info("{}", mod_info);
+			// spdlog::info("{}", mod_info);
 			auto res = cli.Post(querystring, mod_info, "application/json");
-				
+
 			if (res && res->status == 200)
 			{
 				try
@@ -1085,10 +1093,8 @@ void MasterServerPresenceReporter::InternalAddServer(const ServerPresence* pServ
 			}
 			else
 			{
-				spdlog::error(
-					"Failed adding self to server list: error {}",
-					std::to_string(static_cast<int>(res.error())));
-				if(!res->body.empty())
+				spdlog::error("Failed adding self to server list: error {}", std::to_string(static_cast<int>(res.error())));
+				if (!res->body.empty())
 					spdlog::error("res:{}", res->body);
 				return return_cleanup(MasterServerReportPresenceResult::FailedNoConnect);
 			}

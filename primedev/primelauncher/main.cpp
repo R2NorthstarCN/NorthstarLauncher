@@ -28,6 +28,76 @@ HMODULE hTier0Module;
 wchar_t exePath[4096];
 wchar_t buffer[8192];
 
+static std::string ConvertWideToANSI(const std::wstring& wstr)
+{
+    int count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
+    std::string str(count, 0);
+    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
+    return str;
+}
+
+static std::wstring ConvertAnsiToWide(const std::string& str)
+{
+    int count = MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
+    std::wstring wstr(count, 0);
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
+    return wstr;
+}
+
+static std::string ConvertWideToUtf8(const std::wstring& wstr)
+{
+    int count = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
+    std::string str(count, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
+    return str;
+}
+
+static std::wstring ConvertUtf8ToWide(const std::string& str)
+{
+    int count = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), NULL, 0);
+    std::wstring wstr(count, 0);
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), &wstr[0], count);
+    return wstr;
+}
+
+static std::string SanitizeEncodings(const char* buf)
+{
+	std::wstring ws = ConvertAnsiToWide(buf);
+	return ConvertWideToUtf8(ws);
+}
+
+
+void RunUpdater()
+{
+	fs::path updater_path = std::filesystem::current_path() / L"NSCN_Updater.exe";
+	// run updater when we don't have -updated present and updater exists
+	if(std::filesystem::exists(updater_path) && !strstr(GetCommandLineA(), "-updated"))
+	{
+		PROCESS_INFORMATION pi;
+		memset(&pi, 0, sizeof(pi));
+		STARTUPINFO si;
+		memset(&si, 0, sizeof(si));
+		si.cb = sizeof(STARTUPINFO);
+		si.dwFlags = STARTF_USESHOWWINDOW;
+		si.wShowWindow = SW_MINIMIZE;
+		CreateProcessW(
+			updater_path.c_str(),
+			L"",
+			NULL,
+			NULL,
+			false,
+			CREATE_DEFAULT_ERROR_MODE | CREATE_NEW_PROCESS_GROUP,
+			NULL,
+			NULL,
+			(LPSTARTUPINFOW)&si,
+			&pi);
+		exit(0);
+	}
+
+	
+	
+}
+
 DWORD GetProcessByName(std::wstring processName)
 {
 	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -76,7 +146,7 @@ FARPROC GetLauncherMain()
 void LibraryLoadError(DWORD dwMessageId, const wchar_t* libName, const wchar_t* location)
 {
 	wchar_t text[8192];
-	std::string message = std::system_category().message(dwMessageId);
+	std::wstring message = ConvertUtf8ToWide(std::system_category().message(dwMessageId));
 
 	swprintf_s(
 		text,
@@ -352,7 +422,7 @@ int main(int argc, char* argv[])
 			Sleep(100);
 		}
 	}
-
+	RunUpdater();
 	if (!GetExePathWide(exePath, sizeof(exePath)))
 	{
 		MessageBoxA(
