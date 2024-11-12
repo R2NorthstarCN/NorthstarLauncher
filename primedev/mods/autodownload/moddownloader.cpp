@@ -106,23 +106,23 @@ void ModDownloader::FetchModsListFromAPI()
 			for (auto i = verifiedModsJson.MemberBegin(); i != verifiedModsJson.MemberEnd(); ++i)
 			{
 				// Format testing
-				if (!i->value.HasMember("Repository") || !i->value.HasMember("Versions"))
+				if (!i->value.HasMember("DependencyPrefix") || !i->value.HasMember("Versions"))
 				{
 					spdlog::warn("Verified mods manifesto format is unrecognized, skipping loading.");
 					return;
 				}
 
 				std::string name = i->name.GetString();
-				std::unordered_map<std::string, VerifiedModVersion> modVersions;
+				std::string dependency = i->value["DependencyPrefix"].GetString();
 
+				std::unordered_map<std::string, VerifiedModVersion> modVersions;
 				rapidjson::Value& versions = i->value["Versions"];
 				assert(versions.IsArray());
 				for (auto& attribute : versions.GetArray())
 				{
 					assert(attribute.IsObject());
 					// Format testing
-					if (!attribute.HasMember("Version") || !attribute.HasMember("Checksum") || !attribute.HasMember("DownloadLink") ||
-						!attribute.HasMember("Platform"))
+					if (!attribute.HasMember("Version") || !attribute.HasMember("Checksum"))
 					{
 						spdlog::warn("Verified mods manifesto format is unrecognized, skipping loading.");
 						return;
@@ -130,14 +130,10 @@ void ModDownloader::FetchModsListFromAPI()
 
 					std::string version = attribute["Version"].GetString();
 					std::string checksum = attribute["Checksum"].GetString();
-					std::string downloadLink = attribute["DownloadLink"].GetString();
-					std::string platformValue = attribute["Platform"].GetString();
-					VerifiedModPlatform platform =
-						platformValue.compare("thunderstore") == 0 ? VerifiedModPlatform::Thunderstore : VerifiedModPlatform::Unknown;
-					modVersions.insert({version, {.checksum = checksum, .downloadLink = downloadLink, .platform = platform}});
+					modVersions.insert({version, {.checksum = checksum}});
 				}
 
-				VerifiedModDetails modConfig = {.versions = modVersions};
+				VerifiedModDetails modConfig = {.dependencyPrefix = dependency, .versions = modVersions};
 				verifiedMods.insert({name, modConfig});
 				spdlog::info("==> Loaded configuration for mod \"" + name + "\"");
 			}
@@ -171,10 +167,13 @@ int ModDownloader::ModFetchingProgressCallback(
 	return 0;
 }
 
-std::optional<fs::path> ModDownloader::FetchModFromDistantStore(std::string_view modName, VerifiedModVersion version)
+std::optional<fs::path> ModDownloader::FetchModFromDistantStore(std::string_view modName, std::string_view modVersion)
 {
-	std::string url = version.downloadLink;
-	std::string archiveName = fs::path(url).filename().generic_string();
+	// Retrieve mod prefix from local mods list, or use mod name as mod prefix if bypass flag is set
+	std::string modPrefix = strstr(GetCommandLineA(), VERIFICATION_FLAG) ? modName.data() : verifiedMods[modName.data()].dependencyPrefix;
+	// Build archive distant URI
+	std::string archiveName = std::format("{}-{}.zip", modPrefix, modVersion.data());
+	std::string url = STORE_URL + archiveName;
 	spdlog::info(std::format("Fetching mod archive from {}", url));
 
 	// Download destination
@@ -394,7 +393,7 @@ int GetModArchiveSize(unzFile file, unz_global_info64 info)
 	return totalSize;
 }
 
-void ModDownloader::ExtractMod(fs::path modPath, VerifiedModPlatform platform)
+void ModDownloader::ExtractMod(fs::path modPath)
 {
 	unzFile file;
 	std::string name;
@@ -431,14 +430,6 @@ void ModDownloader::ExtractMod(fs::path modPath, VerifiedModPlatform platform)
 	modState.state = EXTRACTING;
 	modState.total = GetModArchiveSize(file, gi);
 	modState.progress = 0;
-
-	// Right now, we only know how to extract Thunderstore mods
-	if (platform != VerifiedModPlatform::Thunderstore)
-	{
-		spdlog::error("Failed extracting mod from unknown platform (value: {}).", platform);
-		modState.state = UNKNOWN_PLATFORM;
-		return;
-	}
 
 	// Mod directory name (removing the ".zip" fom the archive name)
 	name = modPath.filename().string();
@@ -602,9 +593,11 @@ void ModDownloader::DownloadMod(std::string modName, std::string modVersion)
 			fs::path archiveLocation;
 
 			// Download mod archive
-			VerifiedModVersion fullVersion = verifiedMods[modName].versions[modVersion];
-			std::string expectedHash = fullVersion.checksum;
-			std::optional<fs::path> fetchingResult = FetchModFromDistantStore(std::string_view(modName), fullVersion);
+			
+			std::string expectedHash = verifiedMods[modName].versions[modVersion].checksum;
+			std::optional<fs::path> fetchingResult = FetchModFromDistantStore(std::string_view(modName), std::string_view(modVersion));
+
+
 			if (!fetchingResult.has_value())
 			{
 				spdlog::error("Something went wrong while fetching archive, aborting.");
@@ -638,7 +631,20 @@ void ModDownloader::DownloadMod(std::string modName, std::string modVersion)
 			}
 
 			// Extract downloaded mod archive
-			ExtractMod(archiveLocation, fullVersion.platform);
+			ExtractMod(archiveLocation);
+			try
+			{
+				remove(archiveLocation);
+			}
+			catch (const std::exception& a)
+			{
+				spdlog::error("Error while removing downloaded archive: {}", a.what());
+			}
+
+			modState.state = DONE;
+			this->isDownloadingMod = false;
+			spdlog::info("Done downloading {}.", modName);
+			return;
 		});
 
 	requestThread.detach();
