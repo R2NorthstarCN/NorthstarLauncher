@@ -75,6 +75,8 @@ static void __fastcall h_CHostState__State_NewGame(CHostState* self)
 	g_pServerPresence->SetPlaylist(R2::GetCurrentPlaylistName());
 	g_pServerPresence->SetPort(Cvar_hostport->GetInt());
 
+	g_pServerAuthentication->StartPlayerAuthServer();
+
 	g_pServerAuthentication->m_bNeedLocalAuthForNewgame = false;
 }
 

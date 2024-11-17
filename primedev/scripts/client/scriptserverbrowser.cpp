@@ -65,8 +65,8 @@ ADD_SQFUNC("void", NSTryAuthWithServer, "int serverIndex, string password = ''",
 	// do auth
 	g_pMasterServerManager->AuthenticateWithServer(
 		g_pLocalPlayerUserID,
-		g_pMasterServerManager->m_sOwnClientAuthToken,
-		g_pMasterServerManager->m_vRemoteServers[serverIndex],
+		g_pMasterServerManager->m_sOwnClientAuthToken.c_str(),
+		g_pMasterServerManager->m_vRemoteServers[serverIndex].id,
 		(char*)password);
 
 	return SQRESULT_NULL;
@@ -97,7 +97,7 @@ ADD_SQFUNC("void", NSConnectToAuthedServer, "", "", ScriptContext::UI)
 
 	// set auth token, then try to connect
 	// i'm honestly not entirely sure how silentconnect works regarding ports and encryption so using connect for now
-	g_pCVar->FindVar("serverfilter")->SetValue(info.authToken);
+	g_pCVar->FindVar("serverfilter")->SetValue(info.authToken.c_str());
 	Cbuf_AddText(
 		Cbuf_GetCurrentPlayer(),
 		fmt::format(
@@ -185,8 +185,8 @@ ADD_SQFUNC("array<ServerInfo>", NSGetGameServers, "", "", ScriptContext::UI)
 		g_pSquirrel<context>->pushbool(sqvm, remoteServer.requiresPassword);
 		g_pSquirrel<context>->sealstructslot(sqvm, 8);
 
-		// region
-		g_pSquirrel<context>->pushstring(sqvm, remoteServer.region, -1);
+		// gamestate
+		g_pSquirrel<context>->pushinteger(sqvm, remoteServer.gameState);
 		g_pSquirrel<context>->sealstructslot(sqvm, 9);
 
 		// requiredMods

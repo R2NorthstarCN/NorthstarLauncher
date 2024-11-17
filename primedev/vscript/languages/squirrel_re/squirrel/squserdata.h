@@ -8,7 +8,7 @@ struct SQUserData : public SQDelegable
 {
 	int size;
 	char padding1[4];
-	void* (*releasehook)(void* val, int size);
+	void (*releasehook)(void* val, int size);
 	long long typeId;
 	char data[1];
 };

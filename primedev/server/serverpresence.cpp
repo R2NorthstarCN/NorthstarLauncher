@@ -178,6 +178,12 @@ void ServerPresenceManager::SetPort(const int iPort)
 	m_ServerPresence.m_iPort = iPort;
 }
 
+void ServerPresenceManager::SetAuthPort(const int iAuthPort)
+{
+	// update authport
+	m_ServerPresence.m_iAuthPort = iAuthPort;
+}
+
 void ServerPresenceManager::SetName(const std::string sServerNameUnicode)
 {
 	// update name

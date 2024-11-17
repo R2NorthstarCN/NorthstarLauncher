@@ -6,6 +6,7 @@
 #include "server/serverpresence.h"
 #include "engine/hoststate.h"
 #include "bansystem.h"
+#include "util/base64.h"
 #include "core/convar/concommand.h"
 #include "dedicated/dedicated.h"
 #include "config/profile.h"
@@ -13,29 +14,119 @@
 #include "engine/r2engine.h"
 #include "client/r2client.h"
 #include "server/r2server.h"
+#include "scripts/scriptmasterservermessages.h"
+#include "cpp-httplib/httplib.h"
+#include "nlohmann/json.hpp"
+#include "shared/playlist.h"
 
 #include <fstream>
 #include <filesystem>
-#include <string>
 #include <thread>
+
+const char* AUTHSERVER_VERIFY_STRING = "I am a northstar server!";
 
 // global vars
 ServerAuthenticationManager* g_pServerAuthentication;
 CBaseServer__RejectConnectionType CBaseServer__RejectConnection;
 
-void ServerAuthenticationManager::AddRemotePlayer(std::string token, uint64_t uid, std::string username, std::string pdata)
+void ServerAuthenticationManager::StartPlayerAuthServer()
 {
-	std::string uidS = std::to_string(uid);
+	if (m_bRunningPlayerAuthThread)
+	{
+		spdlog::warn("ServerAuthenticationManager::StartPlayerAuthServer was called while m_bRunningPlayerAuthThread is true");
+		return;
+	}
 
-	RemoteAuthData newAuthData {};
-	strncpy_s(newAuthData.uid, sizeof(newAuthData.uid), uidS.c_str(), uidS.length());
-	strncpy_s(newAuthData.username, sizeof(newAuthData.username), username.c_str(), username.length());
-	newAuthData.pdata = new char[pdata.length()];
-	newAuthData.pdataSize = pdata.length();
-	memcpy(newAuthData.pdata, pdata.c_str(), newAuthData.pdataSize);
+	g_pServerPresence->SetAuthPort(Cvar_ns_player_auth_port->GetInt()); // set auth port for presence
+	m_bRunningPlayerAuthThread = true;
 
-	std::lock_guard<std::mutex> guard(m_AuthDataMutex);
-	m_RemoteAuthenticationData[token] = newAuthData;
+	// listen is a blocking call so thread this
+	std::thread serverThread(
+		[this]
+		{
+			// this is just a super basic way to verify that servers have ports open, masterserver will try to read this before ensuring
+			// server is legit
+			m_PlayerAuthServer.Post(
+				"/rui_message",
+				[this](const httplib::Request& request, httplib::Response& response)
+				{
+					if (!request.has_param("serverAuthToken") ||
+						strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
+					{
+						// return;
+					}
+
+					g_pMasterserverMessenger->m_vQueuedMasterserverMessages.push(request.body);
+
+					response.set_content("{\"success\":true}", "application/json");
+				});
+
+			m_PlayerAuthServer.Get(
+				"/verify",
+				[](const httplib::Request& request, httplib::Response& response)
+				{ response.set_content(AUTHSERVER_VERIFY_STRING, "text/plain"); });
+
+			m_PlayerAuthServer.Get(
+				"/status",
+				[](const httplib::Request& request, httplib::Response& response)
+				{
+					std::string result;
+					nlohmann::json json;
+					int maxplayers = 0;
+					auto p_maxplayers = R2::GetCurrentPlaylistVar("max_players", true);
+					if (p_maxplayers)
+					{
+						maxplayers = std::stoi(p_maxplayers);
+					}
+					json["maxplayers"] = maxplayers;
+					json["playercount"] = g_pServerAuthentication->m_PlayerAuthenticationData.size();
+					result = json.dump();
+					response.set_content(result, "application/json");
+				});
+
+			m_PlayerAuthServer.Post(
+				"/authenticate_incoming_player",
+				[this](const httplib::Request& request, httplib::Response& response)
+				{
+					if (!request.has_param("id") || !request.has_param("authToken") || request.body.size() >= 128000 ||
+						!request.has_param("serverAuthToken") ||
+						strcmp(g_pMasterServerManager->m_sOwnServerAuthToken, request.get_param_value("serverAuthToken").c_str()))
+					{
+						response.set_content("{\"success\":false}", "application/json");
+						return;
+					}
+
+					RemoteAuthData newAuthData;
+					if (request.has_param("clantag"))
+					{
+						newAuthData.clantag = request.get_param_value("clantag");
+					}
+					newAuthData.uid = request.get_param_value("id");
+					newAuthData.username = request.get_param_value("username");
+					newAuthData.pdata = base64_decode(request.body);
+
+					std::lock_guard<std::mutex> guard(m_AuthDataMutex);
+					m_RemoteAuthenticationData.insert(std::make_pair(request.get_param_value("authToken"), newAuthData));
+
+					response.set_content("{\"success\":true}", "application/json");
+				});
+
+			m_PlayerAuthServer.listen("0.0.0.0", Cvar_ns_player_auth_port->GetInt());
+		});
+
+	serverThread.detach();
+}
+
+void ServerAuthenticationManager::StopPlayerAuthServer()
+{
+	if (!m_bRunningPlayerAuthThread)
+	{
+		spdlog::warn("ServerAuthenticationManager::StopPlayerAuthServer was called while m_bRunningPlayerAuthThread is false");
+		return;
+	}
+
+	m_bRunningPlayerAuthThread = false;
+	m_PlayerAuthServer.stop();
 }
 
 void ServerAuthenticationManager::AddPlayer(CBaseClient* pPlayer, const char* pToken)
@@ -44,7 +135,7 @@ void ServerAuthenticationManager::AddPlayer(CBaseClient* pPlayer, const char* pT
 
 	auto remoteAuthData = m_RemoteAuthenticationData.find(pToken);
 	if (remoteAuthData != m_RemoteAuthenticationData.end())
-		additionalData.pdataSize = remoteAuthData->second.pdataSize;
+		additionalData.pdataSize = remoteAuthData->second.pdata.size();
 	else
 		additionalData.pdataSize = PERSISTENCE_MAX_SIZE;
 
@@ -66,8 +157,8 @@ bool ServerAuthenticationManager::VerifyPlayerName(const char* pAuthToken, const
 	// always use name from masterserver if available
 	// use of strncpy_s here should verify that this is always nullterminated within valid buffer size
 	auto authData = m_RemoteAuthenticationData.find(pAuthToken);
-	if (authData != m_RemoteAuthenticationData.end() && *authData->second.username)
-		strncpy_s(pOutVerifiedName, 64, authData->second.username, 63);
+	if (authData != m_RemoteAuthenticationData.end() && !authData->second.username.empty())
+		strncpy_s(pOutVerifiedName, 64, authData->second.username.c_str(), 63);
 	else
 		strncpy_s(pOutVerifiedName, 64, pName, 63);
 
@@ -118,7 +209,7 @@ bool ServerAuthenticationManager::CheckAuthentication(CBaseClient* pPlayer, uint
 
 	std::lock_guard<std::mutex> guard(m_AuthDataMutex);
 	auto authData = m_RemoteAuthenticationData.find(pAuthToken);
-	if (authData != m_RemoteAuthenticationData.end() && !strcmp(sUid.c_str(), authData->second.uid))
+	if (authData != m_RemoteAuthenticationData.end() && sUid == authData->second.uid)
 		return true;
 
 	return false;
@@ -143,7 +234,7 @@ void ServerAuthenticationManager::AuthenticatePlayer(CBaseClient* pPlayer, uint6
 		if (!m_bForceResetLocalPlayerPersistence || strcmp(sUid.c_str(), g_pLocalPlayerUserID))
 		{
 			// copy pdata into buffer
-			memcpy(pPlayer->m_PersistenceBuffer, authData->second.pdata, authData->second.pdataSize);
+			memcpy(pPlayer->m_PersistenceBuffer, authData->second.pdata.data(), authData->second.pdata.size());
 		}
 
 		// set persistent data as ready
@@ -170,13 +261,11 @@ bool ServerAuthenticationManager::RemovePlayerAuthData(CBaseClient* pPlayer)
 	// we don't have our auth token at this point, so lookup authdata by uid
 	for (auto& auth : m_RemoteAuthenticationData)
 	{
-		if (!strcmp(pPlayer->m_UID, auth.second.uid))
+		if (pPlayer->m_UID == auth.second.uid)
 		{
 			// pretty sure this is fine, since we don't iterate after the erase
 			// i think if we iterated after it'd be undefined behaviour tho
 			std::lock_guard<std::mutex> guard(m_AuthDataMutex);
-
-			delete[] auth.second.pdata;
 			m_RemoteAuthenticationData.erase(auth.first);
 			return true;
 		}
@@ -286,6 +375,15 @@ h_CBaseClient__Connect(CBaseClient* self, char* pName, void* pNetChannel, char b
 	// we already know this player's authentication data is legit, actually write it to them now
 	g_pServerAuthentication->AuthenticatePlayer(self, iNextPlayerUid, pNextPlayerToken);
 
+	if (!g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag.empty())
+	{
+		// std::string nameWithTag = "[" + g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag + "]" +
+		// self->m_Name; strncpy_s(self->m_Name, nameWithTag.c_str(), 64);
+		char* clantag = ((char*)self + 0x318 + 64);
+		strncpy(clantag, g_pServerAuthentication->m_RemoteAuthenticationData[pNextPlayerToken].clantag.c_str(), 16);
+		clantag[15] = '\0';
+	}
+
 	g_pServerAuthentication->AddPlayer(self, pNextPlayerToken);
 	g_pServerLimits->AddPlayer(self);
 
@@ -302,7 +400,7 @@ static void h_CBaseClient__ActivatePlayer(CBaseClient* self)
 	{
 		g_pServerAuthentication->m_bForceResetLocalPlayerPersistence = false;
 		g_pServerAuthentication->WritePersistentData(self);
-		g_pServerPresence->SetPlayerCount((int)g_pServerAuthentication->m_PlayerAuthenticationData.size());
+		g_pServerPresence->SetPlayerCount(g_pServerAuthentication->m_PlayerAuthenticationData.size());
 	}
 
 	o_pCBaseClient__ActivatePlayer(self);
@@ -342,7 +440,6 @@ static void h_CBaseClient__Disconnect(CBaseClient* self, uint32_t unknownButAlwa
 
 void ConCommand_ns_resetpersistence(const CCommand& args)
 {
-	NOTE_UNUSED(args);
 	if (*g_pServerState == server_state_t::ss_active)
 	{
 		spdlog::error("ns_resetpersistence must be entered from the main menu");
@@ -369,6 +466,7 @@ ON_DLL_LOAD_RELIESON("engine.dll", ServerAuthentication, (ConCommand, ConVar), (
 
 	g_pServerAuthentication = new ServerAuthenticationManager;
 
+	g_pServerAuthentication->Cvar_ns_player_auth_port = new ConVar("ns_player_auth_port", "8081", FCVAR_GAMEDLL, "");
 	g_pServerAuthentication->Cvar_ns_erase_auth_info =
 		new ConVar("ns_erase_auth_info", "1", FCVAR_GAMEDLL, "Whether auth info should be erased from this server on disconnect or crash");
 	g_pServerAuthentication->Cvar_ns_auth_allow_insecure =

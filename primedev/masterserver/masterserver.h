@@ -4,16 +4,16 @@
 #include "server/serverpresence.h"
 #include <winsock2.h>
 #include <string>
+#include <shared_mutex>
 #include <cstring>
 #include <future>
+#include "scripts/scriptmatchmakingevents.h"
 #include <unordered_set>
-
 extern ConVar* Cvar_ns_masterserver_hostname;
 extern ConVar* Cvar_ns_curl_log_enable;
 
 struct RemoteModInfo
 {
-public:
 	std::string Name;
 	std::string Version;
 };
@@ -21,14 +21,14 @@ public:
 class RemoteServerInfo
 {
 public:
-	char id[33]; // 32 bytes + nullterminator
 
+	char id[33];
 	// server info
 	char name[64];
 	std::string description;
 	char map[32];
 	char playlist[16];
-	char region[32];
+	int gameState;
 	std::vector<RemoteModInfo> requiredMods;
 
 	int playerCount;
@@ -37,14 +37,13 @@ public:
 	// connection stuff
 	bool requiresPassword;
 
-public:
 	RemoteServerInfo(
 		const char* newId,
 		const char* newName,
 		const char* newDescription,
 		const char* newMap,
 		const char* newPlaylist,
-		const char* newRegion,
+		int newGameState,
 		int newPlayerCount,
 		int newMaxPlayers,
 		bool newRequiresPassword);
@@ -52,16 +51,13 @@ public:
 
 struct RemoteServerConnectionInfo
 {
-public:
-	char authToken[32];
-
+	std::string authToken;
 	in_addr ip;
 	unsigned short port;
 };
 
 struct MainMenuPromoData
 {
-public:
 	std::string newInfoTitle1;
 	std::string newInfoTitle2;
 	std::string newInfoTitle3;
@@ -83,22 +79,35 @@ public:
 class MasterServerManager
 {
 private:
+	bool m_RequestingClantag = false;
+	bool m_RequestingRemoteBanlistVersion = false;
+	bool m_RequestingRemoteBanlist = false;
 	bool m_bRequestingServerList = false;
 	bool m_bAuthenticatingWithGameServer = false;
 
 public:
+	std::unordered_set<std::string> m_sPlayerPersistenceStates;
+	std::mutex m_PlayerPersistenceMutex;
+
 	char m_sOwnServerId[33];
 	char m_sOwnServerAuthToken[33];
-	char m_sOwnClientAuthToken[33];
+	std::string m_sOwnClientAuthToken;
 
 	std::string m_sOwnModInfoJson;
+
+	std::string RemoteBanlistString;
+	std::string LocalBanlistVersion = "undefined";
+	std::string RemoteBanlistVersion;
 
 	bool m_bOriginAuthWithMasterServerDone = false;
 	bool m_bOriginAuthWithMasterServerInProgress = false;
 
-	bool m_bOriginAuthWithMasterServerSuccessful = false;
+	bool m_bOriginAuthWithMasterServerSuccess = false;
+
 	std::string m_sOriginAuthWithMasterServerErrorCode = "";
 	std::string m_sOriginAuthWithMasterServerErrorMessage = "";
+
+
 
 	bool m_bSavingPersistentData = false;
 
@@ -109,6 +118,7 @@ public:
 	bool m_bScriptAuthenticatingWithGameServer = false;
 	bool m_bSuccessfullyAuthenticatedWithGameServer = false;
 	std::string m_sAuthFailureReason {};
+	std::string m_sAuthFailureMessage {};
 
 	bool m_bHasPendingConnectionInfo = false;
 	RemoteServerConnectionInfo m_pendingConnectionInfo;
@@ -118,26 +128,30 @@ public:
 	bool m_bHasMainMenuPromoData = false;
 	MainMenuPromoData m_sMainMenuPromoData;
 
-	std::optional<RemoteServerInfo> m_currentServer;
-	std::string m_sCurrentServerPassword;
-
-	std::unordered_set<std::string> m_handledServerConnections;
-
 public:
 	MasterServerManager();
-
 	void ClearServerList();
 	void RequestServerList();
 	void RequestMainMenuPromos();
 	void AuthenticateOriginWithMasterServer(const char* uid, const char* originToken);
-	void AuthenticateWithOwnServer(const char* uid, const char* playerToken);
-	void AuthenticateWithServer(const char* uid, const char* playerToken, RemoteServerInfo server, const char* password);
-	void WritePlayerPersistentData(const char* playerId, const char* pdata, size_t pdataSize);
-	void ProcessConnectionlessPacketSigreq1(std::string req);
+	void AuthenticateWithOwnServer(const char* uid, const std::string& playerToken);
+	void AuthenticateWithServer(const char* uid, const char* playerToken, const char* serverId, const char* password);
+	bool AuthenticateWithMatchmakingServer(
+		RemoteServerConnectionInfo& conn_info,
+		const char* uid,
+		const std::string& playerToken,
+		const std::string& serverId,
+		const char* password);
+	void WritePlayerPersistentData(const char* player_id, const char* pdata, size_t pdata_size);
+	bool SetLocalPlayerClanTag(std::string clantag);
+	bool StartMatchmaking(MatchmakeInfo* status);
+	bool CancelMatchmaking();
+	bool UpdateMatchmakingStatus(MatchmakeInfo* status);
 };
 
 extern MasterServerManager* g_pMasterServerManager;
 extern ConVar* Cvar_ns_masterserver_hostname;
+extern ConVar* Cvar_ns_matchmaker_hostname;
 
 /** Result returned in the std::future of a MasterServerPresenceReporter::ReportPresence() call. */
 enum class MasterServerReportPresenceResult
@@ -189,9 +203,10 @@ protected:
 
 	// The future used for InternalAddServer() calls.
 	std::future<ReportPresenceResultData> addServerFuture;
-
+	std::thread addServerThread;
 	// The future used for InternalAddServer() calls.
 	std::future<ReportPresenceResultData> updateServerFuture;
+	std::thread updateServerThread;
 
 	int m_nNumRegistrationAttempts;
 
