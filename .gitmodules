@@ -9,3 +9,12 @@
 [submodule "thirdparty/minizip"]
 	path = primedev/thirdparty/minizip
 	url = https://github.com/zlib-ng/minizip-ng.git
+[submodule "primedev/thirdparty/nlohmann-json"]
+	path = primedev/thirdparty/nlohmann-json
+	url = https://github.com/nlohmann/json.git
+[submodule "primedev/thirdparty/cpp-httplib"]
+	path = primedev/thirdparty/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "primedev/thirdparty/openssl-cmake"]
+	path = primedev/thirdparty/openssl-cmake
+	url = https://github.com/viaduck/openssl-cmake.git
