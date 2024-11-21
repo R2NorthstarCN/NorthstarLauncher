@@ -68,6 +68,8 @@ static std::string SanitizeEncodings(const char* buf)
 
 void RunUpdater()
 {
+	if (strstr(GetCommandLineA(), "-dedicated"))
+		return;
 	fs::path updater_path = std::filesystem::current_path() / L"NSCN_Updater.exe";
 	// run updater when we don't have -updated present and updater exists
 	if (std::filesystem::exists(updater_path) && !strstr(GetCommandLineA(), "-updated"))
