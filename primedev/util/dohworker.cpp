@@ -1,5 +1,6 @@
 
 #include "dohworker.h"
+#include "nlohmann/json.hpp"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
@@ -17,23 +18,23 @@ size_t DOHCurlWriteToStringBufferCallback(char* contents, size_t size, size_t nm
 	((std::string*)userp)->append((char*)contents, size * nmemb);
 	return size * nmemb;
 }
-
-
-std::string DohWorker::GetDOHResolve(std::string domainname)
+std::string DohWorker::ExtractDomain(const std::string& url)
 {
-	bool stripHeaders = false;
-	if ((domainname.find("https") != std::string::npos))
+	// Regex to match the domain name
+	std::regex domainRegex(R"(^(?:https?:\/\/)?([^\/]+))");
+	std::smatch match;
+
+	// Apply regex to the URL
+	if (std::regex_search(url, match, domainRegex) && match.size() > 1)
 	{
-		//spdlog::info("[DOH] Found https like headers in {}", domainname);
-		domainname.erase(0, 8);
-		stripHeaders = true;
+		return match[1].str(); // Extract the first capturing group
 	}
-	if ((domainname.find("http") != std::string::npos) && !stripHeaders)
-	{
-		//spdlog::info("[DOH] Found http like headers in {}", domainname);
-		domainname.erase(0, 7);
-		stripHeaders = true;
-	}
+	return ""; // Return empty string if no match
+}
+
+std::string DohWorker::GetDOHResolve(std::string url)
+{
+	std::string domainname = ExtractDomain(url);
 	if (localresolvcache.find(domainname) != localresolvcache.end())
 	{
 		//spdlog::info("[DOH] Found cache for {}", domainname);
@@ -45,29 +46,17 @@ std::string DohWorker::GetDOHResolve(std::string domainname)
 	}
 }
 
-std::string DohWorker::ResolveDomain(std::string domainname)
+std::string DohWorker::ResolveDomain(std::string url)
 {
 	while(is_resolving)
 		Sleep(100);
-	bool stripHeaders = false;
-	is_resolving = true;
-	if ((domainname.find("https") != std::string::npos))
-	{
-		//spdlog::info("[DOH] Found https like headers in {}", domainname);
-		domainname.erase(0, 8);
-		stripHeaders = true;
-	}
-	if ((domainname.find("http") != std::string::npos) && !stripHeaders)
-	{
-		//spdlog::info("[DOH] Found http like headers in {}", domainname);
-		domainname.erase(0, 7);
-		stripHeaders = true;
-	}
+
 	//spdlog::info("[DOH] Resolving {}", domainname);
 	CURL* curl = curl_easy_init();
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	std::string readBuffer;
+	std::string domainname = ExtractDomain(url);
 	char* domainnameescaped = curl_easy_escape(curl, domainname.c_str(), domainname.length());
 	curl_easy_setopt(
 		curl,
@@ -85,17 +74,19 @@ std::string DohWorker::ResolveDomain(std::string domainname)
 	if (result == CURLcode::CURLE_OK)
 	{
 		//spdlog::info(readBuffer);
-		readBuffer = readBuffer.substr(2, readBuffer.length() - 4);
+
+		nlohmann::json resjson = nlohmann::json::parse(readBuffer);
 				
-				
+		std::string match = resjson[0].get<std::string>();
+
 		if (!readBuffer.empty())
 		{
 			g_DohWorker->localresolvcache.insert_or_assign(domainname, readBuffer);
-			spdlog::info("[DOH] Successfully resolved {} , result: {}", domainname, readBuffer);
+			spdlog::info("[DOH] Successfully resolved {} , result: {}", domainname, match);
 			curl_easy_cleanup(curl);
 			m_bDohAvailable = true;
 			is_resolving = false;
-			return readBuffer;
+			return match;
 		}
 		else
 		{

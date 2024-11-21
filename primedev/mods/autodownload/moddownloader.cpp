@@ -1,4 +1,5 @@
 #include "moddownloader.h"
+#include "util/dohworker.h"
 #include "util/utils.h"
 #include <rapidjson/fwd.h>
 #include <mz_strm_mem.h>
@@ -11,9 +12,9 @@
 #include <bcrypt.h>
 #include <winternl.h>
 #include <fstream>
-
 ModDownloader* g_pModDownloader;
 
+//gcdn.thunderstore.io/live/repository/packages/odds-s2space-0.0.5.zip
 ModDownloader::ModDownloader()
 {
 	spdlog::info("Mod downloader initialized");
@@ -39,6 +40,7 @@ ModDownloader::ModDownloader()
 		}
 		spdlog::info("Found custom verified mods URL in command line argument: {}", url);
 		modsListUrl = strdup(url.c_str());
+
 	}
 	else
 	{
@@ -71,6 +73,20 @@ void ModDownloader::FetchModsListFromAPI()
 			curl_global_init(CURL_GLOBAL_ALL);
 			easyhandle = curl_easy_init();
 			std::string readBuffer;
+
+			curl_easy_setopt(easyhandle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+			const std::string doh_result = g_DohWorker->GetDOHResolve(url);
+			if (g_DohWorker->m_bDohAvailable)
+			{
+				struct curl_slist* host = nullptr;
+				const std::string addr = g_DohWorker->ExtractDomain(url) + ":443:" + doh_result;
+				host = curl_slist_append(nullptr, addr.c_str());
+				curl_easy_setopt(easyhandle, CURLOPT_RESOLVE, host);
+			}
+			else
+			{
+				// spdlog::warn("[DOH] service is not available. falling back to DNS");
+			}
 
 			// Fetching mods list from GitHub repository
 			curl_easy_setopt(easyhandle, CURLOPT_CUSTOMREQUEST, "GET");
@@ -195,6 +211,21 @@ std::optional<fs::path> ModDownloader::FetchModFromDistantStore(std::string_view
 	CURLcode result;
 	CURL* easyhandle;
 	easyhandle = curl_easy_init();
+
+	curl_easy_setopt(easyhandle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+	const std::string doh_result = g_DohWorker->GetDOHResolve(url);
+	if (g_DohWorker->m_bDohAvailable)
+	{
+		struct curl_slist* host = nullptr;
+		const std::string addr = g_DohWorker->ExtractDomain(url) + ":443:" + doh_result;
+		host = curl_slist_append(nullptr, addr.c_str());
+		curl_easy_setopt(easyhandle, CURLOPT_RESOLVE, host);
+	}
+	else
+	{
+		// spdlog::warn("[DOH] service is not available. falling back to DNS");
+	}
+
 
 	curl_easy_setopt(easyhandle, CURLOPT_URL, url.data());
 	curl_easy_setopt(easyhandle, CURLOPT_FAILONERROR, 1L);
