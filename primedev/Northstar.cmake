@@ -34,6 +34,8 @@ add_library(
     "client/r2client.cpp"
     "client/r2client.h"
     "client/rejectconnectionfixes.cpp"
+    "client/tui.cpp"
+    "client/tui.h"
     "config/profile.cpp"
     "config/profile.h"
     "core/convar/concommand.cpp"
@@ -152,6 +154,8 @@ add_library(
     "server/r2server.h"
     "server/serverchathooks.cpp"
     "server/serverchathooks.h"
+    "server/tui.cpp"
+    "server/tui.h"
     
     "server/serverpresence.cpp"
     "server/serverpresence.h"
@@ -168,6 +172,7 @@ add_library(
     "shared/misccommands.h"
     "shared/playlist.cpp"
     "shared/playlist.h"
+    "shared/tui_protocol.h"
     "squirrel/squirrel.cpp"
     "squirrel/squirrel.h"
     "squirrel/squirrelautobind.cpp"
@@ -230,6 +235,8 @@ target_link_libraries(
             bcrypt.lib
             version.lib
     )
+
+target_link_libraries(NorthstarDLL PRIVATE zlibstatic)
 
 target_precompile_headers(
     NorthstarDLL

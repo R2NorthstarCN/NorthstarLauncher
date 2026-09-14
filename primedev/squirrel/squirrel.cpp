@@ -10,6 +10,8 @@
 #include "plugins/pluginmanager.h"
 #include "ns_version.h"
 #include "core/vanilla.h"
+#include "client/tui.h"
+#include "server/tui.h"
 
 #include "vscript/vscript.h"
 
@@ -237,6 +239,11 @@ template <ScriptContext context> void SquirrelManager<context>::VMDestroyed()
 	}
 
 	g_pPluginManager->InformSqvmDestroying(m_pSQVM);
+
+	if constexpr (context == ScriptContext::CLIENT)
+		ClearClientTUIs();
+	if constexpr (context == ScriptContext::SERVER)
+		ResetServerTUIStates();
 
 	// Discard the previous vm and delete the message buffer.
 	m_pSQVM = nullptr;

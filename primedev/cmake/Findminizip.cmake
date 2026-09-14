@@ -36,6 +36,12 @@ if(NOT minizip_FOUND)
         )
 
     add_subdirectory(${PROJECT_SOURCE_DIR}/primedev/thirdparty/minizip minizip)
+
+    # make the zlib instance fetched by minizip usable by first party code
+    get_target_property(zlib_SOURCE_DIR zlibstatic SOURCE_DIR)
+    get_target_property(zlib_BINARY_DIR zlibstatic BINARY_DIR)
+    target_include_directories(zlibstatic INTERFACE "$<BUILD_INTERFACE:${zlib_SOURCE_DIR}>" "$<BUILD_INTERFACE:${zlib_BINARY_DIR}>")
+
     set(minizip_FOUND
         1
         PARENT_SCOPE

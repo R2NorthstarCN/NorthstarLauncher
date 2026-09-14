@@ -14,6 +14,7 @@
 #include "engine/r2engine.h"
 #include "client/r2client.h"
 #include "server/r2server.h"
+#include "server/tui.h"
 #include "scripts/scriptmasterservermessages.h"
 #include "cpp-httplib/httplib.h"
 #include "nlohmann/json.hpp"
@@ -434,6 +435,8 @@ static void h_CBaseClient__Disconnect(CBaseClient* self, uint32_t unknownButAlwa
 	}
 
 	g_pServerPresence->SetPlayerCount((int)g_pServerAuthentication->m_PlayerAuthenticationData.size());
+
+	ResetPlayerTUIState(self - g_pClientArray);
 
 	o_pCBaseClient__Disconnect(self, unknownButAlways1, buf);
 }
