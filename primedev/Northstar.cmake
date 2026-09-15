@@ -1,19 +1,16 @@
 # NorthstarDLL
-set(OPENSSL_USE_STATIC_LIBS TRUE)
-set(ENV{OPENSSL_ROOT_DIR} "C:/Program Files/OpenSSL-Win64")
-set(OPENSSL_MSVC_STATIC_RT TRUE)
 find_package(minhook REQUIRED)
 find_package(libcurl REQUIRED)
 find_package(minizip REQUIRED)
 find_package(silver-bun REQUIRED)
 find_package(nlohmann-json REQUIRED)
-find_package(OpenSSL REQUIRED)
+find_package(libressl REQUIRED)
 find_package(httplib COMPONENTS OpenSSL)
 
 add_library(
     NorthstarDLL SHARED
     "resources.rc"
-	"core/anticheat.cpp"
+    "core/anticheat.cpp"
     "core/anticheat.h"
 
     "client/audio.cpp"
@@ -87,7 +84,7 @@ add_library(
     "logging/sourceconsole.h"
     "masterserver/masterserver.cpp"
     "masterserver/masterserver.h"
-	"masterserver/cabundle.h"
+    "masterserver/cabundle.h"
     "mods/autodownload/moddownloader.h"
     "mods/autodownload/moddownloader.cpp"
     "mods/compiled/kb_act.cpp"
@@ -108,7 +105,7 @@ add_library(
     "plugins/plugins.h"
     "plugins/pluginmanager.h"
     "plugins/pluginmanager.cpp"
-	"scripts/clantag.cpp"
+    "scripts/clantag.cpp"
     "scripts/client/clientchathooks.cpp"
     "scripts/client/cursorposition.cpp"
     "scripts/client/scriptbrowserhooks.cpp"
@@ -117,12 +114,12 @@ add_library(
     "scripts/client/scriptoriginauth.cpp"
     "scripts/client/scriptserverbrowser.cpp"
     "scripts/client/scriptservertoclientstringcommand.cpp"
-	"scripts/server/scriptuserinfo.cpp"
+    "scripts/server/scriptuserinfo.cpp"
     "scripts/scriptmasterservermessages.cpp"
     "scripts/scriptmasterservermessages.h"
     "scripts/scriptgamestate.cpp"
     "scripts/scriptsvm.cpp"
-    
+
     "scripts/scriptgamestate.h"
     "scripts/scriptgamestate.cpp"
     "scripts/scriptmatchmakingevents.h"
@@ -152,7 +149,7 @@ add_library(
     "server/r2server.h"
     "server/serverchathooks.cpp"
     "server/serverchathooks.h"
-    
+
     "server/serverpresence.cpp"
     "server/serverpresence.h"
     "shared/exploit_fixes/exploitfixes.cpp"
@@ -184,7 +181,7 @@ add_library(
     "util/version.h"
     "util/wininfo.cpp"
     "util/wininfo.h"
-	"util/base64.cpp"
+    "util/base64.cpp"
     "util/base64.h"
     "util/dohworker.cpp"
     "util/dohworker.h"
@@ -215,10 +212,10 @@ add_library(
 target_link_libraries(
     NorthstarDLL
     PRIVATE nlohmann_json::nlohmann_json
-	        OpenSSL::SSL
-			OpenSSL::Crypto
-			httplib::httplib
-			minhook
+            ssl
+            crypto
+            httplib::httplib
+            minhook
             libcurl
             minizip
             silver-bun
@@ -234,8 +231,7 @@ target_link_libraries(
 
 target_precompile_headers(
     NorthstarDLL
-    PRIVATE
-    pch.h
+    PRIVATE pch.h
     )
 
 target_compile_definitions(
@@ -243,7 +239,6 @@ target_compile_definitions(
     PRIVATE UNICODE
             _UNICODE
             CURL_STATICLIB
-
     )
 
 set_target_properties(
