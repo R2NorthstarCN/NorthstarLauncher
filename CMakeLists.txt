@@ -5,6 +5,10 @@ cmake_policy(
     NEW
     )
 
+if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 project(
     Northstar
     CXX
