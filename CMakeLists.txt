@@ -27,7 +27,7 @@ endif()
 
 # CJK
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8 /Zi")
 endif()
 # Language specs
 set(CMAKE_CXX_STANDARD 20)
