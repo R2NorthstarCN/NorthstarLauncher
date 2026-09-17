@@ -38,6 +38,10 @@ if(NOT libcurl_FOUND)
         CACHE STRING "Disable CA Path"
         )
 
+    if(NOT DEFINED HAVE_IOCTLSOCKET_FIONBIO)
+        set(HAVE_IOCTLSOCKET_FIONBIO 1)
+    endif()
+
     add_subdirectory(${PROJECT_SOURCE_DIR}/primedev/thirdparty/libcurl libcurl)
     set(libcurl_FOUND
         1

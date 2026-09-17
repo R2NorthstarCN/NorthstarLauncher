@@ -5,6 +5,10 @@ cmake_policy(
     NEW
     )
 
+if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 project(
     Northstar
     CXX
@@ -23,7 +27,7 @@ endif()
 
 # CJK
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8 /Zi")
 endif()
 # Language specs
 set(CMAKE_CXX_STANDARD 20)
@@ -55,7 +59,3 @@ include_directories(primedev/thirdparty)
 
 # Targets
 add_subdirectory(primedev)
-# Forces Minizip to not use functions that are not available in Win 7 libraries.
-if(WIN32)
-    target_compile_definitions(minizip PUBLIC -D_WIN32_WINNT=0x0601)
-endif()
