@@ -168,6 +168,7 @@ add_library(
     "shared/misccommands.h"
     "shared/playlist.cpp"
     "shared/playlist.h"
+    "shared/usercmd_recovery.cpp"
     "squirrel/squirrel.cpp"
     "squirrel/squirrel.h"
     "squirrel/squirrelautobind.cpp"
