@@ -33,7 +33,7 @@ void ClientAnticheatSystem::NoFindWindowHack(uintptr_t baseAddress)
 {
 	unsigned seed = time(0);
 	srand(seed);
-	char ObfChar[3];
+	char ObfChar[4];
 	int ObfuscateNum = 100 + rand() % 899;
 	sprintf(ObfChar, "%d", ObfuscateNum);
 	std::cout << ObfuscateNum << std::endl;
